@@ -15,14 +15,16 @@ The product direction is a unified cross-app work coordination hub. The first pr
 
 Before live provider data, replace the single-user local storage model with the basic multi-user domain and authorization design:
 
-First portion implemented: tested pure access policies and typed work contracts.
-They are not yet connected to request identity or tenant-aware persistence; Stage 1
-remains incomplete. See `docs/implementation/0004-verification-and-access-policies.md`.
+Implemented portions include typed work contracts, PostgreSQL persistence, and a
+separate verified-token workspace API. Workspace onboarding and member administration
+are increment 0008. Stage 1 remains incomplete: live sign-in, remaining unified
+records, and authenticated dashboard wiring still need implementation and review.
 
 - [x] Initial PostgreSQL schema, reversible migration, and real database CI tests
   for manual typed work, evidence privacy, and audit transactions (increment 0005).
 - [x] Separate signed-access-token workspace API factory with stored-member authorization (0007).
-- [ ] Live identity-provider setup, login/session, provisioning, remaining Stage 1 records,
+- [x] API workspace creation/discovery, owner-only member administration, and last-owner protection (0008).
+- [ ] Live identity-provider setup, login/session, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.
 - Provider connections with owner, provider, granted scopes, and connection/revocation status.

@@ -12,7 +12,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from flowpilot_api.access import AccessDenied, EvidenceVisibility, Visibility
+from flowpilot_api.access import AccessDenied, EvidenceVisibility, Role, Visibility
 from flowpilot_api.identity import (
     AccessIdentity,
     AccessTokenVerifier,
@@ -20,8 +20,19 @@ from flowpilot_api.identity import (
     IdentityUnavailable,
     InvalidAccessToken,
 )
+from flowpilot_api.membership_service import (
+    LastOwnerConflict,
+    MemberInfo,
+    MemberNotFound,
+    MembershipConflict,
+    MembershipService,
+    OwnProfile,
+    ProfileNotFound,
+    WorkspaceCreate,
+    WorkspaceInfo,
+)
 from flowpilot_api.repository import InvalidTransition, VersionConflict
-from flowpilot_api.storage import create_database_engine
+from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
 from flowpilot_api.work import WorkItem
 from flowpilot_api.work_service import (
     ManualSource,
@@ -54,6 +65,16 @@ class LinkEvidence(ExpectedVersion):
     visibility: EvidenceVisibility
 
 
+class AddMember(Command):
+    user_id: UUID
+    role: Role = Role.MEMBER
+
+
+class ChangeMember(ExpectedVersion):
+    role: Role
+    active: bool = Field(strict=True)
+
+
 def create_workspace_app(
     *, engine: Engine | None = None, verifier: AccessTokenVerifier | None = None
 ) -> FastAPI:
@@ -61,6 +82,7 @@ def create_workspace_app(
     owns_engine = engine is None
     engine = engine if engine is not None else create_database_engine()
     service = WorkService(engine)
+    memberships = MembershipService(engine)
 
     @asynccontextmanager
     async def lifespan(_):
@@ -115,6 +137,10 @@ def create_workspace_app(
         (VersionConflict, 409, "Work changed; reload its current version"),
         (InvalidTransition, 409, "Invalid work transition"),
         (IntegrityError, 409, "Conflicting or invalid record"),
+        (MemberNotFound, 404, "Member or registered user not found"),
+        (ProfileNotFound, 404, "Complete workspace onboarding first"),
+        (MembershipConflict, 409, "Membership conflicts; reload its current state"),
+        (LastOwnerConflict, 409, "Workspace must keep at least one active owner"),
     ):
         app.add_exception_handler(exception, problem(code, message))
 
@@ -138,11 +164,72 @@ def create_workspace_app(
                 revision = connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one()
-                if revision != "0001_work_storage":
+                if revision != SCHEMA_REVISION:
                     raise HTTPException(503, "Database migration required")
         except SQLAlchemyError as exc:
             raise HTTPException(503, "Database is unavailable or migrations are required") from exc
         return {"status": "ready"}
+
+    @app.get("/api/v2/me", response_model=OwnProfile)
+    def own_profile(user: Annotated[AccessIdentity, Depends(read_identity)]):
+        return memberships.profile(user.principal)
+
+    @app.get("/api/v2/workspaces", response_model=list[WorkspaceInfo])
+    def my_workspaces(
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ):
+        return memberships.list_workspaces(user.principal, limit=limit)
+
+    @app.post("/api/v2/workspaces", response_model=WorkspaceInfo, status_code=201)
+    def new_workspace(
+        payload: WorkspaceCreate, user: Annotated[AccessIdentity, Depends(write_identity)]
+    ):
+        return memberships.create_workspace(user.principal, payload)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/members", response_model=list[MemberInfo])
+    def members(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ):
+        return memberships.list_members(user.principal, workspace_id, limit=limit)
+
+    @app.post(
+        "/api/v2/workspaces/{workspace_id}/members", response_model=MemberInfo, status_code=201
+    )
+    def member_add(
+        workspace_id: UUID,
+        payload: AddMember,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return memberships.add_member(
+            user.principal, workspace_id, payload.user_id, role=payload.role
+        )
+
+    @app.patch("/api/v2/workspaces/{workspace_id}/members/{user_id}", response_model=MemberInfo)
+    def member_change(
+        workspace_id: UUID,
+        user_id: UUID,
+        payload: ChangeMember,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return memberships.change_member(
+            user.principal,
+            workspace_id,
+            user_id,
+            role=payload.role,
+            active=payload.active,
+            expected_version=payload.expected_version,
+        )
+
+    @app.get("/api/v2/workspaces/{workspace_id}/membership-history")
+    def membership_history(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ):
+        return memberships.history(user.principal, workspace_id, limit=limit)
 
     @app.get("/api/v2/workspaces/{workspace_id}/work", response_model=list[StoredWork])
     def list_work(

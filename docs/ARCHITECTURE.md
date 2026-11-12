@@ -22,24 +22,37 @@ Human approval → idempotent executor → provider verification
 
 ## Current code and next persistence step
 
-The current code has FastAPI routes, Pydantic schemas, a deterministic commitment lifecycle, and a SQLite repository. It is a local synthetic-data scaffold, not the product's multi-user storage design.
-
-The next data-model segment should move persistence to PostgreSQL with SQLAlchemy and Alembic migrations. It must introduce users, workspaces, memberships, provider connections, source items, source evidence, typed work items, proposals, approvals, executions, and audit events. Every tenant-owned record needs a workspace key and server-enforced authorization. The selected authentication provider and deployment target are still undecided; avoid inventing them in the domain layer.
+The default local dashboard uses the legacy SQLite adapter. A separate verified
+workspace API uses PostgreSQL, SQLAlchemy transactions, and Alembic migrations for
+users, workspaces, memberships, manual sources, evidence, typed work, and audit.
+Workspace onboarding and owner-only membership administration are increment 0008.
+Provider connections, projects, proposals, approvals, and executions remain future
+records. Every tenant-owned record needs a workspace key and server-enforced
+authorization. The live authentication provider/session flow remains unconfigured;
+AWS is the planned later deployment target.
 
 ## Module boundaries
+
+Increment 0008 adds `MembershipService` and a shared stored-membership resolver.
+Workspace creation establishes the verified caller as owner with an atomic audit.
+Role/active-state changes lock the workspace before actor/target memberships and
+require the target version, serializing last-owner decisions. The new migration
+adds membership versions and immutable workspace history; it rejects pre-existing
+ownerless workspaces rather than guessing an owner. No invitation delivery or
+browser login is implemented.
 
 Increment 0007 adds a separate `workspace_api:create_workspace_app` factory with
 signed access-token verification and API scopes before invoking the PostgreSQL
 service. Its request identities are verified issuer/subject pairs. It does not
-mount legacy routes or the dashboard. A real identity provider, login/session flow,
-and provisioning remain unconfigured; see implementation 0007 for token-profile
+mount legacy routes or the dashboard. A real identity provider and browser login/session
+flow remain unconfigured; API onboarding is now in 0008. See implementation 0007 for token-profile
 requirements and the explicit separation from the local demo.
 
 Increment 0005 adds PostgreSQL migrations and an internal `WorkService` using
 SQLAlchemy transactions and psycopg. The service resolves issuer/subject through
 stored membership on every operation, scopes queries by workspace and visibility,
 and commits state plus audit together. Composite foreign keys prevent tenant-mixed
-relationships. It has no HTTP routes and no verified authentication adapter yet.
+relationships. Increment 0007 wraps it with separately verified HTTP routes.
 The dashboard still uses the separate legacy SQLite API. See implementation 0005
 for the exact storage boundary and deferred records.
 

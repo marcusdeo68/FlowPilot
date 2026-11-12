@@ -90,3 +90,8 @@ The separate bearer-verified workspace API is described in
 [implementation 0007](docs/implementation/0007-verified-workspace-api.md). It requires
 explicit identity/PostgreSQL configuration and does not provide browser login or
 replace the local dashboard. Keep both applications on loopback with synthetic data.
+
+Verified-user workspace creation/discovery and owner-only membership management
+are documented in [implementation 0008](docs/implementation/0008-workspace-onboarding.md).
+This removes manual user/workspace SQL setup once a compatible access token is
+available; live sign-in configuration and dashboard migration remain future work.

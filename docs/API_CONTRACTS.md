@@ -45,7 +45,8 @@ Allowed transitions are documented in `docs/ROADMAP.md` and enforced by server-s
 Factory: `flowpilot_api.workspace_api:create_workspace_app`. This factory mounts
 no legacy `/api/v1` endpoints or dashboard. Configuration and accepted token profile
 are in [implementation 0007](implementation/0007-verified-workspace-api.md).
-It has no live sign-in/provider/provisioning flow yet.
+It has no live provider or browser sign-in flow yet. Increment 0008 adds API
+workspace onboarding and membership administration using the same verified tokens.
 
 All resource endpoints require a verified bearer access token and `flowpilot:read`;
 writes additionally require `flowpilot:write`. Stored membership/role and object
@@ -85,6 +86,31 @@ dependency failure 503. Error responses do not return SQL values or token conten
 Public `/healthz` checks process liveness; `/readyz` checks the PostgreSQL revision.
 Neither grants access to resources. These operations do not approve or execute any
 email, calendar, or provider side effect.
+
+## Workspace onboarding and administration (increment 0008)
+
+| Method and path | Contract |
+| --- | --- |
+| `GET /api/v2/me` | Own internal user ID; 404 before onboarding |
+| `GET /api/v2/workspaces?limit=50` | Caller's active workspaces only; empty for a new identity |
+| `POST /api/v2/workspaces` | `{ "name": "Synthetic team" }`; atomically registers verified identity if needed, creates workspace/owner and audit; 201 |
+| `GET /api/v2/workspaces/{id}/members?limit=50` | Owner-only active/inactive members with versions |
+| `POST /api/v2/workspaces/{id}/members` | `{ "user_id": "UUID", "role": "member" }`; owner grants already registered same-issuer user membership; 201 |
+| `PATCH /api/v2/workspaces/{id}/members/{user_id}` | Explicit `role`, strict boolean `active`, and positive integer `expected_version`; owner-only |
+| `GET /api/v2/workspaces/{id}/membership-history?limit=50` | Owner-only attributed permission history |
+
+Read/write scopes follow the rules above. The create-workspace caller cannot choose
+an owner identity or self-assert a role in JSON. A role change, removal, or reactivation
+requires the current membership version. Stale/duplicate/no-op changes and last-owner
+removal/demotion return 409; unknown targets return 404 and denied administration
+returns 403. Lists cap at 100; full pagination remains future work.
+
+An inactive member is denied subsequent work/source requests even if their bearer
+token has not expired. Their private source ownership is not transferred. An owner
+must explicitly grant another active owner before leaving. This is manual membership
+granting, not a delivered email invitation or an invitation acceptance workflow.
+Workspace creation is not idempotent: do not retry automatically after an ambiguous
+timeout. See [implementation 0008](implementation/0008-workspace-onboarding.md).
 
 ## Remaining cross-app contract (design only)
 

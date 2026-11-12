@@ -2,7 +2,11 @@
 
 ## Current risk boundary
 
-The current API is a local development scaffold with no authentication or user/workspace authorization. Run it only on `127.0.0.1`, use synthetic data, and do not expose or deploy it. It has no provider credentials or model APIs. Do not connect a personal inbox, chat account, notes account, or calendar to this version.
+The default dashboard/legacy API is a local development scaffold without identity
+or workspace authorization. The separate workspace API verifies access tokens and
+stored membership, but has no real provider/browser login configured and remains
+local-only too. Run both on `127.0.0.1` with synthetic data. Do not expose/deploy
+either or connect personal email, chat, notes, or calendar accounts yet.
 
 ## Implemented in the local scaffold
 
@@ -27,7 +31,7 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 Increment 0007's separate API verifies configured RS256 access tokens and resolves
 stored memberships. It has no live identity-provider setup or browser login yet.
 The legacy dashboard remains unauthenticated. Signing-key refresh is throttled;
-request limits, HTTPS/proxy deployment, provisioning, retention, and operational
+request limits, HTTPS/proxy deployment, browser login, invitation consent, retention, and operational
 controls remain open; keep both factories local and synthetic. See implementation
 0007 for the accepted token profile, trusted key endpoint, and provider review.
 
@@ -35,8 +39,17 @@ Increment 0005 implements internal PostgreSQL service checks for active stored
 membership, workspace isolation, source ownership, evidence projection, and atomic
 audit. Increment 0007 separately wraps that service with verified access-token requests.
 The old HTTP API remains unauthenticated. Separate database runtime/migration roles,
-retention/deletion, membership administration, backups, and deployment controls
+retention/deletion, backups, and deployment controls
 remain required. Test database credentials in CI/Compose are synthetic only.
+
+Increment 0008 adds owner-only membership administration with exact versions,
+workspace-serialized last-owner checks, and atomic append-only permission history.
+New workspaces register only the verified issuer/subject as their owner. Grants
+target already registered same-issuer users by ID; there is no public user search
+or email delivery. Deactivation denies later workspace operations, retains private
+ownership/audit attribution, and does not revoke an identity's unrelated memberships.
+Direct database administration can bypass application invariants; runtime database
+roles and reviewed invitation consent are still deployment requirements.
 
 - Authentication and server-side workspace/member/role authorization.
 - Tenant isolation tests and review of every query and background job for object-level access checks.
