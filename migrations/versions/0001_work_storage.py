@@ -56,6 +56,7 @@ def upgrade():
         ),
         member_fk("owner_id"),
         sa.UniqueConstraint("workspace_id", "owner_id", "reference"),
+        sa.UniqueConstraint("workspace_id", "id"),
         sa.UniqueConstraint("workspace_id", "id", "owner_id"),
         sa.CheckConstraint("length(trim(reference)) BETWEEN 1 AND 300"),
         sa.CheckConstraint("length(trim(summary)) BETWEEN 1 AND 500"),
@@ -130,7 +131,8 @@ def upgrade():
         "audit_events",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("workspace_id", sa.Uuid(), nullable=False),
-        sa.Column("work_id", sa.Uuid(), nullable=False),
+        sa.Column("work_id", sa.Uuid()),
+        sa.Column("source_id", sa.Uuid()),
         sa.Column("actor_id", sa.Uuid(), nullable=False),
         sa.Column("operation", sa.String(40), nullable=False),
         sa.Column("from_status", sa.String(20)),
@@ -143,7 +145,14 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["workspace_id", "work_id"], ["work_items.workspace_id", "work_items.id"]
         ),
-        sa.CheckConstraint("operation IN ('created','status_changed','shared','evidence_linked')"),
+        sa.ForeignKeyConstraint(
+            ["workspace_id", "source_id"], ["source_items.workspace_id", "source_items.id"]
+        ),
+        sa.CheckConstraint("""
+            (source_id IS NOT NULL AND work_id IS NULL AND operation = 'source_created')
+            OR (work_id IS NOT NULL AND source_id IS NULL
+                AND operation IN ('created','status_changed','shared','evidence_linked'))
+        """),
         sa.CheckConstraint("version >= 1"),
     )
     op.create_index("ix_audit_work", "audit_events", ["workspace_id", "work_id", "version"])

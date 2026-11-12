@@ -56,7 +56,8 @@ version evidence and require renewed consent when an approved excerpt changes.
 Editing/revoking a share and retention/deletion workflows remain future commands.
 The sharing decision stores actor, time, and selected visibility in evidence_links.
 Audit history deliberately stores operation, actor, status, and version rather
-than message content. Manual source creation is not yet in the work audit stream.
+than message content. Manual source creation adds a source-targeted audit event
+in the same transaction; it is excluded from work history and has no body text.
 
 An owner can retrieve their own manual source by ID through the internal service;
 other viewers receive SourceNotFound even if they can read a shared excerpt.

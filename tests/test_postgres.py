@@ -360,3 +360,39 @@ def test_database_type_constraint_cannot_be_bypassed(setup):
                 text("UPDATE work_items SET status='confirmed' WHERE id=:id"), {"id": item.id}
             )
     assert service.get_work(principal(), workspace, item.id).data.status == "open"
+
+
+def test_source_audit_commits_with_source_and_rolls_back_on_failure(setup):
+    service, workspace, _, users = setup
+    source = service.create_source(
+        principal(),
+        workspace,
+        ManualSource(reference="first", summary="Summary", excerpt="Private"),
+    )
+    with service.engine.begin() as connection:
+        event = (
+            connection.execute(
+                text("SELECT * FROM audit_events WHERE source_id=:source"), {"source": source}
+            )
+            .mappings()
+            .one()
+        )
+        assert event["operation"] == "source_created"
+        assert event["actor_id"] == users["owner"]
+        assert event["work_id"] is None
+        connection.execute(
+            text("""CREATE FUNCTION fail_source_audit() RETURNS trigger
+            LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'source audit failure'; END; $$""")
+        )
+        connection.execute(
+            text("""CREATE TRIGGER fail_source_audit BEFORE INSERT ON audit_events
+            FOR EACH ROW EXECUTE FUNCTION fail_source_audit()""")
+        )
+    with pytest.raises(DBAPIError, match="source audit failure"):
+        service.create_source(
+            principal(),
+            workspace,
+            ManualSource(reference="rolled-back", summary="Summary", excerpt="Private"),
+        )
+    with service.engine.begin() as connection:
+        assert connection.execute(text("SELECT count(*) FROM source_items")).scalar_one() == 1

@@ -309,6 +309,17 @@ class WorkService:
                     **data.model_dump(),
                 },
             )
+            connection.execute(
+                text("""INSERT INTO audit_events
+                (id, workspace_id, source_id, actor_id, operation, version)
+                VALUES (:id, :workspace, :source, :actor, 'source_created', 1)"""),
+                {
+                    "id": uuid4(),
+                    "workspace": workspace_id,
+                    "source": source_id,
+                    "actor": member.user_id,
+                },
+            )
             return source_id
 
     def get_source(self, principal: Principal, workspace_id: UUID, source_id: UUID) -> ManualSource:
