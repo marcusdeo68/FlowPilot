@@ -26,7 +26,8 @@ The default local dashboard uses the legacy SQLite adapter. A separate verified
 workspace API uses PostgreSQL, SQLAlchemy transactions, and Alembic migrations for
 users, workspaces, memberships, manual sources, evidence, typed work, and audit.
 Workspace onboarding and owner-only membership administration are increment 0008.
-Provider connections, projects, proposals, approvals, and executions remain future
+Private task proposals and review history are increment 0009. Provider connections,
+projects, action proposals, approvals, and executions remain future
 records. Every tenant-owned record needs a workspace key and server-enforced
 authorization. The live authentication provider/session flow remains unconfigured;
 AWS is the planned later deployment target.

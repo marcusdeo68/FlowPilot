@@ -95,3 +95,6 @@ Verified-user workspace creation/discovery and owner-only membership management
 are documented in [implementation 0008](docs/implementation/0008-workspace-onboarding.md).
 This removes manual user/workspace SQL setup once a compatible access token is
 available; live sign-in configuration and dashboard migration remain future work.
+
+For a worked example of turning a synthetic note into an accepted private task,
+see [the source review walkthrough](docs/implementation/0009-private-task-review.md).

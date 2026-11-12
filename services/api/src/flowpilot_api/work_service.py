@@ -161,43 +161,55 @@ class WorkService:
         *,
         visibility: Visibility = Visibility.PRIVATE,
     ) -> StoredWork:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id, write=True)
+            return self.insert_authorized_work(connection, member, data, visibility=visibility)
+
+    def insert_authorized_work(
+        self,
+        connection: Connection,
+        member: Membership,
+        data: Commitment | Task | Event,
+        *,
+        visibility: Visibility,
+    ) -> StoredWork:
+        """Insert and audit using the caller's already-authorized transaction."""
         if visibility not in (Visibility.PRIVATE, Visibility.WORKSPACE):
             raise ValueError("Invalid visibility")
         initial = {"task": "open", "commitment": "detected", "event": "scheduled"}
         if data.status != initial[data.kind]:
             raise InvalidTransition("Creation requires the initial state")
-        with self.engine.begin() as connection:
-            member = self._member(connection, principal, workspace_id, write=True)
-            values = {
-                "id": uuid4(),
-                "workspace": workspace_id,
-                "user": member.user_id,
-                "kind": data.kind,
-                "title": data.title,
-                "description": data.description,
-                "status": data.status,
-                "visibility": visibility,
-                "due_date": getattr(data, "due_date", None),
-                "starts_at": getattr(data, "starts_at", None),
-                "ends_at": getattr(data, "ends_at", None),
-                "time_zone": getattr(data, "time_zone", None),
-            }
-            row = (
-                connection.execute(
-                    text("""
-                INSERT INTO work_items (id, workspace_id, creator_id, owner_id, kind, title,
-                    description, status, visibility, due_date, starts_at, ends_at, time_zone)
-                VALUES (:id, :workspace, :user, :user, :kind, :title, :description, :status,
-                    :visibility, :due_date, :starts_at, :ends_at, :time_zone) RETURNING *
-            """),
-                    values,
-                )
-                .mappings()
-                .one()
+        workspace_id = member.workspace_id
+        values = {
+            "id": uuid4(),
+            "workspace": workspace_id,
+            "user": member.user_id,
+            "kind": data.kind,
+            "title": data.title,
+            "description": data.description,
+            "status": data.status,
+            "visibility": visibility,
+            "due_date": getattr(data, "due_date", None),
+            "starts_at": getattr(data, "starts_at", None),
+            "ends_at": getattr(data, "ends_at", None),
+            "time_zone": getattr(data, "time_zone", None),
+        }
+        row = (
+            connection.execute(
+                text("""
+            INSERT INTO work_items (id, workspace_id, creator_id, owner_id, kind, title,
+                description, status, visibility, due_date, starts_at, ends_at, time_zone)
+            VALUES (:id, :workspace, :user, :user, :kind, :title, :description, :status,
+                :visibility, :due_date, :starts_at, :ends_at, :time_zone) RETURNING *
+        """),
+                values,
             )
-            item = _stored(row)
-            self._audit(connection, member, item, "created")
-            return item
+            .mappings()
+            .one()
+        )
+        item = _stored(row)
+        self._audit(connection, member, item, "created")
+        return item
 
     def get_work(self, principal: Principal, workspace_id: UUID, work_id: UUID) -> StoredWork:
         with self.engine.begin() as connection:
