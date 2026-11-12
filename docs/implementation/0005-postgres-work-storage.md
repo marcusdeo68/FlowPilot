@@ -1,6 +1,6 @@
 # Implementation 0005 - PostgreSQL work storage and authorized services
 
-Status: implementation in progress; verification results are recorded below.
+Status: internal storage/service slice implemented; hosted verification in progress.
 The PostgreSQL adapter is an internal synthetic-data foundation. The dashboard
 continues to use its existing unauthenticated SQLite API.
 
@@ -58,6 +58,9 @@ The sharing decision stores actor, time, and selected visibility in evidence_lin
 Audit history deliberately stores operation, actor, status, and version rather
 than message content. Manual source creation is not yet in the work audit stream.
 
+An owner can retrieve their own manual source by ID through the internal service;
+other viewers receive SourceNotFound even if they can read a shared excerpt.
+
 ## Constraints as a second boundary
 
 Composite foreign keys include workspace identity. Linking work in workspace A
@@ -68,7 +71,7 @@ still has a historical row, so the service must recheck active membership.
 
 PostgreSQL checks enforce valid kind/status combinations and event intervals.
 Pydantic additionally validates IANA zones and offset-aware timestamp inputs.
-Database triggers reject audit updates/deletes. Database administrators can still
+Database triggers reject audit updates/deletes and TRUNCATE. Administrators can still
 alter triggers; before deployment use separate migration/runtime roles, backups,
 and a reviewed database permission model. Row-level security is not enabled.
 

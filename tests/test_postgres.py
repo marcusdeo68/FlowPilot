@@ -247,9 +247,14 @@ def test_database_rejects_cross_workspace_relationships(setup):
 def test_audit_is_atomic_and_append_only(setup):
     service, workspace, _, _ = setup
     item = service.create_work(principal(), workspace, Task(title="Transaction"))
-    with pytest.raises(DBAPIError, match="append-only"):
-        with service.engine.begin() as connection:
-            connection.execute(text("DELETE FROM audit_events"))
+    for statement in (
+        "DELETE FROM audit_events",
+        "UPDATE audit_events SET version=2",
+        "TRUNCATE audit_events",
+    ):
+        with pytest.raises(DBAPIError, match="append-only"):
+            with service.engine.begin() as connection:
+                connection.execute(text(statement))
     with service.engine.begin() as connection:
         connection.execute(
             text("""CREATE FUNCTION fail_audit_insert() RETURNS trigger
@@ -294,3 +299,64 @@ def test_event_persists_aware_instants(setup):
     saved = service.get_work(principal(), workspace, item.id)
     assert saved.data.starts_at == event.starts_at
     assert saved.data.time_zone == event.time_zone
+
+
+def test_source_privacy_and_cross_workspace_links(setup):
+    service, workspace, other, users = setup
+    data = ManualSource(reference="synthetic-source", summary="Summary", excerpt="Private excerpt")
+    source = service.create_source(principal("outsider"), other, data)
+    assert service.get_source(principal("outsider"), other, source) == data
+    with pytest.raises(SourceNotFound):
+        service.get_source(principal(), workspace, source)
+    own_source = service.create_source(principal("member"), workspace, data)
+    with pytest.raises(SourceNotFound):
+        service.get_source(principal(), workspace, own_source)
+    item = service.create_work(principal(), workspace, Task(title="Unrelated"))
+    with pytest.raises(SourceNotFound):
+        service.link_evidence(
+            principal(),
+            workspace,
+            item.id,
+            source,
+            visibility=EvidenceVisibility.EXCERPT_SHARED,
+            expected_version=1,
+        )
+    with pytest.raises(IntegrityError):
+        with service.engine.begin() as connection:
+            connection.execute(
+                text("""INSERT INTO evidence_links
+                (workspace_id, work_id, source_id, source_owner_id, visibility)
+                VALUES (:workspace, :work, :source, :owner, 'private')"""),
+                {
+                    "workspace": workspace,
+                    "work": item.id,
+                    "source": source,
+                    "owner": users["outsider"],
+                },
+            )
+    assert service.evidence(principal(), workspace, item.id) == []
+
+
+def test_identity_issuer_and_stored_role_are_authoritative(setup):
+    service, workspace, _, users = setup
+    with pytest.raises(AccessDenied):
+        service.list_work(Principal("unverified-other-issuer", "owner"), workspace)
+    with service.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE memberships SET role='observer' WHERE user_id=:user"),
+            {"user": users["owner"]},
+        )
+    assert service.list_work(principal(), workspace) == []
+    with pytest.raises(AccessDenied):
+        service.create_work(principal(), workspace, Task(title="Old owner role must not survive"))
+
+
+def test_database_type_constraint_cannot_be_bypassed(setup):
+    service, workspace, _, _ = setup
+    item = service.create_work(principal(), workspace, Task(title="Typed task"))
+    with pytest.raises(IntegrityError):
+        with service.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE work_items SET status='confirmed' WHERE id=:id"), {"id": item.id}
+            )
+    assert service.get_work(principal(), workspace, item.id).data.status == "open"

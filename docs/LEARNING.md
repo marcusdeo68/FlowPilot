@@ -44,6 +44,17 @@ Read `uv.lock` and `.github/workflows/ci.yml`: explain how a lock and fresh CI
 environment reduce "works on my machine" failures. Track current gaps and the
 next implementation milestone in [STATUS.md](STATUS.md).
 
+## PostgreSQL and migration exercises (increment 0005)
+
+Read `migrations/versions/0001_work_storage.py`: find a composite foreign key.
+Explain which accidental cross-workspace relationship it blocks and why it cannot
+decide whether a member is active. Trace a service transition from `_member` to
+the work row lock, expected-version check, UPDATE RETURNING, and audit insertion.
+
+Read `tests/test_postgres.py`: explain why each test uses its own schema and why
+the test database must be explicitly named. Compare a migration downgrade on a
+disposable test database with running that command on retained development data.
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)

@@ -311,6 +311,22 @@ class WorkService:
             )
             return source_id
 
+    def get_source(self, principal: Principal, workspace_id: UUID, source_id: UUID) -> ManualSource:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            row = (
+                connection.execute(
+                    text("""SELECT reference, summary, excerpt FROM source_items
+                WHERE workspace_id = :workspace AND id = :id AND owner_id = :user"""),
+                    {"workspace": workspace_id, "id": source_id, "user": member.user_id},
+                )
+                .mappings()
+                .first()
+            )
+            if row is None:
+                raise SourceNotFound
+            return ManualSource.model_validate(dict(row))
+
     def link_evidence(
         self,
         principal: Principal,

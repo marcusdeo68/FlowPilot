@@ -71,3 +71,13 @@ GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
 The access policy and typed-work modules are groundwork for Stage 1; the current
 commitment endpoints still have no identity or workspace authorization. See
 [implementation 0004](docs/implementation/0004-verification-and-access-policies.md).
+
+## PostgreSQL foundation (internal service)
+
+The next storage adapter has a reversible Alembic migration and authorized
+services for manual sources, typed work, sharing, and audit history. It is not
+connected to the dashboard or HTTP authentication yet. Optional local PostgreSQL
+setup, test isolation, design, and remaining limits are documented in
+[implementation 0005](docs/implementation/0005-postgres-work-storage.md).
+CI runs real-database checks separately; local runs skip them unless
+`FLOWPILOT_TEST_DATABASE_URL` points to a dedicated database ending in `_test`.
