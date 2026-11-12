@@ -134,3 +134,10 @@ def test_malformed_or_oversize_token(token_tools, token):
     _, verifier, _ = token_tools
     with pytest.raises(InvalidAccessToken):
         verifier.verify(token)
+
+
+@pytest.mark.parametrize("subject", ["   ", "bad\x00subject", "bad\nsubject"])
+def test_subject_control_characters_rejected(token_tools, subject):
+    _, verifier, sign = token_tools
+    with pytest.raises(InvalidAccessToken):
+        verifier.verify(sign(subject))

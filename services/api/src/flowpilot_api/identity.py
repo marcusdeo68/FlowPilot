@@ -94,7 +94,12 @@ class AccessTokenVerifier:
                 options={"require": ["iss", "aud", "sub", "exp", "iat", "jti", "client_id"]},
             )
             for name in ("sub", "jti", "client_id"):
-                if not isinstance(claims[name], str) or not 1 <= len(claims[name]) <= 300:
+                if (
+                    not isinstance(claims[name], str)
+                    or not 1 <= len(claims[name]) <= 300
+                    or not claims[name].strip()
+                    or any(ord(char) < 32 for char in claims[name])
+                ):
                     raise InvalidAccessToken
             if (
                 type(claims["iat"]) is not int

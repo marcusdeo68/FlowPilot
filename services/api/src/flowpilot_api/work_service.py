@@ -48,6 +48,8 @@ class ManualSource(BaseModel):
     @field_validator("reference", "summary", "excerpt")
     @classmethod
     def meaningful_text(cls, value: str) -> str:
+        if "\x00" in value:
+            raise ValueError("Text cannot contain NUL characters")
         if not value.strip():
             raise ValueError("Text must not be blank")
         return value.strip()

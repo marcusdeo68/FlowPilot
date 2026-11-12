@@ -33,7 +33,7 @@ controls remain open; keep both factories local and synthetic. See implementatio
 
 Increment 0005 implements internal PostgreSQL service checks for active stored
 membership, workspace isolation, source ownership, evidence projection, and atomic
-audit. No network request can yet obtain a verified Principal for that service.
+audit. Increment 0007 separately wraps that service with verified access-token requests.
 The old HTTP API remains unauthenticated. Separate database runtime/migration roles,
 retention/deletion, membership administration, backups, and deployment controls
 remain required. Test database credentials in CI/Compose are synthetic only.

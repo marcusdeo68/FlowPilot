@@ -25,7 +25,10 @@ an expected issuer and API audience, a key ID, and bounded identity claims. Toke
 must include issuer, audience, subject, issued-at, expiry, token ID, and client ID;
 integer lifetimes are limited to 15 minutes with 30 seconds of clock skew.
 Expired, future, unsigned/symmetric, wrong-audience, wrong-issuer, and identity-token
-inputs are rejected. Tokens are bounded to 16 KiB.
+inputs are rejected. Tokens are bounded to 16 KiB. Identity identifiers also reject
+blank values and control characters. Work/source text rejects NUL at validation
+because PostgreSQL text cannot store it; callers get an input error instead of
+reaching a database-driver failure.
 
 The JWKS URL is trusted application configuration, HTTPS, and on the issuer's
 origin. Token-supplied key URLs, inline keys, certificate URLs, and critical custom
