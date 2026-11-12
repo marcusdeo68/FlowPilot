@@ -6,9 +6,13 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0010: [manual-source inbox](implementation/0010-private-source-inbox.md)
+  adds a paginated, owner-only read model with proposal status.
 - Increment 0009: [private task review](implementation/0009-private-task-review.md)
-  implemented on the verified API. Local suite: 91 passed, 40 PostgreSQL checks
-  skipped; PostgreSQL and multi-platform verification run in CI.
+  merged in [PR #8](https://github.com/marcusdeo68/FlowPilot/pull/8).
+  [Run 43307757893](https://github.com/marcusdeo68/FlowPilot/actions/runs/43307757893)
+  passed all six jobs for fedca96, including the real PostgreSQL review tests.
+  Local suite: 91 passed, 40 PostgreSQL checks skipped locally.
 
 - Foundation and verification increment merged in [PR #1](https://github.com/marcusdeo68/FlowPilot/pull/1).
 - 38 tests passed locally and in the Windows/Linux Python 3.11/3.12 CI matrix for
@@ -75,8 +79,8 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    Next choose/configure a compatible identity provider, implement browser
    login/session and invitation acceptance, and migrate the dashboard. Identity
    verification does not yet supply a working browser sign-in experience.
-3. Private manual-source task review is implemented in 0009. Next: source discovery,
-   then authenticated dashboard integration and browser tests.
+3. Private task review (0009) and manual source discovery (0010) now have API
+   implementations. Next: interactive review and authenticated browser coverage.
 4. Only after access controls: provider review and one read-only pilot. AWS
    provisioning also needs an agreed spending limit and deployment readiness.
 
