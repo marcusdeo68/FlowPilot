@@ -1,6 +1,10 @@
 # Implementation 0008 - Workspace onboarding and membership administration
 
-Status: implemented; final PostgreSQL and hosted verification pending.
+Status: merged in PR #7. Run 43285798866 passed all six CI jobs for commit
+7347ff0: 81 backend/contract tests, 35 real PostgreSQL/service/API tests, and six
+Chromium workflows, plus lint, formatting, JavaScript syntax, and package builds
+on Windows/Linux Python 3.11/3.12. Local full suite: 87 passed, 35 PostgreSQL
+checks explicitly skipped because they run against a real database in CI.
 
 ## What this enables
 
@@ -119,8 +123,8 @@ Local baseline and contract tests are run before CI. The real PostgreSQL suite
 tests atomic onboarding, concurrent identity registration, role authorization,
 issuer/workspace isolation, stale versions, reactivation, ownership transfer,
 concurrent owner departures, permission revocation, audit rollback/immutability,
-migration rollback, and signed-token HTTP requests. Final evidence will be recorded
-before merge; PostgreSQL is tested in CI rather than replaced with SQLite mocks.
+migration rollback, and signed-token HTTP requests. The evidence above verifies
+the exact merged source; PostgreSQL is tested in CI rather than replaced with SQLite mocks.
 
 Trace create_workspace through its transaction and explain why a user and workspace
 must not survive an audit failure. Then trace two concurrent owner departures:

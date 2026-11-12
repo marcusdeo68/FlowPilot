@@ -25,17 +25,19 @@ verification for each revision. Update this file when an item's state changes.
   passed 82 tests; 20 real-database checks ran in CI. The demo remains separate.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
-- Increment 0008 adds verified-user workspace onboarding and versioned owner-only
-  membership administration. Local baseline: 81 backend/contract tests passed.
-  PostgreSQL concurrency, revocation, migration, and HTTP verification is pending
-  [PR #7](https://github.com/marcusdeo68/FlowPilot/pull/7).
+- Increment 0008's verified-user workspace onboarding and versioned owner-only
+  membership administration merged in [PR #7](https://github.com/marcusdeo68/FlowPilot/pull/7).
+  Run 43285798866 passed all six jobs: 81 backend/contract tests, 35 real
+  PostgreSQL/service/API tests, and six Chromium workflows, plus lint, formatting,
+  package builds, and JavaScript syntax. Local full suite: 87 passed, 35 real-database
+  checks explicitly skipped. Updated Python 3.12.16 environment verified unchanged.
 
 ## Open issues and verification gaps
 
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API exists; onboarding/admin API is under verification. Live identity configuration, browser login/session, invitation consent, request limits, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested. Live identity configuration, browser login/session, invitation consent, request limits, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -65,8 +67,8 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    stored-membership authorization, private sources, evidence sharing, and audit
    transactions. Remaining Stage 1 tables and live identity-provider setup are still planned.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
-   Workspace creation/discovery and member administration are under verification
-   in 0008. Next choose/configure a compatible identity provider, implement browser
+   Workspace creation/discovery and member administration are verified in 0008.
+   Next choose/configure a compatible identity provider, implement browser
    login/session and invitation acceptance, and migrate the dashboard. Identity
    verification does not yet supply a working browser sign-in experience.
 3. Synthetic source/proposal review workflow, then dashboard integration and
