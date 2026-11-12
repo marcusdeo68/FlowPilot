@@ -26,7 +26,7 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 Increment 0007's separate API verifies configured RS256 access tokens and resolves
 stored memberships. It has no live identity-provider setup or browser login yet.
-The legacy dashboard remains unauthenticated. Unknown-key refresh rate limiting,
+The legacy dashboard remains unauthenticated. Signing-key refresh is throttled;
 request limits, HTTPS/proxy deployment, provisioning, retention, and operational
 controls remain open; keep both factories local and synthetic. See implementation
 0007 for the accepted token profile, trusted key endpoint, and provider review.

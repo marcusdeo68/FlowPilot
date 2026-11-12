@@ -1,6 +1,10 @@
 # Implementation 0007 - Verified workspace API boundary
 
-Status: implementation complete; hosted PostgreSQL/API verification in progress.
+Status: merged in PR #6 after all six CI jobs passed for commit 11c0ca5 in
+run 43227745975. Verification: 76 ordinary/backend/token tests, 20 real PostgreSQL
+and signed-token HTTP tests, and six Chromium tests passed. Local full suite:
+82 passed, 20 PostgreSQL tests explicitly skipped. Lint, formatting, JavaScript
+syntax, and wheel/source builds passed on Windows/Linux Python 3.11/3.12.
 This is a separate local API factory. No real identity account is connected.
 
 ## What changed
@@ -97,7 +101,8 @@ scope parsing, issuer/audience checks, JWKS resolution, malformed/oversized toke
 future and excessive lifetimes, and network failure. PostgreSQL HTTP tests check
 missing/forged authentication, removed legacy routes, extra role fields, observer
 and scope denial, wrong workspace/private resource access, version conflicts,
-and source-owner-controlled evidence. Hosted results will be recorded before merge.
+and source-owner-controlled evidence. The hosted results above verified the exact
+merged source revision; no production identity provider was used.
 
 This API remains on loopback. Before network deployment add request/rate limits,
 trusted proxy/HTTPS/host

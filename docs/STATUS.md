@@ -18,8 +18,11 @@ verification for each revision. Update this file when an item's state changes.
   [PR #5](https://github.com/marcusdeo68/FlowPilot/pull/5). All six CI jobs passed:
   four platform/Python combinations, PostgreSQL, and Chromium. Local verification
   passed 45 tests including six browser workflows; PostgreSQL's 16 tests passed in CI.
-- Increment 0007 adds a separately configured bearer-verified workspace API;
-  final hosted verification is pending. The demo still uses the separate local API.
+- Increment 0007's separately configured bearer-verified workspace API merged in
+  [PR #6](https://github.com/marcusdeo68/FlowPilot/pull/6). Run 43227745975 passed
+  76 ordinary/backend/token tests, 20 PostgreSQL/API tests, and six Chromium tests,
+  plus lint, formatting, package builds, and JavaScript syntax. Local full suite
+  passed 82 tests; 20 real-database checks ran in CI. The demo remains separate.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
 
@@ -28,6 +31,7 @@ verification for each revision. Update this file when an item's state changes.
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
+| FP-010 | Deployment readiness / planned | Verified API exists, but live identity configuration, browser login/session, provisioning/membership administration, request limits, and production database roles/operations are incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -56,8 +60,8 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    CI verified. Includes seven tables, workspace-qualified relationships,
    stored-membership authorization, private sources, evidence sharing, and audit
    transactions. Remaining Stage 1 tables and HTTP identity are still planned.
-2. Verify increment 0007's signed-access-token API and PostgreSQL HTTP checks. Then
-   choose/configure a compatible identity provider, implement login/session and
+2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
+   Next choose/configure a compatible identity provider, implement login/session and
    provisioning flows, and migrate the dashboard. Identity verification does not
    yet supply a working browser sign-in experience.
 3. Synthetic source/proposal review workflow, then dashboard integration and
