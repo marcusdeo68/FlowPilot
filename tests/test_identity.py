@@ -141,3 +141,41 @@ def test_subject_control_characters_rejected(token_tools, subject):
     _, verifier, sign = token_tools
     with pytest.raises(InvalidAccessToken):
         verifier.verify(sign(subject))
+
+
+def test_jwks_network_refresh_is_throttled(monkeypatch):
+    from flowpilot_api.identity import _ThrottledJWKClient
+
+    calls = []
+    clock = [100.0]
+    monkeypatch.setattr("flowpilot_api.identity.time.monotonic", lambda: clock[0])
+
+    def fetch(_):
+        calls.append("request")
+        return {"keys": []}
+
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", fetch)
+    keys = _ThrottledJWKClient("https://identity.example/jwks")
+    keys.fetch_data()
+    keys.fetch_data()
+    assert len(calls) == 1
+    clock[0] += 31
+    keys.fetch_data()
+    assert len(calls) == 2
+
+
+def test_failed_key_refresh_is_fail_closed_and_backed_off(monkeypatch):
+    from flowpilot_api.identity import _ThrottledJWKClient
+
+    calls = []
+
+    def fetch(_):
+        calls.append("request")
+        raise jwt.PyJWKClientConnectionError("Synthetic outage")
+
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", fetch)
+    keys = _ThrottledJWKClient("https://identity.example/jwks")
+    for _ in range(2):
+        with pytest.raises(jwt.PyJWKClientConnectionError):
+            keys.fetch_data()
+    assert len(calls) == 1

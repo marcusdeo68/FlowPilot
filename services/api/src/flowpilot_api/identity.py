@@ -1,6 +1,8 @@
 """Strict RS256 JWT access-token verification; no login, issuance, or role trust."""
 
 import os
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -62,11 +64,33 @@ class AccessIdentity:
     scopes: frozenset[str]
 
 
+class _ThrottledJWKClient(PyJWKClient):
+    """Unknown kid values cannot force a fresh network request on every token."""
+
+    def __init__(self, url: str):
+        super().__init__(url, cache_keys=False, lifespan=300, timeout=5)
+        self._fetch_lock = threading.Lock()
+        self._last_attempt = float("-inf")
+        self._last_response = None
+
+    def fetch_data(self):
+        with self._fetch_lock:
+            now = time.monotonic()
+            if now - self._last_attempt < 30:
+                if self._last_response is None:
+                    raise PyJWKClientConnectionError("Signing key refresh temporarily unavailable")
+                return self._last_response
+            self._last_attempt = now
+            self._last_response = None
+            self._last_response = super().fetch_data()
+            return self._last_response
+
+
 class AccessTokenVerifier:
     def __init__(self, config: IdentityConfig, *, key_resolver: Callable | None = None):
         self.config = config
         # Token headers can select a kid, never the URL from which keys are fetched.
-        self._keys = PyJWKClient(config.jwks_url, cache_keys=False, lifespan=300, timeout=5)
+        self._keys = _ThrottledJWKClient(config.jwks_url)
         self._resolve = key_resolver or self._keys.get_signing_key_from_jwt
 
     def verify(self, token: str) -> AccessIdentity:

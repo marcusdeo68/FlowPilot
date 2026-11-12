@@ -35,6 +35,10 @@ origin. Token-supplied key URLs, inline keys, certificate URLs, and critical cus
 headers are rejected. PyJWT retrieves only the configured JWKS endpoint with a
 bounded timeout and cached key set. Unknown keys do not fall back to unverified
 claims. Identity network failure returns 503; invalid tokens return 401.
+Key fetching is serialized and throttled to one attempt per 30 seconds per process,
+including failure backoff, so arbitrary unknown key IDs cannot each trigger network
+I/O. A newly rotated key can therefore take up to that interval to become visible;
+routine cached key sets last five minutes. Request/CPU rate limits are still needed.
 
 Read operations require `flowpilot:read`; writes require both `flowpilot:read` and
 `flowpilot:write`. These API scopes are additional capabilities, not workspace roles.
@@ -96,7 +100,7 @@ and scope denial, wrong workspace/private resource access, version conflicts,
 and source-owner-controlled evidence. Hosted results will be recorded before merge.
 
 This API remains on loopback. Before network deployment add request/rate limits,
-JWKS refresh throttling for repeated unknown key IDs, trusted proxy/HTTPS/host
+trusted proxy/HTTPS/host
 configuration, database runtime roles, retention/deletion and backups, and reviewed
 provider/session setup. JWT verification alone is not deployment readiness.
 
