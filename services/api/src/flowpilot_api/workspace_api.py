@@ -20,6 +20,7 @@ from flowpilot_api.identity import (
     IdentityUnavailable,
     InvalidAccessToken,
 )
+from flowpilot_api.inbox import InboxPage, InboxService
 from flowpilot_api.membership_service import (
     LastOwnerConflict,
     MemberInfo,
@@ -85,6 +86,7 @@ def create_workspace_app(
     engine = engine if engine is not None else create_database_engine()
     service = WorkService(engine)
     memberships = MembershipService(engine)
+    inbox = InboxService(engine)
 
     @asynccontextmanager
     async def lifespan(_):
@@ -290,6 +292,15 @@ def create_workspace_app(
         return service.share_work(
             user.principal, workspace_id, work_id, expected_version=payload.expected_version
         )
+
+    @app.get("/api/v2/workspaces/{workspace_id}/sources", response_model=InboxPage)
+    def source_list(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+        after: UUID | None = None,
+    ):
+        return inbox.page(user.principal, workspace_id, limit=limit, after=after)
 
     @app.post("/api/v2/workspaces/{workspace_id}/sources", status_code=201)
     def source_create(

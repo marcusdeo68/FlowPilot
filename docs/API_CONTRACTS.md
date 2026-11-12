@@ -133,3 +133,7 @@ executions, and the authenticated frontend remain future work.
 
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
 for source-to-proposal creation, listing, correction, and review contracts.
+
+The [source inbox](implementation/0010-private-source-inbox.md) lists the caller's
+manual sources with review status at `GET /api/v2/workspaces/{workspace_id}/sources`.
+Continue with the returned `next_after` UUID as the `after` query parameter.

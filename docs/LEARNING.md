@@ -91,6 +91,13 @@ in two clients and correct the title in one. Predict what happens when the other
 accepts the old version. Then explain why the row lock alone cannot tell which
 title a person actually reviewed.
 
+## Paginating a private inbox
+
+Exercise for [0010](implementation/0010-private-source-inbox.md): write down
+four sources with identical capture times. Predict which IDs appear on each
+two-item page, then add a newer source between requests. Why must the cursor
+lookup use the same privacy filter as the list?
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
