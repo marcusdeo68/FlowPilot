@@ -40,6 +40,9 @@ py -m uvicorn flowpilot_api.main:app --reload --host 127.0.0.1 --port 8000
 
 The API binds to loopback (`127.0.0.1`) by default. Open `http://127.0.0.1:8000/` for the dashboard or `http://127.0.0.1:8000/docs` for the generated local API reference. The default SQLite database is created under `data/flowpilot.sqlite3`; set `FLOWPILOT_DB_PATH` to choose another local path.
 
+In Cursor, use **Terminal > Run Task > FlowPilot: Run local app** after setup.
+The **FlowPilot: Tests** task runs the regression suite without activating a shell.
+
 `/healthz` reports whether the process is responding. `/readyz` also checks that the database can be opened. Neither endpoint is an authentication check.
 
 The dashboard is an early local prototype. Its inbox, event, draft, and connection cards are illustrative only; only manually entered commitments are stored. The API has no authentication or workspace authorization, so keep it on loopback and use synthetic data. Do not deploy it or connect personal accounts yet.

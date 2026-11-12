@@ -12,6 +12,12 @@ fresh checkout can reproduce the environment. CI uses read-only repository
 permissions, immutable action revisions, and no retained checkout credentials.
 Dependabot proposes dependency and action updates; it cannot merge them itself.
 
+Workspace-scoped Cursor/VS Code settings select `.venv`, enable pytest discovery,
+and provide Run local app and Tests tasks. They use the environment executable
+directly, avoiding terminal activation and global PATH dependence. No machine-wide
+editor settings were changed. Future projects belong under the user's CODE folder;
+this existing checkout remains in its original location until explicitly migrated.
+
 The existing SQLite event table now rejects updates and deletes with triggers.
 Tests intentionally fail an audit insertion and verify that the state change
 rolls back too. A concurrent-write test proves only one client can apply a given
