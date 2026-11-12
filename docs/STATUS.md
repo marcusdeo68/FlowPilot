@@ -6,6 +6,10 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0009: [private task review](implementation/0009-private-task-review.md)
+  implemented on the verified API. Local suite: 91 passed, 40 PostgreSQL checks
+  skipped; PostgreSQL and multi-platform verification run in CI.
+
 - Foundation and verification increment merged in [PR #1](https://github.com/marcusdeo68/FlowPilot/pull/1).
 - 38 tests passed locally and in the Windows/Linux Python 3.11/3.12 CI matrix for
   the PR revision. Lint, formatting, package builds, and JavaScript syntax passed.
@@ -71,8 +75,8 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    Next choose/configure a compatible identity provider, implement browser
    login/session and invitation acceptance, and migrate the dashboard. Identity
    verification does not yet supply a working browser sign-in experience.
-3. Synthetic source/proposal review workflow, then dashboard integration and
-   browser tests. Preserve explicit evidence sharing and human review boundaries.
+3. Private manual-source task review is implemented in 0009. Next: source discovery,
+   then authenticated dashboard integration and browser tests.
 4. Only after access controls: provider review and one read-only pilot. AWS
    provisioning also needs an agreed spending limit and deployment readiness.
 

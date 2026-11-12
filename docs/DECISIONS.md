@@ -1,5 +1,12 @@
 # Architecture decisions
 
+## 0016 - Review a source-derived task before creating canonical work
+
+Keep one private proposal per manual source. A correction keeps the proposal
+pending and invalidates its previous version. Accept only the exact version and
+commit task, private evidence, and review history in a single transaction.
+See [implementation 0009](implementation/0009-private-task-review.md).
+
 ## 0015 - Provision workspaces from verified identity and serialize owner changes
 
 Create users/workspaces/initial owner/audit together using the verified principal,

@@ -126,5 +126,10 @@ The next contract must distinguish records with different trust and authorizatio
 
 Every endpoint must derive permissions from authenticated identity. A client-supplied
 workspace selector is not proof of access. Typed work and manual source/evidence
-services now exist; provider ownership, proposals, exact-payload action approvals,
+services now exist; provider ownership, exact-payload action approvals,
 executions, and the authenticated frontend remain future work.
+
+## Private task review (workspace API)
+
+See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
+for source-to-proposal creation, listing, correction, and review contracts.

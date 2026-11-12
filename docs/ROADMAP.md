@@ -24,6 +24,7 @@ records, and authenticated dashboard wiring still need implementation and review
   for manual typed work, evidence privacy, and audit transactions (increment 0005).
 - [x] Separate signed-access-token workspace API factory with stored-member authorization (0007).
 - [x] API workspace creation/discovery, owner-only member administration, and last-owner protection (0008).
+- [x] Private manual-source task suggestion, correction, dismissal, and version-bound acceptance (0009).
 - [ ] Live identity-provider setup, login/session, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.

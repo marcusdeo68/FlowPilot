@@ -84,6 +84,13 @@ Compare deactivating a membership with deleting an identity or source. Explain
 why an expired privilege should deny new requests while preserving audit attribution
 and keeping private source ownership with its original user.
 
+## Review concurrency
+
+Exercise for [0009](implementation/0009-private-task-review.md): open a proposal
+in two clients and correct the title in one. Predict what happens when the other
+accepts the old version. Then explain why the row lock alone cannot tell which
+title a person actually reviewed.
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)

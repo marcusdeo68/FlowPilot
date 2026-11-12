@@ -1,6 +1,15 @@
+import os
+from uuid import uuid4
+
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from flowpilot_api.main import app
+from flowpilot_api.work_service import WorkService
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 
 @pytest.fixture
@@ -51,3 +60,74 @@ def token_tools():
         return jwt.encode(claims, key, algorithm="RS256", headers=token_headers)
 
     return config, verifier, sign
+
+
+@pytest.fixture
+def pg():
+    url = os.environ.get("FLOWPILOT_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("Set FLOWPILOT_TEST_DATABASE_URL for real PostgreSQL checks")
+    parsed = make_url(url)
+    if parsed.drivername != "postgresql+psycopg" or not (parsed.database or "").endswith("_test"):
+        pytest.fail("Integration tests require a PostgreSQL database ending in _test")
+    schema = "fp_test_" + uuid4().hex
+    root = create_engine(parsed, hide_parameters=True)
+    with root.begin() as connection:
+        connection.execute(CreateSchema(schema))
+    engine = create_engine(
+        parsed, connect_args={"options": f"-csearch_path={schema}"}, hide_parameters=True
+    )
+    config = Config("alembic.ini")
+    try:
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+        yield engine, config
+    finally:
+        engine.dispose()
+        # The target is the exact random schema created above, never public/user schemas.
+        with root.begin() as connection:
+            connection.execute(DropSchema(schema, cascade=True))
+        root.dispose()
+
+
+@pytest.fixture
+def setup(pg):
+    engine, _ = pg
+    workspace, other = uuid4(), uuid4()
+    users = {name: uuid4() for name in ("owner", "member", "observer", "outsider")}
+    with engine.begin() as connection:
+        for label, value in (("Synthetic A", workspace), ("Synthetic B", other)):
+            connection.execute(
+                text("INSERT INTO workspaces (id, name) VALUES (:id, :name)"),
+                {"id": value, "name": label},
+            )
+        for name, user_id in users.items():
+            connection.execute(
+                text("INSERT INTO users (id, issuer, subject) VALUES (:id, 'test', :name)"),
+                {"id": user_id, "name": name},
+            )
+            connection.execute(
+                text("""INSERT INTO memberships (workspace_id, user_id, role)
+                VALUES (:workspace, :user, :role)"""),
+                {
+                    "workspace": other if name == "outsider" else workspace,
+                    "user": user_id,
+                    "role": "owner" if name == "outsider" else name,
+                },
+            )
+    return WorkService(engine), workspace, other, users
+
+
+@pytest.fixture
+def workspace_client(setup, token_tools):
+    from fastapi.testclient import TestClient
+    from flowpilot_api.workspace_api import create_workspace_app
+
+    service, workspace, other, users = setup
+    config, verifier, sign = token_tools
+    with service.engine.begin() as connection:
+        connection.execute(text("UPDATE users SET issuer=:issuer"), {"issuer": config.issuer})
+    app = create_workspace_app(engine=service.engine, verifier=verifier)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        yield client, workspace, other, users, sign

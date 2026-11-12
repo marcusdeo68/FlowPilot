@@ -1,13 +1,11 @@
 """Real PostgreSQL integration checks. Each test owns a random disposable schema."""
 
-import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from uuid import uuid4
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from flowpilot_api.access import AccessDenied, EvidenceVisibility, Role, Visibility
 from flowpilot_api.membership_service import (
     LastOwnerConflict,
@@ -24,71 +22,11 @@ from flowpilot_api.work_service import (
     Principal,
     SourceNotFound,
     WorkNotFound,
-    WorkService,
 )
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.schema import CreateSchema, DropSchema
 
 pytestmark = pytest.mark.postgres
-
-
-@pytest.fixture
-def pg():
-    url = os.environ.get("FLOWPILOT_TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("Set FLOWPILOT_TEST_DATABASE_URL for real PostgreSQL checks")
-    parsed = make_url(url)
-    if parsed.drivername != "postgresql+psycopg" or not (parsed.database or "").endswith("_test"):
-        pytest.fail("Integration tests require a PostgreSQL database ending in _test")
-    schema = "fp_test_" + uuid4().hex
-    root = create_engine(parsed, hide_parameters=True)
-    with root.begin() as connection:
-        connection.execute(CreateSchema(schema))
-    engine = create_engine(
-        parsed, connect_args={"options": f"-csearch_path={schema}"}, hide_parameters=True
-    )
-    config = Config("alembic.ini")
-    try:
-        with engine.begin() as connection:
-            config.attributes["connection"] = connection
-            command.upgrade(config, "head")
-        yield engine, config
-    finally:
-        engine.dispose()
-        # The target is the exact random schema created above, never public/user schemas.
-        with root.begin() as connection:
-            connection.execute(DropSchema(schema, cascade=True))
-        root.dispose()
-
-
-@pytest.fixture
-def setup(pg):
-    engine, _ = pg
-    workspace, other = uuid4(), uuid4()
-    users = {name: uuid4() for name in ("owner", "member", "observer", "outsider")}
-    with engine.begin() as connection:
-        for label, value in (("Synthetic A", workspace), ("Synthetic B", other)):
-            connection.execute(
-                text("INSERT INTO workspaces (id, name) VALUES (:id, :name)"),
-                {"id": value, "name": label},
-            )
-        for name, user_id in users.items():
-            connection.execute(
-                text("INSERT INTO users (id, issuer, subject) VALUES (:id, 'test', :name)"),
-                {"id": user_id, "name": name},
-            )
-            connection.execute(
-                text("""INSERT INTO memberships (workspace_id, user_id, role)
-                VALUES (:workspace, :user, :role)"""),
-                {
-                    "workspace": other if name == "outsider" else workspace,
-                    "user": user_id,
-                    "role": "owner" if name == "outsider" else name,
-                },
-            )
-    return WorkService(engine), workspace, other, users
 
 
 def principal(name="owner"):
@@ -406,20 +344,6 @@ def test_source_audit_commits_with_source_and_rolls_back_on_failure(setup):
         )
     with service.engine.begin() as connection:
         assert connection.execute(text("SELECT count(*) FROM source_items")).scalar_one() == 1
-
-
-@pytest.fixture
-def workspace_client(setup, token_tools):
-    from fastapi.testclient import TestClient
-    from flowpilot_api.workspace_api import create_workspace_app
-
-    service, workspace, other, users = setup
-    config, verifier, sign = token_tools
-    with service.engine.begin() as connection:
-        connection.execute(text("UPDATE users SET issuer=:issuer"), {"issuer": config.issuer})
-    app = create_workspace_app(engine=service.engine, verifier=verifier)
-    with TestClient(app, base_url="http://127.0.0.1") as client:
-        yield client, workspace, other, users, sign
 
 
 def test_workspace_http_authentication_boundary(workspace_client):

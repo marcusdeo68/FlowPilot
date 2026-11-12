@@ -31,6 +31,8 @@ from flowpilot_api.membership_service import (
     WorkspaceCreate,
     WorkspaceInfo,
 )
+from flowpilot_api.proposal_routes import proposal_routes
+from flowpilot_api.proposals import ProposalNotFound, ProposalService, ReviewConflict
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
 from flowpilot_api.work import WorkItem
@@ -131,6 +133,12 @@ def create_workspace_app(
         return handle
 
     for exception, code, message in (
+        (ProposalNotFound, 404, "Proposal not found"),
+        (
+            ReviewConflict,
+            409,
+            "Proposal unchanged, already reviewed, or stale; reload before reviewing",
+        ),
         (AccessDenied, 403, "Workspace capability denied"),
         (WorkNotFound, 404, "Work item not found"),
         (SourceNotFound, 404, "Source item not found"),
@@ -327,4 +335,5 @@ def create_workspace_app(
     ):
         return service.history(user.principal, workspace_id, work_id)
 
+    app.include_router(proposal_routes(ProposalService(engine), read_identity, write_identity))
     return app
