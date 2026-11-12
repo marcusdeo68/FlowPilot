@@ -9,11 +9,15 @@ verification for each revision. Update this file when an item's state changes.
 - Foundation and verification increment merged in [PR #1](https://github.com/marcusdeo68/FlowPilot/pull/1).
 - 38 tests passed locally and in the Windows/Linux Python 3.11/3.12 CI matrix for
   the PR revision. Lint, formatting, package builds, and JavaScript syntax passed.
-- SQLite dashboard is local-only with synthetic/manual data. Tested access policies
-  are not yet wired to authenticated requests or tenant-aware storage.
+- SQLite dashboard is local-only with synthetic/manual data. Its HTTP endpoints
+  are not yet wired to verified identity or the separate PostgreSQL service.
 - PostgreSQL migration and internal authorized work/source services merged in
   [PR #4](https://github.com/marcusdeo68/FlowPilot/pull/4): 16 real PostgreSQL
   integration checks and 39 ordinary tests passed. The legacy HTTP API is separate.
+- Browser maintenance increment merged in
+  [PR #5](https://github.com/marcusdeo68/FlowPilot/pull/5). All six CI jobs passed:
+  four platform/Python combinations, PostgreSQL, and Chromium. Local verification
+  passed 45 tests including six browser workflows; PostgreSQL's 16 tests passed in CI.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
 
@@ -21,10 +25,7 @@ verification for each revision. Update this file when an item's state changes.
 
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
-| FP-001 | Dependency warning / fix awaiting CI | Switched to the supported httpx2 TestClient dependency. | Close after the full CI matrix passes without the old deprecation. |
-| FP-002 | Browser coverage gap / implementation awaiting CI | Six Chromium checks now cover capture, explicit transitions, conflict recovery, safe text, dialog controls, and validation errors. | Close after the browser job passes in CI. Other engines, mobile, and accessibility audits remain future coverage. |
-| FP-007 | Dialog cancel defect / fix awaiting CI | Empty task dialog could not be cancelled because required-title validation blocked Cancel. Reproduced in Chromium; cancel submitters now bypass save validation. | Passing browser regression check. |
-| FP-008 | Validation message defect / fix awaiting CI | Whitespace title produced `[object Object]` rather than readable server validation. Reproduced in Chromium; errors now project field labels and messages. | Passing browser regression check with form recovery. |
+| FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -37,8 +38,12 @@ Keep resolved entries so the reason for a fix remains discoverable.
 | --- | --- | --- |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
-| FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; see implementation 0004. Browser regression coverage is still FP-002. |
+| FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; browser regression passed in PR #5. |
 | FP-006 | Rebuilt incomplete Python environment after recurring file locks | Old environment preserved under ignored `.tools/venv-backup-0006`; fresh environment installed with uv copy mode. Exact lock origin is unconfirmed; future recurring failures need investigation. |
+| FP-001 | Supported TestClient dependency, without warning suppression | httpx2 regression suite passed in PR #5 on Windows/Linux Python 3.11/3.12. |
+| FP-002 | Real-browser workflow job implemented | Six Chromium checks passed locally and in CI in PR #5. See FP-009 for remaining coverage. |
+| FP-007 | Empty dialog cancellation fixed | Required-title validation no longer blocks Cancel/Close; reproduced failing test now passes in Chromium. |
+| FP-008 | Readable server validation errors and recovery | Structured error fields render as text; form remains open and Save re-enables. Chromium regression passed. |
 
 ## Next implementation milestones
 

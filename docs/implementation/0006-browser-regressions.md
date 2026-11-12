@@ -1,6 +1,9 @@
 # Implementation 0006 - Browser regressions and maintenance checks
 
-Status: implemented; final local and hosted verification in progress.
+Status: merged in PR #5 after all six CI jobs passed. Local verification: 45 tests
+passed including six Chromium workflows, with no TestClient deprecation warning.
+CI also passed 16 real PostgreSQL integration checks plus the platform/Python matrix,
+lint, formatting, package builds, and JavaScript syntax checks.
 
 ## Behavior changes and reproduced bugs
 
