@@ -62,6 +62,14 @@ Explain why the API suite passed even though Cancel and validation messages were
 broken. Find the boundary where a structured error becomes user-visible text,
 and explain why textContent matters for an injection-shaped title.
 
+## Identity and authorization exercises (increment 0007)
+
+Trace a token from HTTPBearer to signature/claim validation, API scopes, stored
+membership, workspace query, and optimistic concurrency. Explain why all of these
+checks are needed even when the signature is valid. Find the tests where an
+observer includes an owner role claim and is still denied, and where an ID-token
+type is rejected before an access token can be accepted.
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)

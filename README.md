@@ -85,3 +85,8 @@ CI runs real-database checks separately; local runs skip them unless
 Chromium workflow checks and optional local browser setup are documented in
 [implementation 0006](docs/implementation/0006-browser-regressions.md). CI also
 supports manual dispatch and a daily 10:17 UTC maintenance check.
+
+The separate bearer-verified workspace API is described in
+[implementation 0007](docs/implementation/0007-verified-workspace-api.md). It requires
+explicit identity/PostgreSQL configuration and does not provide browser login or
+replace the local dashboard. Keep both applications on loopback with synthetic data.

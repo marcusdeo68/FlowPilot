@@ -1,5 +1,13 @@
 # Architecture decisions
 
+## 0014 - Separate the verified workspace API from the legacy demo
+
+Introduce an explicit bearer-authenticated API factory with a strict RS256
+access-token profile and scoped PostgreSQL services. Do not mount legacy
+unauthenticated routes into it, accept caller-asserted identity headers, or use
+token role claims as workspace membership. No live provider is chosen; a compatible
+provider/session flow still needs configuration and review. See implementation 0007.
+
 ## 0013 - Introduce PostgreSQL behind an internal authorized service first
 
 Use SQLAlchemy Core transactions, psycopg, and explicit Alembic migrations. Keep

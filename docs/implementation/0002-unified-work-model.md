@@ -1,6 +1,6 @@
 # Implementation 0002 — Unified work model and access foundation
 
-**Status: baseline specified; pure policies/contracts in increment 0004; initial PostgreSQL migration and internal authorized work/source services in increment 0005. Verified HTTP identity, remaining records, and dashboard wiring remain unimplemented.** Stage 1 is incomplete. The local dashboard uses synthetic/manual data and does not satisfy this segment's access requirements.
+**Status: baseline specified; policies/contracts in 0004; PostgreSQL work/source services in 0005; separately configured signed-access-token workspace API in 0007. Real identity-provider setup, browser login, provisioning, remaining records, and dashboard migration remain open.** Stage 1 is incomplete. The legacy local dashboard remains unauthenticated and synthetic-only.
 
 ## Product change this supports
 

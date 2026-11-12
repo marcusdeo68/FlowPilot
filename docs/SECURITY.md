@@ -24,6 +24,13 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 ## Required before multi-user or real provider data
 
+Increment 0007's separate API verifies configured RS256 access tokens and resolves
+stored memberships. It has no live identity-provider setup or browser login yet.
+The legacy dashboard remains unauthenticated. Unknown-key refresh rate limiting,
+request limits, HTTPS/proxy deployment, provisioning, retention, and operational
+controls remain open; keep both factories local and synthetic. See implementation
+0007 for the accepted token profile, trusted key endpoint, and provider review.
+
 Increment 0005 implements internal PostgreSQL service checks for active stored
 membership, workspace isolation, source ownership, evidence projection, and atomic
 audit. No network request can yet obtain a verified Principal for that service.
