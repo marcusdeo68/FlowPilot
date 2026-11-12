@@ -2,6 +2,7 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from uuid import uuid4
 
 import pytest
@@ -661,8 +662,10 @@ def test_concurrent_owner_departures_keep_one_active_owner(setup):
     service.change_member(
         principal(), workspace, users["member"], role=Role.OWNER, active=True, expected_version=1
     )
+    start = Barrier(2)
 
     def leave(actor):
+        start.wait(timeout=5)
         try:
             service.change_member(
                 principal(actor),
