@@ -19,6 +19,18 @@ This repository currently contains a local API foundation, a dependency-free das
 
 Requires Python 3.11 or newer.
 
+For the reproducible development environment, install
+[uv](https://docs.astral.sh/uv/getting-started/installation/) and run:
+
+```powershell
+uv sync --locked --extra dev --python 3.12
+uv run uvicorn flowpilot_api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+On this workstation uv is also available as `.tools\uv.exe`; that directory is
+ignored by Git. The managed environment avoids depending on global Python or
+PowerShell activation settings. A conventional Python installation also works:
+
 ```powershell
 py -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -40,3 +52,18 @@ The dashboard is an early local prototype. Its inbox, event, draft, and connecti
 - `docs/implementation/`: feature-by-feature implementation notes and software/design explanations.
 
 Read [the product direction](docs/PRODUCT.md), [the roadmap](docs/ROADMAP.md), and [security boundaries](docs/SECURITY.md) before extending this foundation.
+
+## Verify changes
+
+```powershell
+uv run --locked --extra dev pytest -q
+uv run --locked --extra dev ruff check .
+uv run --locked --extra dev ruff format --check .
+uv run --locked --extra dev python -m build
+node --check services/api/src/flowpilot_api/web/app.js
+```
+
+GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
+The access policy and typed-work modules are groundwork for Stage 1; the current
+commitment endpoints still have no identity or workspace authorization. See
+[implementation 0004](docs/implementation/0004-verification-and-access-policies.md).

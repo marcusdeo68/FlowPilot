@@ -3,10 +3,12 @@
 import sqlite3
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from flowpilot_api.database import connect, initialize_database
 from flowpilot_api.domain import CommitmentStatus
@@ -41,6 +43,32 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+
+@app.middleware("http")
+async def local_browser_boundary(request: Request, call_next):
+    """Reduce cross-site browser access to the unauthenticated local demo."""
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        origin = request.headers.get("origin")
+        expected_origin = f"{request.url.scheme}://{request.url.netloc}"
+        if (origin is not None and origin != expected_origin) or request.headers.get(
+            "sec-fetch-site"
+        ) == "cross-site":
+            return JSONResponse({"detail": "Cross-origin writes are not allowed"}, status_code=403)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    # FastAPI's development API docs load their own scripts and styles.
+    if request.url.path not in {"/docs", "/redoc", "/docs/oauth2-redirect"}:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; connect-src 'self'; object-src 'none'; "
+            "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        )
+    return response
+
 
 _WEB_ROOT = Path(__file__).resolve().parent / "web"
 
@@ -94,8 +122,8 @@ def create(payload: CommitmentCreate) -> dict[str, object]:
     tags=["commitments"],
 )
 def list_all(
-    status_filter: CommitmentStatus | None = Query(default=None, alias="status"),
-    limit: int = Query(default=50, ge=1, le=100),
+    status_filter: Annotated[CommitmentStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> dict[str, object]:
     items = list_commitments(status=status_filter, limit=limit)
     return {"items": items, "count": len(items)}

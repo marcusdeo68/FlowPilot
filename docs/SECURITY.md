@@ -14,6 +14,12 @@ The current API is a local development scaffold with no authentication or user/w
 
 These controls do not make the scaffold suitable for real user data.
 
+Increment 0004 adds database triggers rejecting event updates/deletes, allowed-host
+checks, foreign-origin browser write rejection, and security headers for the
+dashboard. Pure access policies have isolation tests but are not wired into the
+legacy API. These local protections are not authentication or network deployment
+readiness; see `docs/implementation/0004-verification-and-access-policies.md`.
+
 The first browser dashboard is also local-only. It uses same-origin calls to the unauthenticated manual API and includes sample-only inbox/schedule examples. Keep the server bound to loopback and do not deploy this version to AWS or expose it to a network. The dashboard does not connect external accounts and has no permission to send email or messages.
 
 ## Required before multi-user or real provider data

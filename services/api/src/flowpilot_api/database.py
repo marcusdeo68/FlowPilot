@@ -2,10 +2,9 @@
 
 import os
 import sqlite3
+from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
-from typing import Iterator
-
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS commitments (
@@ -42,6 +41,14 @@ CREATE INDEX IF NOT EXISTS ix_commitments_status_updated
     ON commitments(status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS ix_commitment_events_commitment_created
     ON commitment_events(commitment_id, created_at, id);
+
+CREATE TRIGGER IF NOT EXISTS commitment_events_no_update
+BEFORE UPDATE ON commitment_events
+BEGIN SELECT RAISE(ABORT, 'Audit events are append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS commitment_events_no_delete
+BEFORE DELETE ON commitment_events
+BEGIN SELECT RAISE(ABORT, 'Audit events are append-only'); END;
 """
 
 
