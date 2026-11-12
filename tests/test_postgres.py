@@ -7,7 +7,15 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from flowpilot_api.access import AccessDenied, EvidenceVisibility, Visibility
+from flowpilot_api.access import AccessDenied, EvidenceVisibility, Role, Visibility
+from flowpilot_api.membership_service import (
+    LastOwnerConflict,
+    MemberNotFound,
+    MembershipConflict,
+    MembershipService,
+    ProfileNotFound,
+    WorkspaceCreate,
+)
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.work import Commitment, Event, Task
 from flowpilot_api.work_service import (
@@ -96,6 +104,7 @@ def test_migration_round_trip(pg):
         "work_items",
         "evidence_links",
         "audit_events",
+        "workspace_events",
     }
     assert tables <= set(inspect(engine).get_table_names())
     with engine.begin() as connection:
@@ -532,3 +541,332 @@ def test_workspace_http_evidence_requires_source_owner(workspace_client):
     assert client.get(path, headers=member).json() == [
         {"summary": "Shared summary", "excerpt": "Private excerpt"}
     ]
+
+
+def test_new_workspace_provisions_only_verified_identity(pg):
+    engine, _ = pg
+    service = MembershipService(engine)
+    person = Principal("synthetic-issuer", "new-user")
+    assert service.list_workspaces(person) == []
+    with pytest.raises(ProfileNotFound):
+        service.profile(person)
+    with engine.begin() as connection:
+        assert connection.execute(text("SELECT count(*) FROM users")).scalar_one() == 0
+    workspace = service.create_workspace(person, WorkspaceCreate(name=" First workspace "))
+    profile = service.profile(person)
+    assert workspace.name == "First workspace"
+    assert workspace.role == Role.OWNER
+    assert service.list_workspaces(person) == [workspace]
+    assert service.list_members(person, workspace.id)[0].user_id == profile.id
+    events = service.history(person, workspace.id)
+    assert events[0]["actor_id"] == profile.id
+    assert events[0]["operation"] == "workspace_created"
+    assert service.list_workspaces(Principal("other-issuer", "new-user")) == []
+
+
+def test_concurrent_onboarding_does_not_duplicate_identity(pg):
+    engine, _ = pg
+    service = MembershipService(engine)
+    person = Principal("synthetic-issuer", "new-user")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        spaces = list(
+            pool.map(
+                lambda _: service.create_workspace(person, WorkspaceCreate(name="Personal")),
+                range(2),
+            )
+        )
+    assert len({space.id for space in spaces}) == 2
+    with engine.begin() as connection:
+        assert connection.execute(text("SELECT count(*) FROM users")).scalar_one() == 1
+        assert connection.execute(text("SELECT count(*) FROM workspace_events")).scalar_one() == 2
+
+
+def test_workspace_creation_rolls_back_profile_and_membership_on_audit_failure(pg):
+    engine, _ = pg
+    with engine.begin() as connection:
+        connection.execute(
+            text("""CREATE FUNCTION fail_workspace_audit() RETURNS trigger
+            LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'workspace audit failure'; END; $$""")
+        )
+        connection.execute(
+            text("""CREATE TRIGGER fail_workspace_audit BEFORE INSERT ON workspace_events
+            FOR EACH ROW EXECUTE FUNCTION fail_workspace_audit()""")
+        )
+    service = MembershipService(engine)
+    with pytest.raises(DBAPIError, match="workspace audit failure"):
+        service.create_workspace(principal(), WorkspaceCreate(name="Must roll back"))
+    with engine.begin() as connection:
+        for table in ("users", "workspaces", "memberships", "workspace_events"):
+            # Fixed test-owned table names, not user input.
+            assert connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
+
+
+def test_membership_admin_is_owner_only_and_workspace_scoped(setup):
+    work, workspace, other, users = setup
+    service = MembershipService(work.engine)
+    for actor in ("member", "observer", "outsider"):
+        with pytest.raises(AccessDenied):
+            service.list_members(principal(actor), workspace)
+        with pytest.raises(AccessDenied):
+            service.add_member(principal(actor), workspace, users["outsider"])
+    with pytest.raises(AccessDenied):
+        service.list_members(principal(), other)
+    added = service.add_member(principal(), workspace, users["outsider"], role=Role.OBSERVER)
+    assert (added.role, added.active, added.version) == (Role.OBSERVER, True, 1)
+    with pytest.raises(MembershipConflict):
+        service.add_member(principal(), workspace, users["outsider"])
+    assert len(service.history(principal(), workspace)) == 1
+    assert len(service.list_workspaces(principal("outsider"))) == 2
+    with pytest.raises(MemberNotFound):
+        service.add_member(principal(), workspace, uuid4())
+
+
+def test_foreign_issuer_user_is_not_silently_granted_membership(setup):
+    work, workspace, _, _ = setup
+    service = MembershipService(work.engine)
+    foreign = Principal("other-issuer", "foreign")
+    service.create_workspace(foreign, WorkspaceCreate(name="Other issuer"))
+    with pytest.raises(MemberNotFound):
+        service.add_member(principal(), workspace, service.profile(foreign).id)
+
+
+def test_last_owner_requires_explicit_transfer(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    for role, active in ((Role.MEMBER, True), (Role.OWNER, False)):
+        with pytest.raises(LastOwnerConflict):
+            service.change_member(
+                principal(), workspace, users["owner"], role=role, active=active, expected_version=1
+            )
+    owner = next(
+        m for m in service.list_members(principal(), workspace) if m.user_id == users["owner"]
+    )
+    assert (owner.role, owner.active, owner.version) == (Role.OWNER, True, 1)
+    assert service.history(principal(), workspace) == []
+    promoted = service.change_member(
+        principal(), workspace, users["member"], role=Role.OWNER, active=True, expected_version=1
+    )
+    assert promoted.version == 2
+    service.change_member(
+        principal(), workspace, users["owner"], role=Role.MEMBER, active=True, expected_version=1
+    )
+    with pytest.raises(AccessDenied):
+        service.list_members(principal(), workspace)
+    assert len(service.history(principal("member"), workspace)) == 2
+
+
+def test_concurrent_owner_departures_keep_one_active_owner(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    service.change_member(
+        principal(), workspace, users["member"], role=Role.OWNER, active=True, expected_version=1
+    )
+
+    def leave(actor):
+        try:
+            service.change_member(
+                principal(actor),
+                workspace,
+                users[actor],
+                role=Role.OWNER,
+                active=False,
+                expected_version=1 if actor == "owner" else 2,
+            )
+            return "left"
+        except LastOwnerConflict:
+            return "last-owner"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(leave, ("owner", "member"))) == ["last-owner", "left"]
+    with work.engine.begin() as connection:
+        assert (
+            connection.execute(
+                text("""SELECT count(*) FROM memberships WHERE
+            workspace_id=:workspace AND active=true AND role='owner'"""),
+                {"workspace": workspace},
+            ).scalar_one()
+            == 1
+        )
+
+
+def test_stale_admin_update_rejected(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    service.change_member(
+        principal(), workspace, users["member"], role=Role.OBSERVER, active=True, expected_version=1
+    )
+    with pytest.raises(MembershipConflict):
+        service.change_member(
+            principal(),
+            workspace,
+            users["member"],
+            role=Role.OWNER,
+            active=True,
+            expected_version=1,
+        )
+    member = next(
+        m for m in service.list_members(principal(), workspace) if m.user_id == users["member"]
+    )
+    assert (member.role, member.version) == (Role.OBSERVER, 2)
+    assert len(service.history(principal(), workspace)) == 1
+
+
+def test_removal_denies_existing_identity_and_preserves_private_work(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    item = work.create_work(principal("member"), workspace, Task(title="Private retained task"))
+    service.change_member(
+        principal(), workspace, users["member"], role=Role.MEMBER, active=False, expected_version=1
+    )
+    with pytest.raises(AccessDenied):
+        work.get_work(principal("member"), workspace, item.id)
+    assert service.list_workspaces(principal("member")) == []
+    with pytest.raises(WorkNotFound):
+        work.get_work(principal(), workspace, item.id)
+    with pytest.raises(MembershipConflict):
+        service.add_member(principal(), workspace, users["member"])
+    service.change_member(
+        principal(), workspace, users["member"], role=Role.MEMBER, active=True, expected_version=2
+    )
+    assert work.get_work(principal("member"), workspace, item.id).id == item.id
+
+
+def test_membership_audit_failure_rolls_back_role_and_version(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    with work.engine.begin() as connection:
+        connection.execute(
+            text("""CREATE FUNCTION fail_membership_audit() RETURNS trigger
+            LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'membership audit failure'; END; $$""")
+        )
+        connection.execute(
+            text("""CREATE TRIGGER fail_membership_audit BEFORE INSERT ON workspace_events
+            FOR EACH ROW EXECUTE FUNCTION fail_membership_audit()""")
+        )
+    with pytest.raises(DBAPIError, match="membership audit failure"):
+        service.change_member(
+            principal(),
+            workspace,
+            users["member"],
+            role=Role.OBSERVER,
+            active=True,
+            expected_version=1,
+        )
+    member = next(
+        m for m in service.list_members(principal(), workspace) if m.user_id == users["member"]
+    )
+    assert (member.role, member.version) == (Role.MEMBER, 1)
+
+
+def test_workspace_audit_is_append_only(setup):
+    work, workspace, _, users = setup
+    service = MembershipService(work.engine)
+    service.change_member(
+        principal(), workspace, users["member"], role=Role.OBSERVER, active=True, expected_version=1
+    )
+    for statement in (
+        "DELETE FROM workspace_events",
+        "UPDATE workspace_events SET to_role='owner'",
+        "TRUNCATE workspace_events",
+    ):
+        with pytest.raises(DBAPIError, match="append-only"):
+            with work.engine.begin() as connection:
+                connection.execute(text(statement))
+    assert len(service.history(principal(), workspace)) == 1
+
+
+def test_membership_migration_downgrade_preserves_existing_work(setup, pg, token_tools):
+    from fastapi.testclient import TestClient
+    from flowpilot_api.workspace_api import create_workspace_app
+
+    work, workspace, _, _ = setup
+    engine, config = pg
+    item = work.create_work(principal(), workspace, Task(title="Existing work"))
+    _, verifier, _ = token_tools
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "0001_work_storage")
+    assert "workspace_events" not in inspect(engine).get_table_names()
+    assert "version" not in {
+        column["name"] for column in inspect(engine).get_columns("memberships")
+    }
+    assert work.get_work(principal(), workspace, item.id).data.title == "Existing work"
+    with TestClient(
+        create_workspace_app(engine=engine, verifier=verifier), base_url="http://127.0.0.1"
+    ) as client:
+        assert client.get("/readyz").status_code == 503
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+    assert work.get_work(principal(), workspace, item.id).id == item.id
+
+
+def test_http_onboarding_without_manual_user_sql(workspace_client):
+    client, _, _, _, sign = workspace_client
+    headers = {"Authorization": "Bearer " + sign("newcomer")}
+    assert client.get("/api/v2/me", headers=headers).status_code == 404
+    assert client.get("/api/v2/workspaces", headers=headers).json() == []
+    assert (
+        client.post(
+            "/api/v2/workspaces", headers=headers, json={"name": "My workspace", "role": "owner"}
+        ).status_code
+        == 422
+    )
+    response = client.post("/api/v2/workspaces", headers=headers, json={"name": " My workspace "})
+    assert response.status_code == 201
+    workspace = response.json()
+    assert workspace["name"] == "My workspace" and workspace["role"] == "owner"
+    profile = client.get("/api/v2/me", headers=headers).json()
+    assert set(profile) == {"id"}
+    assert client.get("/api/v2/workspaces", headers=headers).json() == [workspace]
+    path = f"/api/v2/workspaces/{workspace['id']}/work"
+    assert (
+        client.post(
+            path, headers=headers, json={"item": {"kind": "task", "title": "First task"}}
+        ).status_code
+        == 201
+    )
+    assert client.get(path, headers={"Authorization": "Bearer " + sign()}).status_code == 403
+
+
+def test_http_membership_transfer_and_revocation(workspace_client):
+    client, workspace, _, users, sign = workspace_client
+    headers = {"Authorization": "Bearer " + sign()}
+    member_headers = {"Authorization": "Bearer " + sign("member")}
+    base = f"/api/v2/workspaces/{workspace}"
+    assert client.get(base + "/members", headers=member_headers).status_code == 403
+    assert client.get(base + "/membership-history", headers=member_headers).status_code == 403
+    own_path = base + f"/members/{users['owner']}"
+    command_body = {"role": "owner", "active": False, "expected_version": 1}
+    assert client.patch(own_path, headers=headers, json=command_body).status_code == 409
+    promote = base + f"/members/{users['member']}"
+    assert (
+        client.patch(
+            promote, headers=headers, json={"role": "owner", "active": True, "expected_version": 1}
+        ).status_code
+        == 200
+    )
+    assert client.patch(own_path, headers=headers, json=command_body).status_code == 200
+    assert client.get(base + "/work", headers=headers).status_code == 403
+    assert client.get(base + "/members", headers=member_headers).status_code == 200
+    assert len(client.get(base + "/membership-history", headers=member_headers).json()) == 2
+
+
+def test_migration_rejects_ownerless_legacy_workspace(pg):
+    engine, config = pg
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "0001_work_storage")
+        connection.execute(
+            text("INSERT INTO workspaces (id,name) VALUES (:id,'Legacy ownerless')"),
+            {"id": uuid4()},
+        )
+    with pytest.raises(RuntimeError, match="without active owners"):
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+    assert "version" not in {
+        column["name"] for column in inspect(engine).get_columns("memberships")
+    }
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM workspaces")).scalar_one() == 1

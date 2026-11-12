@@ -5,6 +5,8 @@ import os
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import make_url
 
+SCHEMA_REVISION = "0002_membership_admin"
+
 
 def create_database_engine(url: str | None = None) -> Engine:
     configured = url or os.environ.get("FLOWPILOT_DATABASE_URL")

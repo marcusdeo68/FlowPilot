@@ -1,6 +1,6 @@
-"""Authorized PostgreSQL commands for synthetic work; no HTTP authentication yet.
+"""Authorized PostgreSQL commands for synthetic work.
 
-Only a verified authentication adapter may construct Principal in a future API.
+Only a verified authentication adapter may construct Principal for an API.
 No request is permitted to assert its own issuer/subject or role.
 """
 
@@ -15,12 +15,11 @@ from flowpilot_api.access import (
     AccessDenied,
     EvidenceVisibility,
     Membership,
-    Role,
     Visibility,
-    require_membership,
     require_work_access,
     visible_evidence,
 )
+from flowpilot_api.member_context import resolve_member
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.work import Commitment, Event, Task, WorkItem, can_change_work_status
 
@@ -104,28 +103,13 @@ class WorkService:
         *,
         write: bool = False,
     ) -> Membership:
-        row = (
-            connection.execute(
-                text("""
-            SELECT m.user_id, m.workspace_id, m.role, m.active
-            FROM memberships m JOIN users u ON u.id = m.user_id
-            WHERE m.workspace_id = :workspace AND u.issuer = :issuer AND u.subject = :subject
-            FOR SHARE OF m
-        """),
-                {
-                    "workspace": workspace_id,
-                    "issuer": principal.issuer,
-                    "subject": principal.subject,
-                },
-            )
-            .mappings()
-            .first()
+        return resolve_member(
+            connection,
+            issuer=principal.issuer,
+            subject=principal.subject,
+            workspace_id=workspace_id,
+            write=write,
         )
-        if row is None:
-            raise AccessDenied
-        member = Membership(row["user_id"], row["workspace_id"], Role(row["role"]), row["active"])
-        require_membership(member, workspace_id, write=write)
-        return member
 
     def _work(
         self, connection: Connection, member: Membership, work_id: UUID, *, write: bool = False
