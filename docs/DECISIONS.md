@@ -1,5 +1,14 @@
 # Architecture decisions
 
+## 0013 - Introduce PostgreSQL behind an internal authorized service first
+
+Use SQLAlchemy Core transactions, psycopg, and explicit Alembic migrations. Keep
+SQL values bound, scope relationships with composite workspace foreign keys, and
+resolve membership inside every service transaction. Freeze migration definitions
+instead of importing live models. Keep the legacy local UI operational while
+verified request identity and remaining Stage 1 records are implemented; do not
+expose the new service through self-asserted identity headers. See implementation 0005.
+
 ## 0012 - Establish reproducible verification and pure policies first
 
 Use uv with a committed dependency lock, pytest invariants, Ruff, and a Windows/Linux

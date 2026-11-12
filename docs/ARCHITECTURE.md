@@ -28,6 +28,14 @@ The next data-model segment should move persistence to PostgreSQL with SQLAlchem
 
 ## Module boundaries
 
+Increment 0005 adds PostgreSQL migrations and an internal `WorkService` using
+SQLAlchemy transactions and psycopg. The service resolves issuer/subject through
+stored membership on every operation, scopes queries by workspace and visibility,
+and commits state plus audit together. Composite foreign keys prevent tenant-mixed
+relationships. It has no HTTP routes and no verified authentication adapter yet.
+The dashboard still uses the separate legacy SQLite API. See implementation 0005
+for the exact storage boundary and deferred records.
+
 Increment 0004 introduces pure `access.py` policy functions and `work.py`
 discriminated contracts with isolated regression tests. They establish rules for
 the next persistence adapter; the legacy SQLite HTTP endpoints do not yet resolve

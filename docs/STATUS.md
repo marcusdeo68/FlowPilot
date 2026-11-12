@@ -38,8 +38,11 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 These are planned capabilities, not reported bugs. Stage 1 is incomplete.
 
-1. PostgreSQL schema and reversible migrations, with database integration tests
-   for workspace relationships, isolation, and audit transactions.
+1. PostgreSQL storage/service slice implemented in
+   [implementation 0005](implementation/0005-postgres-work-storage.md), pending final
+   CI/merge verification. Includes seven tables, workspace-qualified relationships,
+   stored-membership authorization, private sources, evidence sharing, and audit
+   transactions. Remaining Stage 1 tables and HTTP identity are still planned.
 2. Verified authentication and server-resolved memberships; wire access policies
    into every repository/service path and test unauthorized requests.
 3. Synthetic source/proposal review workflow, then dashboard integration and

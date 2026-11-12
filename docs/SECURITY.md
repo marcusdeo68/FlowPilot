@@ -24,6 +24,13 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 ## Required before multi-user or real provider data
 
+Increment 0005 implements internal PostgreSQL service checks for active stored
+membership, workspace isolation, source ownership, evidence projection, and atomic
+audit. No network request can yet obtain a verified Principal for that service.
+The old HTTP API remains unauthenticated. Separate database runtime/migration roles,
+retention/deletion, membership administration, backups, and deployment controls
+remain required. Test database credentials in CI/Compose are synthetic only.
+
 - Authentication and server-side workspace/member/role authorization.
 - Tenant isolation tests and review of every query and background job for object-level access checks.
 - PostgreSQL migrations, backups, recovery, encryption at rest, retention, deletion, and export procedures.

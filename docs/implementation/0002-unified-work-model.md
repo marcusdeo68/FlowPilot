@@ -1,6 +1,6 @@
 # Implementation 0002 — Unified work model and access foundation
 
-**Status: baseline specified; pure access policies and typed contracts implemented/tested in increment 0004. Database, verified identity, and authorization wiring remain unimplemented.** The local dashboard uses synthetic/manual data; it does not satisfy this segment's access requirements.
+**Status: baseline specified; pure policies/contracts in increment 0004; initial PostgreSQL migration and internal authorized work/source services in increment 0005. Verified HTTP identity, remaining records, and dashboard wiring remain unimplemented.** Stage 1 is incomplete. The local dashboard uses synthetic/manual data and does not satisfy this segment's access requirements.
 
 ## Product change this supports
 
