@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f7f4" />
+    <meta name="description" content="FlowPilot work coordination dashboard" />
+    <title>FlowPilot — Today</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="/" aria-label="FlowPilot home">
+          <span class="brand-mark" aria-hidden="true">F</span>
+          <span>flowpilot</span>
+        </a>
+        <div class="workspace-switcher">
+          <span class="workspace-avatar">S</span>
+          <span class="workspace-copy"><strong>Studio North</strong><small>Personal workspace</small></span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </div>
+        <p class="nav-label">WORKSPACE</p>
+        <nav class="nav-list">
+          <a class="nav-item active" href="#today" aria-current="page"><span class="nav-icon">◷</span>Today</a>
+          <a class="nav-item" href="#inbox"><span class="nav-icon">▤</span>Unified inbox<span class="nav-count">4</span></a>
+          <a class="nav-item" href="#tasks"><span class="nav-icon">◉</span>Tasks &amp; projects</a>
+          <a class="nav-item" href="#schedule"><span class="nav-icon">▦</span>Schedule</a>
+        </nav>
+        <p class="nav-label nav-label-spaced">MANAGE</p>
+        <nav class="nav-list">
+          <a class="nav-item" href="#review"><span class="nav-icon">✉</span>Review &amp; send<span class="nav-count count-muted">1</span></a>
+          <a class="nav-item" href="#connections"><span class="nav-icon">⌘</span>Connections</a>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="demo-status"><span></span><div><strong>Demo workspace</strong><small>Local data only</small></div></div>
+          <div class="profile-row"><span class="profile-avatar">M</span><span><strong>Marcus D.</strong><small>Local preview</small></span><span class="more">···</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="today">
+        <header class="topbar">
+          <div class="breadcrumbs">Studio North <span>/</span> <strong>Today</strong></div>
+          <div class="topbar-actions"><span class="today-date" id="today-date"></span><button class="icon-button" aria-label="Notifications">♧<i></i></button><span class="top-avatar">M</span></div>
+        </header>
+        <section class="welcome-row">
+          <div><p class="eyebrow">MONDAY, NOVEMBER 16</p><h1>Good morning, Marcus <span>✦</span></h1><p class="welcome-subtitle">Here’s what needs your attention today.</p></div>
+          <button class="primary-button" id="new-task"><span>＋</span> New task</button>
+        </section>
+        <div class="demo-banner"><span>DEMO DATA</span><p>Inbox, schedule, and email examples are illustrative. No accounts are connected.</p></div>
+
+        <section class="stats-grid" aria-label="Work summary">
+          <article class="stat-card"><div class="stat-heading"><span>Due today</span><span class="stat-icon coral">◷</span></div><strong id="due-count">—</strong><small><span class="trend">↑ 2</span> from yesterday</small></article>
+          <article class="stat-card"><div class="stat-heading"><span>Sample schedule</span><span class="stat-icon violet">▦</span></div><strong>5</strong><small>Illustrative upcoming</small></article>
+          <article class="stat-card"><div class="stat-heading"><span>Sample review</span><span class="stat-icon amber">✧</span></div><strong>4</strong><small>Illustrative signals</small></article>
+          <article class="stat-card"><div class="stat-heading"><span>Sample follow-ups</span><span class="stat-icon blue">↗</span></div><strong>2</strong><small>Draft preview only</small></article>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="panel tasks-panel" id="tasks">
+            <div class="panel-heading"><div><h2>Today’s focus</h2><p>Your priorities, all in one place</p></div><button class="text-button" id="view-all">View all <span>→</span></button></div>
+            <div class="task-list" id="task-list" aria-live="polite"><div class="loading-row">Loading your work…</div></div>
+            <button class="add-task-row" id="add-task"><span>＋</span> Add a task</button>
+          </section>
+          <section class="panel inbox-panel" id="inbox">
+            <div class="panel-heading"><div><h2>Sample signals</h2><p>Illustrative source updates</p></div><span class="unread-dot" aria-label="4 sample items"></span></div>
+            <div class="signal-list">
+              <article class="signal-item"><span class="source-icon gmail">M</span><div class="signal-copy"><div class="signal-top"><strong>Client proposal feedback</strong><time>12m</time></div><p>Jordan asked if we can share a revised timeline before Friday.</p><div class="signal-meta"><span>Sample email</span><span>·</span><span>Possible task</span></div></div></article>
+              <article class="signal-item"><span class="source-icon slack">#</span><div class="signal-copy"><div class="signal-top"><strong>Launch assets are ready</strong><time>1h</time></div><p>Priya posted the final campaign files in <b>#launch-team</b>.</p><div class="signal-meta"><span>Sample chat</span><span>·</span><span>Project update</span></div></div></article>
+              <article class="signal-item"><span class="source-icon note">▤</span><div class="signal-copy"><div class="signal-top"><strong>Planning notes updated</strong><time>3h</time></div><p>Two new action items were added to the quarterly plan.</p><div class="signal-meta"><span>Notes</span><span>·</span><span>2 suggestions</span></div></div></article>
+            </div>
+            <a class="panel-footer-link" href="#inbox">Open unified inbox <span>→</span></a>
+          </section>
+          <section class="panel schedule-panel" id="schedule">
+            <div class="panel-heading"><div><h2>Coming up</h2><p>Sample schedule · next few days</p></div><button class="more-button" aria-label="More schedule options">···</button></div>
+            <div class="schedule-list"><article class="event-row" data-day-offset="0"><div class="event-date"><strong>—</strong><small>—</small></div><div class="event-info"><strong>Send revised timeline</strong><span>Today · Due by 4:00 PM</span></div><span class="event-type task-type">Task</span></article><article class="event-row" data-day-offset="1"><div class="event-date"><strong>—</strong><small>—</small></div><div class="event-info"><strong>Design review</strong><span>10:30 AM · 30 min</span></div><span class="event-type meeting-type">Meet</span></article><article class="event-row" data-day-offset="3"><div class="event-date"><strong>—</strong><small>—</small></div><div class="event-info"><strong>Campaign launch</strong><span>All day · Marketing</span></div><span class="event-type event-type-tag">Event</span></article></div>
+            <a class="panel-footer-link" href="#schedule">View schedule <span>→</span></a>
+          </section>
+          <section class="panel draft-panel" id="review">
+            <div class="draft-icon">✉</div><div class="draft-content"><div class="draft-heading"><div><h2>Ready for your review</h2><p>A follow-up draft is waiting for you.</p></div><span class="draft-count">1</span></div><div class="draft-preview"><span class="draft-to">To: Jordan Lee</span><strong>Re: Project timeline</strong><p>Hi Jordan, thanks for the feedback. I’ve updated the timeline to reflect…</p></div><button class="secondary-button" id="review-draft">Review draft <span>→</span></button></div>
+          </section>
+        </div>
+        <footer class="page-footer"><span>FlowPilot brings your work into focus.</span><span class="footer-status"><i></i> All changes saved</span></footer>
+      </main>
+    </div>
+    <dialog id="task-dialog" aria-labelledby="dialog-title">
+      <form method="dialog" id="task-form">
+        <div class="dialog-heading"><div><p class="eyebrow">QUICK CAPTURE</p><h2 id="dialog-title">Add a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
+        <label for="task-title">Task title</label><input id="task-title" name="title" required maxlength="200" placeholder="What needs to get done?" />
+        <label for="task-owner">Owner <span>optional</span></label><input id="task-owner" name="owner_name" maxlength="160" placeholder="Name" />
+        <label for="task-date">Due date <span>optional</span></label><input id="task-date" name="due_date" type="date" />
+        <p class="dialog-note">Saved to this local demo workspace. It won’t be shared or sent anywhere.</p>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" id="save-task" value="default">Add task</button></div>
+      </form>
+    </dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

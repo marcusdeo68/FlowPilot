@@ -1,0 +1,34 @@
+# Learning guide for the current foundation
+
+This project assumes basic Python and Java knowledge, but limited experience with web services and production systems. The goal is to understand the request path and trade-offs, not memorize every line.
+
+## Concepts in this increment
+
+- **HTTP API:** routes map an HTTP method and URL to validated input and a response.
+- **Pydantic schema:** a boundary that parses untrusted JSON and rejects invalid or unexpected fields.
+- **Domain rule:** a product rule expressed independently of HTTP and storage. Here, not every status can transition to every other status.
+- **Repository:** the module that translates domain operations into SQL.
+- **Parameterized SQL:** values are sent separately from SQL syntax, preventing input from being interpreted as executable SQL.
+- **Transaction:** a group of database writes that either all commit or all roll back.
+- **Optimistic concurrency:** a client supplies the version it read; the server rejects the update if the record changed since then.
+- **Append-only event history:** changes are recorded as new rows rather than overwriting past events.
+- **Liveness vs readiness:** liveness answers whether the process responds; readiness checks whether a required dependency is available.
+
+## Walk the request path
+
+For a status update, start in `services/api/src/flowpilot_api/main.py` at the transition route. Follow the validated `CommitmentTransition` schema to `repository.transition_commitment`, then to `domain.can_transition` and the transaction in `database.py`. Note where the record version is checked, where the event is inserted, and how failures become HTTP `409` responses.
+
+## Questions to be able to answer
+
+1. Why can the model suggest a state change but not decide whether that change is legal?
+2. Why are the status update and event insertion inside the same transaction?
+3. What race does `expected_version` prevent?
+4. Why does loopback binding not substitute for authentication in a deployed service?
+5. Why must imported email be treated as data rather than trusted instructions?
+
+## Resources
+
+- [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
+- [Pydantic model documentation](https://docs.pydantic.dev/latest/concepts/models/)
+- [SQLite transactions](https://www.sqlite.org/lang_transaction.html)
+- [PostgreSQL tutorial](https://www.postgresql.org/docs/current/tutorial.html)

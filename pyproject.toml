@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flowpilot-api"
+version = "0.1.0"
+description = "Local development API foundation for FlowPilot"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["services/api/src"]
+
+[tool.setuptools.package-dir]
+"" = "services/api/src"
+
+[tool.setuptools.package-data]
+flowpilot_api = ["web/*.html", "web/*.css", "web/*.js"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

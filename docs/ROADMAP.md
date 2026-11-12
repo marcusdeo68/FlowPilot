@@ -1,0 +1,99 @@
+# FlowPilot roadmap
+
+The product direction is a unified cross-app work coordination hub. The first proof remains narrow: reliably turn source changes into reviewed tasks/commitments/events, then prepare a useful follow-up. Stages are dependencies, not delivery promises.
+
+## Stage 0 — Local foundation (scaffolded)
+
+- [x] FastAPI local app and liveness/readiness endpoints.
+- [x] SQLite records for synthetic/manual commitments.
+- [x] Explicit commitment transitions, record versions, and append-only status events.
+- [x] Product, architecture, API, security, learning, and implementation notes.
+- [ ] Create the private GitHub repository and connect the workspace.
+- [ ] Install/use a Python runtime, then validate the local app and add the first quality checks.
+
+## Stage 1 — Multi-source work model and access foundation (next implementation segment)
+
+Before live provider data, replace the single-user local storage model with the basic multi-user domain and authorization design:
+
+- PostgreSQL schema and versioned migrations.
+- Users, workspaces, memberships, roles, and server-side authorization boundaries.
+- Provider connections with owner, provider, granted scopes, and connection/revocation status.
+- Source items with provider identity, timestamps, link, minimal retained content, and visibility metadata.
+- Typed work items for commitments, tasks, and events; relationships to source evidence and projects.
+- Proposals, human review state, action proposals, exact-payload approvals, executions, and audit events.
+- Synthetic fixtures; no OAuth connection or real messages in this segment.
+
+The detailed design and acceptance criteria are in `docs/implementation/0002-unified-work-model.md`.
+
+## Stage 2 — Unified manual workflow UI (shell started)
+
+- Today / Command Center for changes, due work, events, blockers, and approvals.
+- Unified Inbox with source evidence and review/edit/confirm/dispute actions.
+- Tasks & Projects and a schedule view.
+- Action review UI that makes sender account, recipients, target, and content visible before approval.
+- Seeded synthetic sources to validate the product without provider access.
+- [x] First local dashboard shell with a today view and API-backed manual commitment capture.
+- [ ] Replace sample-only inbox and schedule cards with typed synthetic source/evidence fixtures.
+- [ ] Connect inbox review and task/project screens to the unified work model after Stage 1 access boundaries exist.
+
+## Stage 3 — AI proposal pipeline and evaluation
+
+- Structured proposals for commitments, tasks, dates, owners, events, and changed/canceled work.
+- Evidence references into source items; explicit uncertainty and abstention.
+- Evaluation data that distinguishes a promise from a suggestion, question, or hypothetical statement.
+- Regression checks for duplicates, state reconciliation, prompt injection, quality, latency, and cost.
+- Models can propose; deterministic code validates and users confirm. Models do not write canonical state or execute tools.
+
+## Stage 4 — One read-only provider pilot
+
+- Pick the first provider after API, scope, consent, data retention, and verification review.
+- Begin with read-only data synchronization and a narrow set of approved sources.
+- Add verified webhooks or safe polling, deduplication, backoff, revocation, and user-scoped data visibility.
+- Start with synthetic fixtures; only move to consented real data after access controls and retention are ready.
+
+Gmail is a product-relevant candidate, but the official Gmail API classifies full message-read scopes as restricted; storage/transmission of restricted data can bring security assessment requirements. This needs early planning before product architecture depends on broad inbox access ([Gmail API scopes](https://developers.google.com/workspace/gmail/api/auth/scopes), [Google Workspace user data policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy)).
+
+## Stage 5 — Human-approved actions
+
+- Create editable professional email drafts with exact sender, recipient, subject, body, and attachment preview.
+- Start with saving drafts where supported; sending is a separate capability and permission grant.
+- Approval binds an authorized user to the exact action payload, account, target, version, and expiry.
+- Editing after approval invalidates it; execution re-checks authorization and uses an idempotency key.
+- Record provider responses and verify whether the action happened before offering retries.
+
+Gmail `gmail.send` is sensitive, while `gmail.compose` is a restricted scope; the appropriate scope depends on whether FlowPilot only saves drafts or sends email. App verification and any assessment obligations must be addressed before launch ([Gmail API scopes](https://developers.google.com/workspace/gmail/api/auth/scopes)).
+
+## Stage 6 — Expand sources based on pilot value
+
+- Slack: scope only the channels/conversations a user or app is permitted to access; keep per-provider app permissions explicit ([Slack permission scopes](https://api.slack.com/scopes)).
+- Microsoft Teams: review delegated vs application permissions and admin consent requirements for the target chat/channel features ([Microsoft Graph permissions](https://learn.microsoft.com/graph/permissions-reference?view=graph-rest-1.0)).
+- Google Keep: do not assume personal-account note sync is available. Google's published Keep API is oriented toward enterprise administration and domain authorization; validate the intended account model before committing this connector ([Google Keep API overview](https://developers.google.com/workspace/keep/api/guides)).
+- Consider Calendar, Drive, Google Docs, Notion, or other sources only when a pilot demonstrates a clear workflow and their access model passes the same review.
+
+## Stage 7 — Pilot and reliability
+
+- Pilot with one small team and a bounded number of sources.
+- Measure missed/incorrect proposals, duplicate rate, user corrections, time to resolve, action success, latency, and model/API costs.
+- Improve observability, retries, data deletion/export, permission transparency, and recovery from provider outages.
+
+## Stage 8 — AWS delivery and operations (parallel portfolio track)
+
+Build and prove the local container first, then deploy a private development environment only after authentication, workspace authorization, PostgreSQL migrations, and secret handling are in place. The initial AWS target is an ECS service on Fargate, with images in ECR, PostgreSQL in RDS inside private subnets, credentials in Secrets Manager, and application logs/alarms in CloudWatch. Fargate runs containers without requiring the project to manage EC2 hosts ([ECS Fargate overview](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html)); RDS provides a managed PostgreSQL option ([RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html)).
+
+- Dockerize the API/UI and add a non-root runtime, health checks, and image scanning.
+- Define the network, IAM roles, database, service, and logs as Terraform; keep state remote and encrypted before team use.
+- Build/test in GitHub Actions and authenticate to AWS through OIDC with a repository-and-branch constrained trust policy; do not store long-lived AWS keys as repository secrets ([GitHub OIDC for AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws)).
+- Add CloudWatch alarms, log retention, a deployment rollback path, deletion/backup notes, and an AWS Budget alert before enabling a public endpoint.
+- Start with a private, low-cost dev environment and tear it down when idle. Budget alerts are useful but delayed: AWS billing data used by Budgets refreshes at least daily ([AWS Budgets guidance](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-best-practices.html)).
+
+This track adds credible resume evidence in containerization, AWS networking/IAM, managed PostgreSQL, Infrastructure as Code, secure CI/CD, observability, and cost-aware operations. It is a later deployment target, not authorization to create AWS resources now.
+
+## Commitment lifecycle in the current scaffold
+
+```text
+detected → confirmed → active → completed
+    │          │         │  ↘ blocked → active
+    └──────────┴─────────┴──→ canceled / disputed
+```
+
+The transition table in `services/api/src/flowpilot_api/domain.py` applies to the current local API. The broader work-item lifecycle will be specified in Stage 1 and must preserve event history.
