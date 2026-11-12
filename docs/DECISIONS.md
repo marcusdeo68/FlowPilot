@@ -1,5 +1,13 @@
 # Architecture decisions
 
+## 0012 - Establish reproducible verification and pure policies first
+
+Use uv with a committed dependency lock, pytest invariants, Ruff, and a Windows/Linux
+CI matrix before replacing persistence. Keep authorization policies independent
+of HTTP and storage so cross-workspace privacy rules can be reviewed and tested.
+Wire them only to verified identities and stored membership; standalone policy
+tests do not establish API authentication. See implementation 0004 for boundaries.
+
 ## 0001 — Use a Python modular monolith first
 
 **Decision:** Build the first backend as a single FastAPI application with separate domain, API, and persistence modules.

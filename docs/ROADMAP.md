@@ -8,12 +8,16 @@ The product direction is a unified cross-app work coordination hub. The first pr
 - [x] SQLite records for synthetic/manual commitments.
 - [x] Explicit commitment transitions, record versions, and append-only status events.
 - [x] Product, architecture, API, security, learning, and implementation notes.
-- [ ] Create the private GitHub repository and connect the workspace.
-- [ ] Install/use a Python runtime, then validate the local app and add the first quality checks.
+- [x] Create the GitHub repository and connect the workspace (public by user choice).
+- [x] Install/use a Python runtime, validate the local app, and add automated quality checks.
 
 ## Stage 1 — Multi-source work model and access foundation (next implementation segment)
 
 Before live provider data, replace the single-user local storage model with the basic multi-user domain and authorization design:
+
+First portion implemented: tested pure access policies and typed work contracts.
+They are not yet connected to request identity or tenant-aware persistence; Stage 1
+remains incomplete. See `docs/implementation/0004-verification-and-access-policies.md`.
 
 - PostgreSQL schema and versioned migrations.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.

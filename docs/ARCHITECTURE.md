@@ -28,6 +28,12 @@ The next data-model segment should move persistence to PostgreSQL with SQLAlchem
 
 ## Module boundaries
 
+Increment 0004 introduces pure `access.py` policy functions and `work.py`
+discriminated contracts with isolated regression tests. They establish rules for
+the next persistence adapter; the legacy SQLite HTTP endpoints do not yet resolve
+verified identities or invoke these policies. Do not infer tenant isolation from
+the presence of the policy module.
+
 - **API:** HTTP routes, request authentication, authorization dependencies, and error mapping.
 - **Domain:** work item semantics, permitted lifecycle transitions, and approval invariants.
 - **Connectors:** provider-specific OAuth scopes, API calls, webhook verification, and normalization.

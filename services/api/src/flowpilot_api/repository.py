@@ -1,7 +1,7 @@
 """Persistence operations; SQL values are always bound parameters."""
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from flowpilot_api.database import transaction
@@ -22,7 +22,7 @@ class VersionConflict(Exception):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def row_to_commitment(row: sqlite3.Row) -> dict[str, object]:
@@ -68,13 +68,13 @@ def create_commitment(payload: CommitmentCreate) -> dict[str, object]:
                VALUES (?, 'created', 'local-user', NULL, ?, NULL, ?)""",
             (commitment_id, CommitmentStatus.DETECTED.value, timestamp),
         )
-        row = connection.execute("SELECT * FROM commitments WHERE id = ?", (commitment_id,)).fetchone()
+        row = connection.execute(
+            "SELECT * FROM commitments WHERE id = ?", (commitment_id,)
+        ).fetchone()
     return row_to_commitment(row)
 
 
-def list_commitments(
-    *, status: CommitmentStatus | None, limit: int
-) -> list[dict[str, object]]:
+def list_commitments(*, status: CommitmentStatus | None, limit: int) -> list[dict[str, object]]:
     with transaction() as connection:
         if status is None:
             rows = connection.execute(

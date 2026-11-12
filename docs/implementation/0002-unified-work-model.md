@@ -1,6 +1,6 @@
 # Implementation 0002 — Unified work model and access foundation
 
-**Status: access-model baseline specified / database and authorization not implemented.** This is the next backend engineering segment. The local dashboard has been started independently with synthetic/manual data; it does not satisfy this segment's access requirements.
+**Status: baseline specified; pure access policies and typed contracts implemented/tested in increment 0004. Database, verified identity, and authorization wiring remain unimplemented.** The local dashboard uses synthetic/manual data; it does not satisfy this segment's access requirements.
 
 ## Product change this supports
 

@@ -47,14 +47,7 @@ function createTaskRow(task, index) {
   checkbox.className = "task-check";
   checkbox.type = "checkbox";
   checkbox.checked = task.status === "completed";
-  const completionPaths = {
-    detected: ["confirmed", "active", "completed"],
-    confirmed: ["active", "completed"],
-    active: ["completed"],
-    blocked: ["active", "completed"],
-    disputed: ["confirmed", "active", "completed"],
-  };
-  checkbox.disabled = task.id.startsWith("sample-") || !completionPaths[task.status];
+  checkbox.disabled = task.id.startsWith("sample-") || task.status !== "active";
   checkbox.setAttribute("aria-label", `Mark ${task.title} complete`);
 
   const copy = document.createElement("div");
@@ -64,6 +57,9 @@ function createTaskRow(task, index) {
   title.textContent = task.title;
   const details = document.createElement("div");
   details.className = "task-detail";
+  const status = document.createElement("span");
+  status.textContent = task.status;
+  details.append(status);
   const due = document.createElement("span");
   due.textContent = formatDueDate(task.due_date);
   details.append(due);
@@ -85,7 +81,22 @@ function createTaskRow(task, index) {
   copy.append(title, details);
   row.append(checkbox, copy);
   if (!task.id.startsWith("sample-")) {
-    checkbox.addEventListener("change", () => transitionTask(task, row));
+    checkbox.addEventListener("change", () => transitionTask(task, "completed", checkbox));
+    const nextSteps = {
+      detected: ["confirmed", "Confirm"],
+      confirmed: ["active", "Start"],
+      blocked: ["active", "Resume"],
+      disputed: ["confirmed", "Resolve & confirm"],
+    };
+    if (nextSteps[task.status]) {
+      const [target, label] = nextSteps[task.status];
+      const action = document.createElement("button");
+      action.className = "text-button";
+      action.textContent = label;
+      action.setAttribute("aria-label", `${label}: ${task.title}`);
+      action.addEventListener("click", () => transitionTask(task, target, action));
+      row.append(action);
+    }
   }
   row.style.animationDelay = `${index * 35}ms`;
   return row;
@@ -118,37 +129,23 @@ async function loadTasks() {
   render();
 }
 
-async function transitionTask(task, row) {
-  const checkbox = row.querySelector(".task-check");
-  checkbox.disabled = true;
+async function transitionTask(task, target_status, control) {
+  control.disabled = true;
   try {
-    let state = task.status;
-    let version = task.version;
     const path = `/api/v1/commitments/${encodeURIComponent(task.id)}/transitions`;
-    const completionPaths = {
-      detected: ["confirmed", "active", "completed"],
-      confirmed: ["active", "completed"],
-      active: ["completed"],
-      blocked: ["active", "completed"],
-      disputed: ["confirmed", "active", "completed"],
-    };
-    for (const target_status of completionPaths[state] || []) {
-      const response = await fetch(path, {
+    const response = await fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ target_status, expected_version: version }),
+        body: JSON.stringify({ target_status, expected_version: task.version }),
       });
       if (!response.ok) throw new Error("Task changed. Reload and try again.");
-      const updated = await response.json();
-      state = updated.status;
-      version = updated.version;
-    }
     await loadTasks();
-    showToast("Task marked complete.");
+    showToast(`Commitment ${target_status}.`);
   } catch (error) {
-    checkbox.checked = false;
-    checkbox.disabled = false;
+    await loadTasks();
     showToast(error.message || "Could not update task.");
+  } finally {
+    control.disabled = false;
   }
 }
 

@@ -1,4 +1,5 @@
 .venv/
+.tools/
 __pycache__/
 *.py[cod]
 *.sqlite3
@@ -11,6 +12,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+coverage.xml
 dist/
 build/
 *.egg-info/
