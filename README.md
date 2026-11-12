@@ -53,6 +53,7 @@ The dashboard is an early local prototype. Its inbox, event, draft, and connecti
 - `services/api/src/flowpilot_api/web/`: dependency-free local dashboard assets.
 - `docs/`: product intent, architecture, security boundaries, decisions, and learning notes.
 - `docs/implementation/`: feature-by-feature implementation notes and software/design explanations.
+- `docs/STATUS.md`: maintenance tracker, known issues, verification gaps, and next milestones.
 
 Read [the product direction](docs/PRODUCT.md), [the roadmap](docs/ROADMAP.md), and [security boundaries](docs/SECURITY.md) before extending this foundation.
 

@@ -26,6 +26,24 @@ For a status update, start in `services/api/src/flowpilot_api/main.py` at the tr
 4. Why does loopback binding not substitute for authentication in a deployed service?
 5. Why must imported email be treated as data rather than trusted instructions?
 
+## Verification and access policy exercises (increment 0004)
+
+Read `tests/test_api.py` alongside `database.py`: deliberately failing an event
+insert proves that the status update rolls back. Explain why a test that only
+checks a successful response would miss this failure mode.
+
+Read `access.py` and `tests/test_access.py`: compare workspace membership with
+source ownership. Explain why an owner can read a shared task but cannot inherit
+another member's private email. The policies are not yet wired into HTTP routes.
+
+Read `work.py`: compare task and commitment states, then try an event with no
+timestamp offset. Explain why an IANA display zone alone does not identify a
+unique instant around daylight-saving changes.
+
+Read `uv.lock` and `.github/workflows/ci.yml`: explain how a lock and fresh CI
+environment reduce "works on my machine" failures. Track current gaps and the
+next implementation milestone in [STATUS.md](STATUS.md).
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
