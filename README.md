@@ -81,3 +81,7 @@ setup, test isolation, design, and remaining limits are documented in
 [implementation 0005](docs/implementation/0005-postgres-work-storage.md).
 CI runs real-database checks separately; local runs skip them unless
 `FLOWPILOT_TEST_DATABASE_URL` points to a dedicated database ending in `_test`.
+
+Chromium workflow checks and optional local browser setup are documented in
+[implementation 0006](docs/implementation/0006-browser-regressions.md). CI also
+supports manual dispatch and a daily 10:17 UTC maintenance check.

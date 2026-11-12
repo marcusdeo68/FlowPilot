@@ -162,6 +162,20 @@ function showToast(message) {
   showToast.timeoutId = window.setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
+function validationMessage(detail) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const labels = { title: "Task title", owner_name: "Owner", due_date: "Due date" };
+    return detail.map((issue) => {
+      const field = issue.loc?.at(-1);
+      const label = labels[field] || "Task";
+      const message = typeof issue.msg === "string" ? issue.msg : "Invalid value";
+      return `${label}: ${message}`;
+    }).join(". ");
+  }
+  return "Could not save this task.";
+}
+
 document.querySelector("#new-task").addEventListener("click", openTaskDialog);
 document.querySelector("#add-task").addEventListener("click", openTaskDialog);
 document.querySelector("#view-all").addEventListener("click", () => showToast("The task workspace is coming in a later increment."));
@@ -181,7 +195,7 @@ form.addEventListener("submit", async (event) => {
     });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
-      throw new Error(result.detail || "Could not save this task.");
+      throw new Error(validationMessage(result.detail));
     }
     dialog.close();
     await loadTasks();

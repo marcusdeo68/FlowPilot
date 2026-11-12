@@ -1,6 +1,6 @@
 # Implementation 0005 - PostgreSQL work storage and authorized services
 
-Status: internal storage/service slice implemented; hosted verification in progress.
+Status: merged in PR #4 after successful PostgreSQL and cross-platform CI.
 The PostgreSQL adapter is an internal synthetic-data foundation. The dashboard
 continues to use its existing unauthenticated SQLite API.
 
@@ -104,7 +104,10 @@ skips them when no test URL is set. CI includes migration downgrade/upgrade,
 cross-workspace reads/writes and foreign keys, observer denial, inactive membership,
 source-owner sharing, stale versions, concurrent writers, audit failure rollback,
 append-only enforcement, and event timestamps. Local PostgreSQL availability and
-hosted results will be recorded before merge.
+hosted results: all 16 PostgreSQL integration checks passed in run 43223717384;
+all 39 ordinary checks, lint, formatting, JavaScript syntax, and package builds
+passed on Windows/Linux with Python 3.11/3.12. PostgreSQL is not installed locally;
+real-database verification ran in CI, not against a local substitute.
 
 ## Next increment and learning
 

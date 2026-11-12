@@ -86,12 +86,12 @@
     </div>
     <dialog id="task-dialog" aria-labelledby="dialog-title">
       <form method="dialog" id="task-form">
-        <div class="dialog-heading"><div><p class="eyebrow">QUICK CAPTURE</p><h2 id="dialog-title">Add a task</h2></div><button class="close-button" value="cancel" aria-label="Close">×</button></div>
+        <div class="dialog-heading"><div><p class="eyebrow">QUICK CAPTURE</p><h2 id="dialog-title">Add a task</h2></div><button class="close-button" value="cancel" aria-label="Close" formnovalidate>×</button></div>
         <label for="task-title">Task title</label><input id="task-title" name="title" required maxlength="200" placeholder="What needs to get done?" />
         <label for="task-owner">Owner <span>optional</span></label><input id="task-owner" name="owner_name" maxlength="160" placeholder="Name" />
         <label for="task-date">Due date <span>optional</span></label><input id="task-date" name="due_date" type="date" />
         <p class="dialog-note">Saved to this local demo workspace. It won’t be shared or sent anywhere.</p>
-        <div class="dialog-actions"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" id="save-task" value="default">Add task</button></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" formnovalidate>Cancel</button><button class="primary-button" id="save-task" value="default">Add task</button></div>
       </form>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

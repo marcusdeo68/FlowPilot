@@ -55,6 +55,13 @@ Read `tests/test_postgres.py`: explain why each test uses its own schema and why
 the test database must be explicitly named. Compare a migration downgrade on a
 disposable test database with running that command on retained development data.
 
+## Browser regression exercises (increment 0006)
+
+Read the empty-dialog and whitespace-title tests in `tests/test_browser.py`.
+Explain why the API suite passed even though Cancel and validation messages were
+broken. Find the boundary where a structured error becomes user-visible text,
+and explain why textContent matters for an injection-shaped title.
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
