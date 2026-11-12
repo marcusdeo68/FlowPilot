@@ -11,6 +11,9 @@ verification for each revision. Update this file when an item's state changes.
   the PR revision. Lint, formatting, package builds, and JavaScript syntax passed.
 - SQLite dashboard is local-only with synthetic/manual data. Tested access policies
   are not yet wired to authenticated requests or tenant-aware storage.
+- PostgreSQL migration and internal authorized work/source services merged in
+  [PR #4](https://github.com/marcusdeo68/FlowPilot/pull/4): 16 real PostgreSQL
+  integration checks and 39 ordinary tests passed. The legacy HTTP API is separate.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
 
@@ -18,8 +21,10 @@ verification for each revision. Update this file when an item's state changes.
 
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
-| FP-001 | Dependency warning / open | pytest reports Starlette's httpx TestClient deprecation. Tests pass; a future upstream release could remove compatibility. | Evaluate supported replacement against official release guidance; close when the supported client passes the API suite without the warning. |
-| FP-002 | Test coverage gap / open | Dashboard JavaScript has a syntax check; no automated real-browser workflow tests. API tests cannot detect broken buttons, focus handling, or DOM rendering. | Add browser checks for capture, explicit transitions, conflict recovery, and safe text rendering. Close when these run in CI. |
+| FP-001 | Dependency warning / fix awaiting CI | Switched to the supported httpx2 TestClient dependency. | Close after the full CI matrix passes without the old deprecation. |
+| FP-002 | Browser coverage gap / implementation awaiting CI | Six Chromium checks now cover capture, explicit transitions, conflict recovery, safe text, dialog controls, and validation errors. | Close after the browser job passes in CI. Other engines, mobile, and accessibility audits remain future coverage. |
+| FP-007 | Dialog cancel defect / fix awaiting CI | Empty task dialog could not be cancelled because required-title validation blocked Cancel. Reproduced in Chromium; cancel submitters now bypass save validation. | Passing browser regression check. |
+| FP-008 | Validation message defect / fix awaiting CI | Whitespace title produced `[object Object]` rather than readable server validation. Reproduced in Chromium; errors now project field labels and messages. | Passing browser regression check with form recovery. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -33,14 +38,15 @@ Keep resolved entries so the reason for a fix remains discoverable.
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
 | FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; see implementation 0004. Browser regression coverage is still FP-002. |
+| FP-006 | Rebuilt incomplete Python environment after recurring file locks | Old environment preserved under ignored `.tools/venv-backup-0006`; fresh environment installed with uv copy mode. Exact lock origin is unconfirmed; future recurring failures need investigation. |
 
 ## Next implementation milestones
 
 These are planned capabilities, not reported bugs. Stage 1 is incomplete.
 
 1. PostgreSQL storage/service slice implemented in
-   [implementation 0005](implementation/0005-postgres-work-storage.md), pending final
-   CI/merge verification. Includes seven tables, workspace-qualified relationships,
+   [implementation 0005](implementation/0005-postgres-work-storage.md), merged and
+   CI verified. Includes seven tables, workspace-qualified relationships,
    stored-membership authorization, private sources, evidence sharing, and audit
    transactions. Remaining Stage 1 tables and HTTP identity are still planned.
 2. Verified authentication and server-resolved memberships; wire access policies
@@ -61,5 +67,7 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
 - Dependencies: weekly Dependabot update PRs are configured. GitHub vulnerability
   alerts and security-update PRs are enabled. Updates require normal validation.
 - Between sessions: there is no scheduled development agent, uptime monitor, or
-  continuous bug triage process. CI runs on pushes/PRs; it does not watch a running
-  application. Add deployment monitoring when there is a deployed environment.
+  continuous bug triage process. CI is configured for main pushes/PRs, manual runs,
+  and a daily 10:17 UTC check; it does not watch a running application. The daily
+  schedule has not yet been observed firing. Add deployment monitoring when there
+  is a deployed environment.

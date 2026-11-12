@@ -18,11 +18,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "build>=1,<2"]
+dev = ["pytest>=8,<10", "httpx2>=2.16,<3", "ruff>=0.11,<1", "build>=1,<2"]
+browser = ["playwright>=1.56,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["postgres: requires an isolated PostgreSQL test database"]
+markers = [
+    "postgres: requires an isolated PostgreSQL test database",
+    "browser: requires Playwright Chromium and FLOWPILOT_BROWSER_TESTS=1",
+]
+
+[tool.uv]
+link-mode = "copy"
 
 [tool.setuptools.packages.find]
 where = ["services/api/src"]
