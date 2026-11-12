@@ -396,3 +396,139 @@ def test_source_audit_commits_with_source_and_rolls_back_on_failure(setup):
         )
     with service.engine.begin() as connection:
         assert connection.execute(text("SELECT count(*) FROM source_items")).scalar_one() == 1
+
+
+@pytest.fixture
+def workspace_client(setup, token_tools):
+    from fastapi.testclient import TestClient
+    from flowpilot_api.workspace_api import create_workspace_app
+
+    service, workspace, other, users = setup
+    config, verifier, sign = token_tools
+    with service.engine.begin() as connection:
+        connection.execute(text("UPDATE users SET issuer=:issuer"), {"issuer": config.issuer})
+    app = create_workspace_app(engine=service.engine, verifier=verifier)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        yield client, workspace, other, users, sign
+
+
+def test_workspace_http_authentication_boundary(workspace_client):
+    client, workspace, _, _, sign = workspace_client
+    path = f"/api/v2/workspaces/{workspace}/work"
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers={"Authorization": "Bearer fake"}).status_code == 401
+    assert client.get(path, headers={"X-User-ID": "owner", "X-Role": "owner"}).status_code == 401
+    assert client.get("/api/v1/commitments").status_code == 404
+    assert client.get("/readyz").status_code == 200
+    assert (
+        client.get(path, headers={"Authorization": "Bearer " + sign("outsider")}).status_code == 403
+    )
+    response = client.get(path, headers={"Authorization": "Bearer " + sign()})
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.json() == []
+
+
+def test_workspace_http_create_transition_and_tenant_checks(workspace_client):
+    client, workspace, other, _, sign = workspace_client
+    headers = {"Authorization": "Bearer " + sign()}
+    path = f"/api/v2/workspaces/{workspace}/work"
+    response = client.post(
+        path, headers=headers, json={"item": {"kind": "task", "title": "API task"}}
+    )
+    assert response.status_code == 201, response.text
+    item = response.json()
+    assert item["data"]["status"] == "open"
+    assert (
+        client.get(
+            path + "/" + item["id"], headers={"Authorization": "Bearer " + sign("member")}
+        ).status_code
+        == 404
+    )
+    transition = path + f"/{item['id']}/transitions"
+    assert (
+        client.post(
+            transition, headers=headers, json={"target": "active", "expected_version": 1}
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            transition, headers=headers, json={"target": "completed", "expected_version": 1}
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/api/v2/workspaces/{other}/work",
+            headers=headers,
+            json={"item": {"kind": "task", "title": "Wrong tenant"}},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            path,
+            headers=headers,
+            json={"item": {"kind": "task", "title": "Forged"}, "role": "owner"},
+        ).status_code
+        == 422
+    )
+
+
+def test_workspace_http_scopes_and_stored_role(workspace_client):
+    client, workspace, _, _, sign = workspace_client
+    path = f"/api/v2/workspaces/{workspace}/work"
+    assert (
+        client.get(
+            path, headers={"Authorization": "Bearer " + sign(overrides={"scope": ""})}
+        ).status_code
+        == 403
+    )
+    read_only = {"Authorization": "Bearer " + sign(overrides={"scope": "flowpilot:read"})}
+    assert client.get(path, headers=read_only).status_code == 200
+    assert (
+        client.post(
+            path, headers=read_only, json={"item": {"kind": "task", "title": "No scope"}}
+        ).status_code
+        == 403
+    )
+    forged_role = {"Authorization": "Bearer " + sign("observer", overrides={"role": "owner"})}
+    assert (
+        client.post(
+            path, headers=forged_role, json={"item": {"kind": "task", "title": "No role"}}
+        ).status_code
+        == 403
+    )
+
+
+def test_workspace_http_evidence_requires_source_owner(workspace_client):
+    client, workspace, _, _, sign = workspace_client
+    base = f"/api/v2/workspaces/{workspace}"
+    member = {"Authorization": "Bearer " + sign("member")}
+    owner = {"Authorization": "Bearer " + sign()}
+    source = client.post(
+        base + "/sources",
+        headers=member,
+        json={
+            "reference": "synthetic-message",
+            "summary": "Shared summary",
+            "excerpt": "Private excerpt",
+        },
+    )
+    assert source.status_code == 201
+    source_id = source.json()["id"]
+    assert client.get(base + f"/sources/{source_id}", headers=owner).status_code == 404
+    work = client.post(
+        base + "/work",
+        headers=member,
+        json={"item": {"kind": "task", "title": "Shared task"}, "visibility": "workspace"},
+    ).json()
+    path = base + f"/work/{work['id']}/evidence"
+    payload = {"source_id": source_id, "visibility": "summary_shared", "expected_version": 1}
+    assert client.post(path, headers=owner, json=payload).status_code == 404
+    assert client.post(path, headers=member, json=payload).status_code == 200
+    assert client.get(path, headers=owner).json() == [{"summary": "Shared summary"}]
+    assert client.get(path, headers=member).json() == [
+        {"summary": "Shared summary", "excerpt": "Private excerpt"}
+    ]

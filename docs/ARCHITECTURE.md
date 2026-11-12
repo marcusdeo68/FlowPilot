@@ -28,6 +28,13 @@ The next data-model segment should move persistence to PostgreSQL with SQLAlchem
 
 ## Module boundaries
 
+Increment 0007 adds a separate `workspace_api:create_workspace_app` factory with
+signed access-token verification and API scopes before invoking the PostgreSQL
+service. Its request identities are verified issuer/subject pairs. It does not
+mount legacy routes or the dashboard. A real identity provider, login/session flow,
+and provisioning remain unconfigured; see implementation 0007 for token-profile
+requirements and the explicit separation from the local demo.
+
 Increment 0005 adds PostgreSQL migrations and an internal `WorkService` using
 SQLAlchemy transactions and psycopg. The service resolves issuer/subject through
 stored membership on every operation, scopes queries by workspace and visibility,

@@ -21,7 +21,9 @@ remains incomplete. See `docs/implementation/0004-verification-and-access-polici
 
 - [x] Initial PostgreSQL schema, reversible migration, and real database CI tests
   for manual typed work, evidence privacy, and audit transactions (increment 0005).
-- [ ] Remaining Stage 1 records, verified HTTP identity, and dashboard persistence migration.
+- [x] Separate signed-access-token workspace API factory with stored-member authorization (0007).
+- [ ] Live identity-provider setup, login/session, provisioning, remaining Stage 1 records,
+  and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.
 - Provider connections with owner, provider, granted scopes, and connection/revocation status.
 - Source items with provider identity, timestamps, link, minimal retained content, and visibility metadata.

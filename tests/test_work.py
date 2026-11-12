@@ -46,3 +46,15 @@ def test_event_contract():
     )
     assert item.title == "Synthetic meeting"
     assert can_change_work_status(item, "canceled")
+
+
+def test_postgres_incompatible_nul_rejected_before_storage():
+    from flowpilot_api.work_service import ManualSource
+
+    for factory in (
+        lambda: Task(title="bad\x00title"),
+        lambda: Task(title="Task", description="bad\x00description"),
+        lambda: ManualSource(reference="ref", summary="Summary", excerpt="bad\x00excerpt"),
+    ):
+        with pytest.raises(ValidationError, match="NUL"):
+            factory()

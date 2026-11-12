@@ -18,6 +18,8 @@ verification for each revision. Update this file when an item's state changes.
   [PR #5](https://github.com/marcusdeo68/FlowPilot/pull/5). All six CI jobs passed:
   four platform/Python combinations, PostgreSQL, and Chromium. Local verification
   passed 45 tests including six browser workflows; PostgreSQL's 16 tests passed in CI.
+- Increment 0007 adds a separately configured bearer-verified workspace API;
+  final hosted verification is pending. The demo still uses the separate local API.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
 
@@ -39,7 +41,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
 | FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; browser regression passed in PR #5. |
-| FP-006 | Rebuilt incomplete Python environment after recurring file locks | Old environment preserved under ignored `.tools/venv-backup-0006`; fresh environment installed with uv copy mode. Exact lock origin is unconfirmed; future recurring failures need investigation. |
+| FP-006 | Environment moved outside sync directory after locks recurred | Copy mode alone did not solve repeated update failures. Fresh environment now lives under local application data, linked by `.venv`; old/residual files are preserved and ignored. See implementation 0007. Exact lock origin remains unconfirmed. |
 | FP-001 | Supported TestClient dependency, without warning suppression | httpx2 regression suite passed in PR #5 on Windows/Linux Python 3.11/3.12. |
 | FP-002 | Real-browser workflow job implemented | Six Chromium checks passed locally and in CI in PR #5. See FP-009 for remaining coverage. |
 | FP-007 | Empty dialog cancellation fixed | Required-title validation no longer blocks Cancel/Close; reproduced failing test now passes in Chromium. |
@@ -54,8 +56,10 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    CI verified. Includes seven tables, workspace-qualified relationships,
    stored-membership authorization, private sources, evidence sharing, and audit
    transactions. Remaining Stage 1 tables and HTTP identity are still planned.
-2. Verified authentication and server-resolved memberships; wire access policies
-   into every repository/service path and test unauthorized requests.
+2. Verify increment 0007's signed-access-token API and PostgreSQL HTTP checks. Then
+   choose/configure a compatible identity provider, implement login/session and
+   provisioning flows, and migrate the dashboard. Identity verification does not
+   yet supply a working browser sign-in experience.
 3. Synthetic source/proposal review workflow, then dashboard integration and
    browser tests. Preserve explicit evidence sharing and human review boundaries.
 4. Only after access controls: provider review and one read-only pilot. AWS

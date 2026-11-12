@@ -18,6 +18,8 @@ class WorkBase(BaseModel):
     @classmethod
     def meaningful_text(cls, value: str | None) -> str | None:
         if value is not None:
+            if "\x00" in value:
+                raise ValueError("Text cannot contain NUL characters")
             value = value.strip()
             if not value:
                 raise ValueError("Text must not be blank")

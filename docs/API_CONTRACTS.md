@@ -1,6 +1,6 @@
 # API contracts — foundation increment
 
-Base path: `/api/v1`. All responses are JSON. IDs are UUIDs and timestamps are UTC ISO 8601 strings.
+Legacy local demo base path: `/api/v1`. All responses are JSON. IDs are UUIDs and timestamps are UTC ISO 8601 strings. This API remains unauthenticated and synthetic-only. The separate workspace API is described below.
 
 ## Operations
 
@@ -40,7 +40,53 @@ Only `title` is required. Unknown properties are rejected. Text fields have leng
 
 Allowed transitions are documented in `docs/ROADMAP.md` and enforced by server-side domain rules. A stale `expected_version` or an illegal transition returns `409 Conflict`; clients should fetch the current record before retrying. This API does not represent an external action approval.
 
-## Planned cross-app contract (design only)
+## Separate workspace API (increment 0007)
+
+Factory: `flowpilot_api.workspace_api:create_workspace_app`. This factory mounts
+no legacy `/api/v1` endpoints or dashboard. Configuration and accepted token profile
+are in [implementation 0007](implementation/0007-verified-workspace-api.md).
+It has no live sign-in/provider/provisioning flow yet.
+
+All resource endpoints require a verified bearer access token and `flowpilot:read`;
+writes additionally require `flowpilot:write`. Stored membership/role and object
+visibility determine actual access. The path workspace UUID is a selector, not
+authorization. Unknown JSON fields are rejected.
+
+Base: `/api/v2/workspaces/{workspace_id}`.
+
+| Method and suffix | Purpose |
+| --- | --- |
+| `GET /work?limit=50` | Authorized private/shared work, maximum 100 |
+| `POST /work` | Create a typed item in its initial state; defaults private |
+| `GET /work/{id}` | Authorized work record |
+| `POST /work/{id}/transitions` | Explicit target and expected version |
+| `POST /work/{id}/share` | Creator explicitly shares work at expected version |
+| `POST /sources` | Store an immutable bounded synthetic/manual source |
+| `GET /sources/{id}` | Read source as its owner; shared evidence is separate |
+| `POST /work/{id}/evidence` | Source owner links evidence with explicit visibility/version |
+| `GET /work/{id}/evidence` | Project only evidence authorized for this viewer |
+| `GET /work/{id}/history` | Authorized append-only work audit history |
+
+Example create body:
+
+```json
+{"item":{"kind":"task","title":"Review synthetic plan"},"visibility":"private"}
+```
+
+A transition body is `{"target":"active","expected_version":1}`. Sharing uses
+`{"expected_version":1}`. Linking evidence uses `source_id`, `visibility`
+(`private`, `summary_shared`, or `excerpt_shared`), and `expected_version`.
+Writes return the resulting record and incremented version. Source creation returns
+its ID. Creates return 201; successful reads/changes return 200. Authentication
+failure returns 401, denied capabilities 403, absent/inaccessible objects 404,
+conflicting/stale/illegal changes 409, invalid input 422, and identity/readiness
+dependency failure 503. Error responses do not return SQL values or token contents.
+
+Public `/healthz` checks process liveness; `/readyz` checks the PostgreSQL revision.
+Neither grants access to resources. These operations do not approve or execute any
+email, calendar, or provider side effect.
+
+## Remaining cross-app contract (design only)
 
 The next contract must distinguish records with different trust and authorization meanings:
 
@@ -52,4 +98,7 @@ The next contract must distinguish records with different trust and authorizatio
 - `approvals`: authenticated approver and approved action version; changing the payload makes the approval stale.
 - `executions`: idempotency key, attempt/result, provider response reference, and verification status.
 
-Every endpoint must derive its workspace and permissions from the authenticated identity. A client-supplied `workspace_id` is not proof of access. This contract is a design target; these resources and controls are not implemented yet.
+Every endpoint must derive permissions from authenticated identity. A client-supplied
+workspace selector is not proof of access. Typed work and manual source/evidence
+services now exist; provider ownership, proposals, exact-payload action approvals,
+executions, and the authenticated frontend remain future work.

@@ -70,4 +70,10 @@ FlowPilot may help draft professional email quickly. The interface should show t
 
 ## Current implementation boundary
 
-The existing code is a local API scaffold for synthetic/manual commitment records, status transitions, and an event history. It has no accounts, workspaces, provider integrations, AI inference, or authenticated access. The next implementation segment must redesign the data model and authorization foundation before real connectors or user data are introduced.
+The default dashboard remains a local, unauthenticated SQLite scaffold for
+synthetic/manual commitments. A separate PostgreSQL workspace API now has typed
+work/source/evidence storage, stored-membership authorization, and configured
+signed-access-token verification. It has no real identity provider, browser login,
+or provisioning flow yet. Provider integrations, AI inference, proposals/actions,
+and deployment remain future work. Complete the access model and operational
+controls before introducing real connectors or personal data.
