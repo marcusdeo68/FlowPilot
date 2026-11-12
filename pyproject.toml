@@ -12,6 +12,9 @@ dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30,<1.0",
     "tzdata>=2025.1; sys_platform == 'win32'",
+    "sqlalchemy>=2.0,<2.1",
+    "alembic>=1.15,<2",
+    "psycopg[binary]>=3.2,<4",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +22,7 @@ dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "build>=1,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["postgres: requires an isolated PostgreSQL test database"]
 
 [tool.setuptools.packages.find]
 where = ["services/api/src"]

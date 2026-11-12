@@ -1,0 +1,19 @@
+# Synthetic local development only. No public database listener.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: flowpilot
+      POSTGRES_PASSWORD: synthetic-dev-only
+      POSTGRES_DB: flowpilot_dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowpilot -d flowpilot_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres_dev:
