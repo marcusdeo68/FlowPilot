@@ -70,6 +70,20 @@ checks are needed even when the signature is valid. Find the tests where an
 observer includes an owner role claim and is still denied, and where an ID-token
 type is rejected before an access token can be accepted.
 
+## Workspace administration exercises (increment 0008)
+
+Read `membership_service.py` beside the concurrent-owner-departure test. Explain
+why checking an owner count without first taking the workspace lock would race,
+and why a membership version alone would not protect two different owner rows.
+
+Trace create_workspace: find the issuer/subject uniqueness constraint, the owner
+membership insertion, and audit write. Explain why a failure must roll back all
+three, while a read-only workspace-discovery request must not register an account.
+
+Compare deactivating a membership with deleting an identity or source. Explain
+why an expired privilege should deny new requests while preserving audit attribution
+and keeping private source ownership with its original user.
+
 ## Resources
 
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)

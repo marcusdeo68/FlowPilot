@@ -1,5 +1,15 @@
 # Architecture decisions
 
+## 0015 - Provision workspaces from verified identity and serialize owner changes
+
+Create users/workspaces/initial owner/audit together using the verified principal,
+not client-selected owner fields. Use a shared resolver for stored membership.
+All role/active-state mutations lock the workspace before member rows, then check
+the exact target version and last-active-owner rule. Keep departed memberships
+and private ownership for history; reactivation is explicit. Initial manual grants
+target registered same-issuer IDs; invitation delivery/consent is a later flow.
+See implementation 0008 for the concurrency proof, privacy boundary, and limitations.
+
 ## 0014 - Separate the verified workspace API from the legacy demo
 
 Introduce an explicit bearer-authenticated API factory with a strict RS256

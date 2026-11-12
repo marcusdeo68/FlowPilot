@@ -25,13 +25,17 @@ verification for each revision. Update this file when an item's state changes.
   passed 82 tests; 20 real-database checks ran in CI. The demo remains separate.
 - Run and verification commands: [README](../README.md). Design:
   [implementation 0004](implementation/0004-verification-and-access-policies.md).
+- Increment 0008 adds verified-user workspace onboarding and versioned owner-only
+  membership administration. Local baseline: 81 backend/contract tests passed.
+  PostgreSQL concurrency, revocation, migration, and HTTP verification is pending
+  [PR #7](https://github.com/marcusdeo68/FlowPilot/pull/7).
 
 ## Open issues and verification gaps
 
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API exists, but live identity configuration, browser login/session, provisioning/membership administration, request limits, and production database roles/operations are incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | Verified API exists; onboarding/admin API is under verification. Live identity configuration, browser login/session, invitation consent, request limits, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -59,11 +63,12 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    [implementation 0005](implementation/0005-postgres-work-storage.md), merged and
    CI verified. Includes seven tables, workspace-qualified relationships,
    stored-membership authorization, private sources, evidence sharing, and audit
-   transactions. Remaining Stage 1 tables and HTTP identity are still planned.
+   transactions. Remaining Stage 1 tables and live identity-provider setup are still planned.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
-   Next choose/configure a compatible identity provider, implement login/session and
-   provisioning flows, and migrate the dashboard. Identity verification does not
-   yet supply a working browser sign-in experience.
+   Workspace creation/discovery and member administration are under verification
+   in 0008. Next choose/configure a compatible identity provider, implement browser
+   login/session and invitation acceptance, and migrate the dashboard. Identity
+   verification does not yet supply a working browser sign-in experience.
 3. Synthetic source/proposal review workflow, then dashboard integration and
    browser tests. Preserve explicit evidence sharing and human review boundaries.
 4. Only after access controls: provider review and one read-only pilot. AWS
