@@ -10,10 +10,13 @@ verification for each revision. Update this file when an item's state changes.
   makes `AGENTS.md` load the [engineering guardrails](ENGINEERING_GUARDRAILS.md)
   at startup. Each deliverable requires a read-only planner, independent audit
   and live verification; a debugger investigates repeated unexplained failures.
-  [Run 43345995562](https://github.com/marcusdeo68/FlowPilot/actions/runs/43345995562)
-  verified candidate `649aeb5`: all six jobs passed, including 88 ordinary tests,
+  Merged as `8ca01e7` after independent review.
+  [Run 43378096613](https://github.com/marcusdeo68/FlowPilot/actions/runs/43378096613)
+  verified final candidate `2cd4d56`: all six jobs passed, including 88 ordinary tests,
   43 PostgreSQL checks, six Chromium workflows, and zero Pyright diagnostics.
-  Merge and final-candidate verification are still pending.
+  Local lint, formatting, typecheck, build and six Chromium workflows also passed.
+  [Post-merge run 43378664219](https://github.com/marcusdeo68/FlowPilot/actions/runs/43378664219)
+  passed all six jobs for merged `8ca01e7`.
 
 - The [application typecheck](implementation/application-typecheck.md) runs the
   pinned Pyright command alongside lint and tests. The initial audit found nine
@@ -24,8 +27,11 @@ verification for each revision. Update this file when an item's state changes.
   [All six jobs passed](https://github.com/marcusdeo68/FlowPilot/actions/runs/43308565337),
   including the PostgreSQL source privacy, pagination and signed HTTP tests.
 - Increment 0011: [dashboard focus](implementation/0011-dashboard-focus.md)
-  fixes FP-011. Local: 95 passed including nine Chromium workflows; 43 PostgreSQL
-  tests skipped locally.
+  fixes FP-011 in [PR #10](https://github.com/marcusdeo68/FlowPilot/pull/10).
+  Reconciled with current main; loading, retry, overlapping responses and browser
+  calendar dates have focused Chromium regressions (13 Chromium workflows passed
+  locally). The PR records independent verification, exact-candidate CI and merge
+  history; those checks are required before sign-off.
 - Increment 0009: [private task review](implementation/0009-private-task-review.md)
   merged in [PR #8](https://github.com/marcusdeo68/FlowPilot/pull/8).
   [Run 43307757893](https://github.com/marcusdeo68/FlowPilot/actions/runs/43307757893)

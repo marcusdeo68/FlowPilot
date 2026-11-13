@@ -115,6 +115,13 @@ function render() {
 
 async function loadTasks() {
   const version = ++loadVersion;
+  recentButton.hidden = true;
+  document.querySelector("#due-count").textContent = "—";
+  taskList.setAttribute("aria-busy", "true");
+  const loading = document.createElement("p");
+  loading.className = "loading-row";
+  loading.textContent = "Loading local commitments…";
+  taskList.replaceChildren(loading);
   try {
     const response = await fetch(`/api/v1/focus?day=${localDate(0)}`, { cache: "no-store", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("Could not load local tasks");
@@ -137,6 +144,8 @@ async function loadTasks() {
     retry.textContent = "Retry loading";
     retry.addEventListener("click", () => { retry.disabled = true; loadTasks(); });
     taskList.replaceChildren(message, retry);
+  } finally {
+    if (version === loadVersion) taskList.setAttribute("aria-busy", "false");
   }
 }
 

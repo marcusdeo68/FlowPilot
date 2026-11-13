@@ -32,10 +32,22 @@ without creating another record. The explicit write/transition controls still
 send their existing version checks. No authentication, connector, or workspace
 API impersonation path was introduced.
 
+Initial reads, refreshes, and retries show a loading message, an unknown count,
+and `aria-busy` while awaiting the current response. Only the newest request may
+clear that busy state. Failure replaces loading with the explicit retry control;
+a successful empty result alone may show zero. Chromium tests hold a real HTTP
+response until after a newer read finishes, then release either the older success
+or failure to verify that the current display survives. A fixed clock and explicit
+Los Angeles browser time zone also exercise the previous calendar day at UTC midnight.
+
 ## Verification and next step
 
-Local run: 95 passed, including nine Chromium workflows; 43 PostgreSQL checks
-skipped locally. Tests cover the empty count, a load failure followed by recovery,
+The original branch recorded 95 passing tests, including nine Chromium workflows;
+43 PostgreSQL checks were skipped locally. The reconciled revision passed 13
+Chromium workflows, including loading, overlapping-response and browser-date
+regressions. [PR #10](https://github.com/marcusdeo68/FlowPilot/pull/10) records
+independent verification, exact-candidate CI, and merge history; all are required
+before sign-off. Tests cover the empty count, a load failure followed by recovery,
 expanding actual records, terminal-state exclusion and an older due item outside
 the display window. The legacy demo still does not show the private workspace
 inbox. Next: interactive synthetic-source review against the verified API.

@@ -40,7 +40,9 @@ def page(chromium, tmp_path, monkeypatch):
             if not thread.is_alive() or time.monotonic() > deadline:
                 pytest.fail("Loopback test server failed to start")
             time.sleep(0.02)
-        context = chromium.new_context(viewport={"width": 1280, "height": 900})
+        context = chromium.new_context(
+            viewport={"width": 1280, "height": 900}, timezone_id="America/Los_Angeles"
+        )
         tab = context.new_page()
         tab.goto(f"http://127.0.0.1:{port}")
         tab.get_by_text("No tasks yet. Add one to get started.", exact=True).wait_for()
@@ -175,6 +177,87 @@ def test_expand_recent_rows_without_synthetic_tasks(page):
     expect(page.locator(".task-row")).to_have_count(6)
     page.get_by_role("button", name="Show fewer").click()
     expect(page.locator(".task-row")).to_have_count(4)
+
+
+HOLD_FOCUS = """(() => {
+    window.holdNextFocus = true;
+    const realFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+        if (!String(args[0]).startsWith('/api/v1/focus?') || !window.holdNextFocus)
+            return realFetch(...args);
+        window.holdNextFocus = false;
+        const response = await realFetch(...args);
+        return new Promise(resolve => {
+            window.releaseFocus = () => { window.releaseFocus = null; resolve(response); };
+        });
+    };
+})()"""
+
+
+def test_initial_loading_and_delayed_retry_are_distinct(page):
+    from playwright.sync_api import expect
+
+    page.add_init_script(HOLD_FOCUS)
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("() => typeof window.releaseFocus === 'function'")
+    expect(page.locator("#task-list")).to_have_attribute("aria-busy", "true")
+    expect(page.locator("#task-list")).to_contain_text("Loading local commitments")
+    expect(page.locator("#due-count")).to_have_text("—")
+    page.evaluate("window.releaseFocus()")
+    expect(page.locator("#task-list")).to_contain_text("No tasks yet")
+
+    page.route("**/api/v1/focus?*", lambda route: route.fulfill(status=503))
+    page.evaluate("loadTasks()")
+    expect(page.get_by_role("button", name="Retry loading")).to_be_visible()
+    page.unroute("**/api/v1/focus?*")
+    page.evaluate("window.holdNextFocus = true")
+    page.get_by_role("button", name="Retry loading").click()
+    page.wait_for_function("() => typeof window.releaseFocus === 'function'")
+    expect(page.locator("#task-list")).to_contain_text("Loading local commitments")
+    expect(page.get_by_role("button", name="Retry loading")).to_have_count(0)
+    page.evaluate("window.releaseFocus()")
+    expect(page.locator("#task-list")).to_contain_text("No tasks yet")
+    expect(page.locator("#task-list")).to_have_attribute("aria-busy", "false")
+
+
+@pytest.mark.parametrize("old_failure", [False, True])
+def test_older_focus_response_cannot_replace_newer_result(page, old_failure):
+    from playwright.sync_api import expect
+
+    page.evaluate(HOLD_FOCUS)
+    if old_failure:
+        page.route("**/api/v1/focus?*", lambda route: route.fulfill(status=503), times=1)
+    page.evaluate("void loadTasks()")
+    page.wait_for_function("() => typeof window.releaseFocus === 'function'")
+    assert (
+        page.request.post(
+            page.url + "api/v1/commitments", data={"title": "Newest saved result"}
+        ).status
+        == 201
+    )
+    page.evaluate("loadTasks()")
+    expect(page.locator(".task-title")).to_have_text("Newest saved result")
+    page.evaluate("window.releaseFocus()")
+    expect(page.locator(".task-title")).to_have_text("Newest saved result")
+    expect(page.locator("#task-list")).to_have_attribute("aria-busy", "false")
+
+
+def test_focus_uses_browser_calendar_day_across_utc_midnight(page):
+    from datetime import UTC, datetime
+
+    from playwright.sync_api import expect
+
+    page.clock.install(time=datetime(2027, 2, 18, 0, 30, tzinfo=UTC))
+    for day in ("2027-02-17", "2027-02-18"):
+        assert (
+            page.request.post(
+                page.url + "api/v1/commitments", data={"title": day, "due_date": day}
+            ).status
+            == 201
+        )
+    with page.expect_request("**/api/v1/focus?day=2027-02-17"):
+        page.reload()
+    expect(page.locator("#due-count")).to_have_text("1")
 
 
 def test_server_validation_is_readable_and_form_stays_open(page):
