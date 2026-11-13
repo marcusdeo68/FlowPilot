@@ -34,6 +34,13 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0012 adds optional opaque browser sessions to the verified API.
+`browser_sessions.py` stores credential digests, verified identity/scopes, exact
+origin/audience binding, absolute expiry and atomic lifecycle audit.
+`session_routes.py` enforces origin, CSRF and cookie rules; existing business
+services continue to recheck stored permissions. It does not connect the dashboard
+or configure a login provider. See [0012](implementation/0012-browser-sessions.md).
+
 Increment 0008 adds `MembershipService` and a shared stored-membership resolver.
 Workspace creation establishes the verified caller as owner with an atomic audit.
 Role/active-state changes lock the workspace before actor/target memberships and

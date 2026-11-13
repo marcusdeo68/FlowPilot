@@ -63,6 +63,7 @@ class IdentityConfig:
 class AccessIdentity:
     principal: Principal
     scopes: frozenset[str]
+    expires_at: int
 
 
 class _ThrottledJWKClient(PyJWKClient):
@@ -136,7 +137,9 @@ class AccessTokenVerifier:
             if not isinstance(scope, str) or len(scope) > 1000:
                 raise InvalidAccessToken
             return AccessIdentity(
-                Principal(self.config.issuer, claims["sub"]), frozenset(scope.split())
+                Principal(self.config.issuer, claims["sub"]),
+                frozenset(scope.split()),
+                claims["exp"],
             )
         except PyJWKClientConnectionError as exc:
             raise IdentityUnavailable from exc

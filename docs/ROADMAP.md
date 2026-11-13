@@ -31,7 +31,8 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] API workspace creation/discovery, owner-only member administration, and last-owner protection (0008).
 - [x] Private manual-source task suggestion, correction, dismissal, and version-bound acceptance (0009).
 - [x] Cursor-paginated owner-only source inbox with current review state (0010).
-- [ ] Live identity-provider setup, login/session, invitation consent, remaining Stage 1 records,
+- [ ] Optional token-bounded browser sessions (0012, verification in progress).
+- [ ] Live identity-provider setup, login/callback, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.
 - Provider connections with owner, provider, granted scopes, and connection/revocation status.

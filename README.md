@@ -99,3 +99,8 @@ available; live sign-in configuration and dashboard migration remain future work
 
 For a worked example of turning a synthetic note into an accepted private task,
 see [the source review walkthrough](docs/implementation/0009-private-task-review.md).
+
+Optional bounded browser sessions for the verified API are described in
+[implementation 0012](docs/implementation/0012-browser-sessions.md). These require
+a compatible verified access token and explicit loopback origin; they do not yet
+provide a sign-in screen. CI tests their lifecycle in Chromium with PostgreSQL.

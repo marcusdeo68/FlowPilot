@@ -1,10 +1,17 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-12. This file records implementation evidence, known issues, and
+Updated: 2026-11-13. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
+
+- Increment 0012: [bounded browser sessions](implementation/0012-browser-sessions.md)
+  is in implementation/verification. Optional exact loopback origin, opaque hashed
+  credentials, token-bounded expiry, CSRF, atomic logout and lifecycle audit are
+  implemented. Local checks: 119 passed (13 Chromium), 53 real-database checks
+  skipped locally; zero type errors. Independent audit and exact-candidate CI
+  remain required. No sign-in UI, real provider or live account is connected.
 
 - Product direction clarified: Gmail, Google Calendar, Slack and Google Keep are
   the intended integrations. Configurable popup reminders, task organization and
@@ -109,8 +116,9 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    transactions. Remaining Stage 1 tables and live identity-provider setup are still planned.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
    Workspace creation/discovery and member administration are verified in 0008.
-   Next choose/configure a compatible identity provider, implement browser
-   login/session and invitation acceptance, and migrate the dashboard. Identity
+   Increment 0012 adds optional browser sessions. Next choose/configure a compatible
+   identity provider, implement login/callback and invitation acceptance, and
+   migrate the dashboard. Identity
    verification does not yet supply a working browser sign-in experience.
 3. Private task review (0009) and manual source discovery (0010) now have API
    implementations. Next: interactive review and authenticated browser coverage.

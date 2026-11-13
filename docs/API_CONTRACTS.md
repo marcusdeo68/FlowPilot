@@ -113,6 +113,27 @@ granting, not a delivered email invitation or an invitation acceptance workflow.
 Workspace creation is not idempotent: do not retry automatically after an ambiguous
 timeout. See [implementation 0008](implementation/0008-workspace-onboarding.md).
 
+## Optional browser session contract (increment 0012)
+
+Enabled only with an exact loopback `FLOWPILOT_BROWSER_ORIGIN`. The configured
+origin must also be the API's origin. Existing bearer-only requests remain valid.
+
+| Method and path | Contract |
+| --- | --- |
+| `POST /api/v2/session` | Verified read-scoped bearer, exact Origin, no session cookie; 201 with `expires_at` (Unix seconds), `csrf_token` and HttpOnly session cookie |
+| `GET /api/v2/session` | Active cookie, safe same-origin read; same expiry/CSRF fields, no renewal |
+| `DELETE /api/v2/session` | Exact Origin, active cookie's `X-CSRF-Token`; atomic revocation then cookie deletion, 204 |
+
+Unsafe cookie requests require exact Origin plus CSRF. Foreign supplied Origin
+and cross-origin Fetch Metadata are denied on reads too. Missing/invalid/expired
+sessions return 401, origin/CSRF/scope failures 403, and session-storage outages
+503. Bearer-plus-cookie or duplicate credentials return 401. Expired/revoked or
+malformed cookies can be cleared by same-origin DELETE without CSRF or persisted
+state mutation. Retrying logout is safe. Session exchange is not idempotent: an
+ambiguous response may leave an unused row until expiry; no automatic retries.
+Scopes/expiry come from verified claims and permissions remain live service checks.
+See [0012](implementation/0012-browser-sessions.md) for limitations.
+
 ## Remaining cross-app contract (design only)
 
 The next contract must distinguish records with different trust and authorization meanings:
