@@ -6,6 +6,15 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Engineering workflow: [PR #11](https://github.com/marcusdeo68/FlowPilot/pull/11)
+  makes `AGENTS.md` load the [engineering guardrails](ENGINEERING_GUARDRAILS.md)
+  at startup. Each deliverable requires a read-only planner, independent audit
+  and live verification; a debugger investigates repeated unexplained failures.
+  [Run 43345995562](https://github.com/marcusdeo68/FlowPilot/actions/runs/43345995562)
+  verified candidate `649aeb5`: all six jobs passed, including 88 ordinary tests,
+  43 PostgreSQL checks, six Chromium workflows, and zero Pyright diagnostics.
+  Merge and final-candidate verification are still pending.
+
 - The [application typecheck](implementation/application-typecheck.md) runs the
   pinned Pyright command alongside lint and tests. The initial audit found nine
   diagnostics in identity configuration, route annotations and stored work parsing.
