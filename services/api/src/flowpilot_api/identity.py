@@ -48,14 +48,15 @@ class IdentityConfig:
             raise ValueError("A nonempty API audience and bounded issuer are required")
 
     @classmethod
-    def from_environment(cls):
-        names = ("FLOWPILOT_OIDC_ISSUER", "FLOWPILOT_OIDC_AUDIENCE", "FLOWPILOT_OIDC_JWKS_URL")
-        values = [os.environ.get(name) for name in names]
-        if not all(values):
+    def from_environment(cls) -> "IdentityConfig":
+        issuer = os.environ.get("FLOWPILOT_OIDC_ISSUER")
+        audience = os.environ.get("FLOWPILOT_OIDC_AUDIENCE")
+        jwks_url = os.environ.get("FLOWPILOT_OIDC_JWKS_URL")
+        if not issuer or not audience or not jwks_url:
             raise ValueError(
                 "Configure issuer, API audience, and JWKS URL before starting workspace API"
             )
-        return cls(*values)
+        return cls(issuer, audience, jwks_url)
 
 
 @dataclass(frozen=True)

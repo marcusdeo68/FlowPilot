@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 from sqlalchemy import Connection, Engine, text
 
 from flowpilot_api.access import (
@@ -67,6 +67,10 @@ class StoredWork:
     updated_at: datetime
 
 
+class _StoredWorkPayload(RootModel[WorkItem]):
+    """Validate a database projection against the same tagged union used by the API."""
+
+
 def _stored(row) -> StoredWork:
     fields = {
         "kind": row["kind"],
@@ -85,7 +89,7 @@ def _stored(row) -> StoredWork:
         owner_id=row["owner_id"],
         visibility=Visibility(row["visibility"]),
         version=row["version"],
-        data=TypeAdapter(WorkItem).validate_python(fields),
+        data=_StoredWorkPayload.model_validate(fields).root,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
