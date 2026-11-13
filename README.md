@@ -63,6 +63,7 @@ Read [the product direction](docs/PRODUCT.md), [the roadmap](docs/ROADMAP.md), a
 uv run --locked --extra dev pytest -q
 uv run --locked --extra dev ruff check .
 uv run --locked --extra dev ruff format --check .
+npx --yes --package pyright@1.1.407 pyright
 uv run --locked --extra dev python -m build
 node --check services/api/src/flowpilot_api/web/app.js
 ```

@@ -28,6 +28,7 @@ jobs:
       - run: uv sync --locked --extra dev
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync ruff format --check .
+      - run: npx --yes --package pyright@1.1.407 pyright
       - run: uv run --no-sync pytest -q
       - run: uv run --no-sync python -m build
       - run: node --check services/api/src/flowpilot_api/web/app.js
