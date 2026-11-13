@@ -95,6 +95,33 @@ def test_missing_and_invalid_ids(client):
     assert client.get("/api/v1/commitments?limit=101").status_code == 422
 
 
+def test_focus_count_is_independent_of_recent_window_and_terminal_items(client):
+    from datetime import date
+
+    from flowpilot_api.repository import create_commitment
+    from flowpilot_api.schemas import CommitmentCreate
+
+    day = date(2027, 2, 18)
+    oldest = create_commitment(CommitmentCreate(title="Old but due", due_date=day))
+    for status_path in (["canceled"], ["confirmed", "active", "completed"]):
+        item = create_commitment(CommitmentCreate(title="Closed", due_date=day))
+        for version, target in enumerate(status_path, 1):
+            assert (
+                client.post(
+                    f"/api/v1/commitments/{item['id']}/transitions",
+                    json={"target_status": target, "expected_version": version},
+                ).status_code
+                == 200
+            )
+    for number in range(50):
+        create_commitment(CommitmentCreate(title=f"Newer {number}"))
+    result = client.get(f"/api/v1/focus?day={day}").json()
+    assert len(result["items"]) == 50 and result["due_count"] == 1
+    assert oldest["id"] not in [item["id"] for item in result["items"]]
+    assert client.get("/api/v1/focus?day=2027-02-19").json()["due_count"] == 0
+    assert client.get("/api/v1/focus?day=invalid").status_code == 422
+
+
 @pytest.mark.parametrize(
     "headers",
     [

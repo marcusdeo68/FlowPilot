@@ -73,3 +73,17 @@ class CommitmentEventOut(BaseModel):
 class CommitmentListOut(BaseModel):
     items: list[CommitmentOut]
     count: int
+
+
+class FocusItem(BaseModel):
+    id: UUID
+    title: str
+    owner_name: str | None
+    due_date: date | None
+    status: CommitmentStatus
+    version: int
+
+
+class FocusOut(BaseModel):
+    items: list[FocusItem]
+    due_count: int

@@ -7,6 +7,7 @@ Legacy local demo base path: `/api/v1`. All responses are JSON. IDs are UUIDs an
 | Method and path | Purpose | Expected results |
 |---|---|---|
 | `GET /healthz` | Process liveness | `200 {"status":"ok"}` |
+| `GET /api/v1/focus?day=YYYY-MM-DD` | Local dashboard snapshot: 50 recent rows plus the whole-database nonterminal due count for that day | 200; invalid/missing day 422 |
 | `GET /readyz` | Database readiness | `200` when the local DB is reachable; otherwise `503` |
 | `POST /api/v1/commitments` | Create a manually entered candidate | `201`, initial state `detected` |
 | `GET /api/v1/commitments?status=&limit=` | List latest records, optionally by state | `200`, maximum 100 items |

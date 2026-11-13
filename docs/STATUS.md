@@ -10,17 +10,28 @@ verification for each revision. Update this file when an item's state changes.
   makes `AGENTS.md` load the [engineering guardrails](ENGINEERING_GUARDRAILS.md)
   at startup. Each deliverable requires a read-only planner, independent audit
   and live verification; a debugger investigates repeated unexplained failures.
-  [Run 43345995562](https://github.com/marcusdeo68/FlowPilot/actions/runs/43345995562)
-  verified candidate `649aeb5`: all six jobs passed, including 88 ordinary tests,
+  Merged as `8ca01e7` after independent review.
+  [Run 43378096613](https://github.com/marcusdeo68/FlowPilot/actions/runs/43378096613)
+  verified final candidate `2cd4d56`: all six jobs passed, including 88 ordinary tests,
   43 PostgreSQL checks, six Chromium workflows, and zero Pyright diagnostics.
-  Merge and final-candidate verification are still pending.
+  Local lint, formatting, typecheck, build and six Chromium workflows also passed.
+  [Post-merge run 43378664219](https://github.com/marcusdeo68/FlowPilot/actions/runs/43378664219)
+  passed all six jobs for merged `8ca01e7`.
 
 - The [application typecheck](implementation/application-typecheck.md) runs the
   pinned Pyright command alongside lint and tests. The initial audit found nine
   diagnostics in identity configuration, route annotations and stored work parsing.
 
 - Increment 0010: [manual-source inbox](implementation/0010-private-source-inbox.md)
-  adds a paginated, owner-only read model with proposal status.
+  merged in [PR #9](https://github.com/marcusdeo68/FlowPilot/pull/9).
+  [All six jobs passed](https://github.com/marcusdeo68/FlowPilot/actions/runs/43308565337),
+  including the PostgreSQL source privacy, pagination and signed HTTP tests.
+- Increment 0011: [dashboard focus](implementation/0011-dashboard-focus.md)
+  fixes FP-011 in [PR #10](https://github.com/marcusdeo68/FlowPilot/pull/10).
+  Reconciled with current main; loading, retry, overlapping responses and browser
+  calendar dates have focused Chromium regressions (13 Chromium workflows passed
+  locally). The PR records independent verification, exact-candidate CI and merge
+  history; those checks are required before sign-off.
 - Increment 0009: [private task review](implementation/0009-private-task-review.md)
   merged in [PR #8](https://github.com/marcusdeo68/FlowPilot/pull/8).
   [Run 43307757893](https://github.com/marcusdeo68/FlowPilot/actions/runs/43307757893)
@@ -70,6 +81,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 | ID | Resolution | Evidence |
 | --- | --- | --- |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
+| FP-011 | An empty DB showed 1 due task; outages showed sample tasks. Due counts over recent rows also missed older records. | Chromium initially failed with expected 0, actual 1. The focus endpoint now counts persisted work; empty, outage/retry, and older-due-item regressions pass locally. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
 | FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; browser regression passed in PR #5. |
 | FP-006 | Environment moved outside sync directory after locks recurred | Copy mode alone did not solve repeated update failures. Fresh environment now lives under local application data, linked by `.venv`; old/residual files are preserved and ignored. See implementation 0007. Exact lock origin remains unconfirmed. |

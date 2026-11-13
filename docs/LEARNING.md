@@ -107,6 +107,12 @@ an empty audience at startup.
 
 ## Resources
 
+For [0011](implementation/0011-dashboard-focus.md), compare a workspace with no
+records to an unreachable workspace. Which one can safely display zero? Explain
+why the 50 most recent rows cannot answer a question about every due commitment.
+Hold one read response while a second completes: explain why both success and
+failure handlers must check the sequence number before changing the display.
+
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
 - [Pydantic model documentation](https://docs.pydantic.dev/latest/concepts/models/)
 - [SQLite transactions](https://www.sqlite.org/lang_transaction.html)

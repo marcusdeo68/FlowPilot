@@ -51,7 +51,7 @@
         <div class="demo-banner"><span>DEMO DATA</span><p>Inbox, schedule, and email examples are illustrative. No accounts are connected.</p></div>
 
         <section class="stats-grid" aria-label="Work summary">
-          <article class="stat-card"><div class="stat-heading"><span>Due today</span><span class="stat-icon coral">◷</span></div><strong id="due-count">—</strong><small><span class="trend">↑ 2</span> from yesterday</small></article>
+          <article class="stat-card"><div class="stat-heading"><span>Due today</span><span class="stat-icon coral">◷</span></div><strong id="due-count">—</strong><small>Open local commitments</small></article>
           <article class="stat-card"><div class="stat-heading"><span>Sample schedule</span><span class="stat-icon violet">▦</span></div><strong>5</strong><small>Illustrative upcoming</small></article>
           <article class="stat-card"><div class="stat-heading"><span>Sample review</span><span class="stat-icon amber">✧</span></div><strong>4</strong><small>Illustrative signals</small></article>
           <article class="stat-card"><div class="stat-heading"><span>Sample follow-ups</span><span class="stat-icon blue">↗</span></div><strong>2</strong><small>Draft preview only</small></article>
@@ -59,7 +59,7 @@
 
         <div class="dashboard-grid">
           <section class="panel tasks-panel" id="tasks">
-            <div class="panel-heading"><div><h2>Today’s focus</h2><p>Your priorities, all in one place</p></div><button class="text-button" id="view-all">View all <span>→</span></button></div>
+            <div class="panel-heading"><div><h2>Today’s focus</h2><p>Recently updated commitments</p></div><button class="text-button" id="view-all" aria-controls="task-list" aria-expanded="false" hidden>Show recent</button></div>
             <div class="task-list" id="task-list" aria-live="polite"><div class="loading-row">Loading your work…</div></div>
             <button class="add-task-row" id="add-task"><span>＋</span> Add a task</button>
           </section>
@@ -81,7 +81,7 @@
             <div class="draft-icon">✉</div><div class="draft-content"><div class="draft-heading"><div><h2>Ready for your review</h2><p>A follow-up draft is waiting for you.</p></div><span class="draft-count">1</span></div><div class="draft-preview"><span class="draft-to">To: Jordan Lee</span><strong>Re: Project timeline</strong><p>Hi Jordan, thanks for the feedback. I’ve updated the timeline to reflect…</p></div><button class="secondary-button" id="review-draft">Review draft <span>→</span></button></div>
           </section>
         </div>
-        <footer class="page-footer"><span>FlowPilot brings your work into focus.</span><span class="footer-status"><i></i> All changes saved</span></footer>
+        <footer class="page-footer"><span>FlowPilot brings your work into focus.</span><span class="footer-status">Local demo workspace</span></footer>
       </main>
     </div>
     <dialog id="task-dialog" aria-labelledby="dialog-title">

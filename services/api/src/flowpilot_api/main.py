@@ -2,6 +2,7 @@
 
 import sqlite3
 from contextlib import asynccontextmanager, closing
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -17,6 +18,7 @@ from flowpilot_api.repository import (
     InvalidTransition,
     VersionConflict,
     create_commitment,
+    focus_snapshot,
     get_commitment,
     list_commitments,
     list_events,
@@ -28,6 +30,7 @@ from flowpilot_api.schemas import (
     CommitmentListOut,
     CommitmentOut,
     CommitmentTransition,
+    FocusOut,
 )
 
 
@@ -104,6 +107,11 @@ def readiness() -> dict[str, str]:
     except (OSError, sqlite3.Error) as exc:
         raise HTTPException(status_code=503, detail="Database is unavailable") from exc
     return {"status": "ready"}
+
+
+@app.get("/api/v1/focus", response_model=FocusOut, tags=["commitments"])
+def local_focus(day: date) -> dict[str, object]:
+    return focus_snapshot(day)
 
 
 @app.post(

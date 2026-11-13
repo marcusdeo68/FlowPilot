@@ -14,12 +14,10 @@ document.querySelectorAll(".event-row[data-day-offset]").forEach((event) => {
   event.querySelector(".event-date small").textContent = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date).toUpperCase();
 });
 
-const sampleTasks = [
-  { id: "sample-1", title: "Send revised project timeline", owner_name: "Marcus", due_date: localDate(0), priority: "high", status: "active" },
-  { id: "sample-2", title: "Review campaign launch assets", owner_name: "Priya S.", due_date: localDate(1), priority: "normal", status: "active" },
-  { id: "sample-3", title: "Share notes from the planning session", owner_name: "Marcus", due_date: localDate(2), priority: "normal", status: "active" },
-];
 let tasks = [];
+let expanded = false;
+let loadVersion = 0;
+const recentButton = document.querySelector("#view-all");
 
 function localDate(offset) {
   const date = new Date();
@@ -47,7 +45,7 @@ function createTaskRow(task, index) {
   checkbox.className = "task-check";
   checkbox.type = "checkbox";
   checkbox.checked = task.status === "completed";
-  checkbox.disabled = task.id.startsWith("sample-") || task.status !== "active";
+  checkbox.disabled = task.status !== "active";
   checkbox.setAttribute("aria-label", `Mark ${task.title} complete`);
 
   const copy = document.createElement("div");
@@ -80,23 +78,21 @@ function createTaskRow(task, index) {
   }
   copy.append(title, details);
   row.append(checkbox, copy);
-  if (!task.id.startsWith("sample-")) {
-    checkbox.addEventListener("change", () => transitionTask(task, "completed", checkbox));
-    const nextSteps = {
-      detected: ["confirmed", "Confirm"],
-      confirmed: ["active", "Start"],
-      blocked: ["active", "Resume"],
-      disputed: ["confirmed", "Resolve & confirm"],
-    };
-    if (nextSteps[task.status]) {
-      const [target, label] = nextSteps[task.status];
-      const action = document.createElement("button");
-      action.className = "text-button";
-      action.textContent = label;
-      action.setAttribute("aria-label", `${label}: ${task.title}`);
-      action.addEventListener("click", () => transitionTask(task, target, action));
-      row.append(action);
-    }
+  checkbox.addEventListener("change", () => transitionTask(task, "completed", checkbox));
+  const nextSteps = {
+    detected: ["confirmed", "Confirm"],
+    confirmed: ["active", "Start"],
+    blocked: ["active", "Resume"],
+    disputed: ["confirmed", "Resolve & confirm"],
+  };
+  if (nextSteps[task.status]) {
+    const [target, label] = nextSteps[task.status];
+    const action = document.createElement("button");
+    action.className = "text-button";
+    action.textContent = label;
+    action.setAttribute("aria-label", `${label}: ${task.title}`);
+    action.addEventListener("click", () => transitionTask(task, target, action));
+    row.append(action);
   }
   row.style.animationDelay = `${index * 35}ms`;
   return row;
@@ -104,29 +100,53 @@ function createTaskRow(task, index) {
 
 function render() {
   taskList.replaceChildren();
+  recentButton.hidden = tasks.length <= 4;
+  recentButton.textContent = expanded ? "Show fewer" : `Show recent (${tasks.length})`;
+  recentButton.setAttribute("aria-expanded", String(expanded));
   if (!tasks.length) {
     const empty = document.createElement("p");
     empty.className = "loading-row";
     empty.textContent = "No tasks yet. Add one to get started.";
     taskList.append(empty);
   } else {
-    tasks.slice(0, 4).forEach((task, index) => taskList.append(createTaskRow(task, index)));
+    (expanded ? tasks : tasks.slice(0, 4)).forEach((task, index) => taskList.append(createTaskRow(task, index)));
   }
-  const todayCount = tasks.filter((task) => task.due_date === localDate(0) && !["completed", "canceled"].includes(task.status)).length;
-  document.querySelector("#due-count").textContent = String(todayCount);
 }
 
 async function loadTasks() {
+  const version = ++loadVersion;
+  recentButton.hidden = true;
+  document.querySelector("#due-count").textContent = "—";
+  taskList.setAttribute("aria-busy", "true");
+  const loading = document.createElement("p");
+  loading.className = "loading-row";
+  loading.textContent = "Loading local commitments…";
+  taskList.replaceChildren(loading);
   try {
-    const response = await fetch("/api/v1/commitments?limit=50", { headers: { Accept: "application/json" } });
+    const response = await fetch(`/api/v1/focus?day=${localDate(0)}`, { cache: "no-store", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("Could not load local tasks");
     const data = await response.json();
-    tasks = data.items.length ? data.items : sampleTasks;
+    if (version !== loadVersion) return;
+    tasks = data.items;
+    document.querySelector("#due-count").textContent = String(data.due_count);
+    render();
   } catch {
-    tasks = sampleTasks;
-    showToast("Showing sample tasks. Start the local API to save changes.");
+    if (version !== loadVersion) return;
+    tasks = [];
+    expanded = false;
+    recentButton.hidden = true;
+    document.querySelector("#due-count").textContent = "—";
+    const message = document.createElement("p");
+    message.className = "loading-row";
+    message.textContent = "Could not load local commitments.";
+    const retry = document.createElement("button");
+    retry.className = "text-button";
+    retry.textContent = "Retry loading";
+    retry.addEventListener("click", () => { retry.disabled = true; loadTasks(); });
+    taskList.replaceChildren(message, retry);
+  } finally {
+    if (version === loadVersion) taskList.setAttribute("aria-busy", "false");
   }
-  render();
 }
 
 async function transitionTask(task, target_status, control) {
@@ -178,7 +198,7 @@ function validationMessage(detail) {
 
 document.querySelector("#new-task").addEventListener("click", openTaskDialog);
 document.querySelector("#add-task").addEventListener("click", openTaskDialog);
-document.querySelector("#view-all").addEventListener("click", () => showToast("The task workspace is coming in a later increment."));
+recentButton.addEventListener("click", () => { expanded = !expanded; render(); });
 document.querySelector("#review-draft").addEventListener("click", () => showToast("Draft review will be added with the approval workflow."));
 form.addEventListener("submit", async (event) => {
   if (event.submitter?.value === "cancel") return;
