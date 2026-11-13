@@ -1,6 +1,7 @@
 # Implementation 0012 - Bounded browser sessions
 
-Status: implementation and independent verification in progress. No live identity
+Status: implemented in [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14),
+with independent sign-off for source revision `2e31179`. No live identity
 provider, sign-in screen, dashboard migration, or external account is added.
 
 ## Behavior and request path
@@ -77,20 +78,23 @@ $env:FLOWPILOT_BROWSER_TESTS = '1'
 
 ## Validation evidence
 
-Initial local checks: 119 tests passed (including 13 existing Chromium workflows),
-53 PostgreSQL-dependent checks skipped because no local test database is running.
-This includes 17 new ordinary session checks. Pinned Pyright reports zero errors.
-CI's browser job supplies PostgreSQL for two new authenticated Chromium workflows.
-Initial candidate `5c0c91f` passed all six jobs in
-[CI run 43467252561](https://github.com/marcusdeo68/FlowPilot/actions/runs/43467252561):
-106 ordinary tests per platform/Python combination, 51 PostgreSQL tests and
-15 Chromium workflows. Independent audit caught FP-012: cookie-name whitespace
-could evade ambiguity detection. Five new regressions reproduced the failure;
-the parser fix passes those locally and requires revised CI/re-review before
-sign-off. [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14) records final
-revision checks and merge evidence. Existing
-tests are retained; PostgreSQL's dedicated job excludes browser-marked tests because
-those execute with Chromium in the browser job.
+Independent local checks on `2e31179`: 124 tests passed, including 13 existing
+Chromium workflows; 53 PostgreSQL-dependent checks skipped because no local test
+database is running. Ruff lint/format, package build, JavaScript syntax and pinned
+Pyright passed with zero errors. Documentation links were checked.
+
+[CI run 43495939794](https://github.com/marcusdeo68/FlowPilot/actions/runs/43495939794)
+passed all six jobs for that source revision: 111 ordinary tests per platform/Python
+combination, 51 PostgreSQL tests and 15 Chromium workflows, with no integration
+skips. The browser job supplies PostgreSQL for two new authenticated workflows.
+Existing tests are retained; PostgreSQL's dedicated job excludes browser-marked
+tests because those execute with Chromium in the browser job.
+
+Independent audit caught FP-012 before merge: cookie-name whitespace could evade
+ambiguity detection. Five new regressions reproduced the failure; framework-matched
+normalization, HTTP regressions, full reruns and independent re-review verified the
+fix. [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14) records final
+documentation-revision checks and merge evidence.
 
 ## Limitations and next increment
 
