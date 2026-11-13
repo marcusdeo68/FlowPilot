@@ -98,6 +98,13 @@ four sources with identical capture times. Predict which IDs appear on each
 two-item page, then add a newer source between requests. Why must the cursor
 lookup use the same privacy filter as the list?
 
+## Type narrowing
+
+Exercise for the [application typecheck](implementation/application-typecheck.md):
+trace the possible values of the audience before and after the configuration
+guard. Explain what Pyright can infer and why the application must still reject
+an empty audience at startup.
+
 ## Resources
 
 For [0011](implementation/0011-dashboard-focus.md), compare a workspace with no
