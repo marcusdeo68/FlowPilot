@@ -4,6 +4,34 @@
 
 FlowPilot is a unified work coordination hub. It brings permitted signals from email, chat, notes, and calendars into one place; identifies changes, responsibilities, and deadlines; and helps people move the resulting work forward.
 
+The central outcome is to help people stay on top of their work and communication
+without feeling overwhelmed or disorganized. The hub should make the next useful
+action clear, organize related tasks, and surface important deadlines without
+turning every incoming update into an interruption.
+
+## Intended integrations and capabilities
+
+The intended integrations are **Gmail, Google Calendar, Slack, and Google Keep**.
+These are product targets; none is connected in the current implementation.
+
+- Bring permitted email, messages, calendar events, and notes into a centralized
+  workspace with their source context and privacy intact.
+- Organize tasks and commitments by priority, deadline, and project, with a focused
+  Today view so users can decide what needs attention next.
+- Offer configurable popup reminders for important or upcoming deadlines and
+  items. Include control over timing, snoozing and dismissal; group related
+  updates and avoid repeated alerts for the same item. Browser/OS delivery and
+  closed-app behavior require a later design and implementation.
+- Compose and send Gmail email and Slack messages, and create new Google Keep
+  text or list notes from the hub, where supported. Each provider write requires review
+  and explicit approval of the exact account, destination and content.
+
+Google Keep remains an intended integration with an account-access feasibility
+gate: its documented API targets enterprise administration. Validate the intended
+account model before promising personal-account access; see the
+[security notes](SECURITY.md#provider-specific-review-notes). Additional providers
+may follow, but these four define the current product direction.
+
 The unifying idea is not to mirror every source application or automate a user's desktop windows. FlowPilot creates a trustworthy, cross-app view of work while keeping each provider's permissions and source context visible.
 
 ## First audience and problem hypothesis
@@ -40,6 +68,8 @@ FlowPilot helps a team answer:
 - **Tasks & Projects:** accepted tasks, commitments, owners, dependencies, and project grouping.
 - **Schedule:** important deadlines and events from work items and permitted calendar sources.
 - **Review & Send:** prepared email/message/calendar actions with editable previews and clear approval.
+- **Reminders:** prioritized deadline/item alerts with user-controlled timing,
+  snoozing, dismissal and privacy-preserving notification previews (planned).
 - **Connections & Settings:** connected accounts, requested scopes, data retention, visibility, notification preferences, and revocation.
 
 This should feel like a focused productivity workspace. A conversational assistant may help people search or explain changes later, but the core UI should work without prompting a model for every action.
@@ -67,6 +97,8 @@ FlowPilot may help draft professional email quickly. The interface should show t
 - Separate read access from write/action permissions wherever a provider allows it.
 - Treat AI output as a proposal; deterministic server rules and authorization decide what becomes state or causes a side effect.
 - Keep the core manual workflow usable without AI or any connected provider.
+- Evaluate each screen and notification against whether it reduces overload:
+  show clear priorities, group related work, and provide control over interruptions.
 
 ## Current implementation boundary
 
