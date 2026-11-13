@@ -6,6 +6,14 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Product direction clarified: Gmail, Google Calendar, Slack and Google Keep are
+  the intended integrations. Configurable popup reminders, task organization and
+  approved email/Slack/Keep composition belong in a calm centralized workspace.
+  These are planned capabilities, not newly implemented features or defects.
+  [Product intent](PRODUCT.md#intended-integrations-and-capabilities),
+  [roadmap](ROADMAP.md) and [security boundaries](SECURITY.md) capture the scope;
+  Google Keep account/API feasibility and notification delivery remain open.
+
 - Engineering workflow: [PR #11](https://github.com/marcusdeo68/FlowPilot/pull/11)
   makes `AGENTS.md` load the [engineering guardrails](ENGINEERING_GUARDRAILS.md)
   at startup. Each deliverable requires a read-only planner, independent audit
