@@ -7,7 +7,12 @@ verification for each revision. Update this file when an item's state changes.
 ## Current checkpoint
 
 - Increment 0010: [manual-source inbox](implementation/0010-private-source-inbox.md)
-  adds a paginated, owner-only read model with proposal status.
+  merged in [PR #9](https://github.com/marcusdeo68/FlowPilot/pull/9).
+  [All six jobs passed](https://github.com/marcusdeo68/FlowPilot/actions/runs/43308565337),
+  including the PostgreSQL source privacy, pagination and signed HTTP tests.
+- Increment 0011: [dashboard focus](implementation/0011-dashboard-focus.md)
+  fixes FP-011. Local: 95 passed including nine Chromium workflows; 43 PostgreSQL
+  tests skipped locally.
 - Increment 0009: [private task review](implementation/0009-private-task-review.md)
   merged in [PR #8](https://github.com/marcusdeo68/FlowPilot/pull/8).
   [Run 43307757893](https://github.com/marcusdeo68/FlowPilot/actions/runs/43307757893)
@@ -57,6 +62,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 | ID | Resolution | Evidence |
 | --- | --- | --- |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
+| FP-011 | An empty DB showed 1 due task; outages showed sample tasks. Due counts over recent rows also missed older records. | Chromium initially failed with expected 0, actual 1. The focus endpoint now counts persisted work; empty, outage/retry, and older-due-item regressions pass locally. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
 | FP-005 | Completion no longer silently confirms a commitment | Dashboard exposes individual Confirm/Start/Complete actions; browser regression passed in PR #5. |
 | FP-006 | Environment moved outside sync directory after locks recurred | Copy mode alone did not solve repeated update failures. Fresh environment now lives under local application data, linked by `.venv`; old/residual files are preserved and ignored. See implementation 0007. Exact lock origin remains unconfirmed. |

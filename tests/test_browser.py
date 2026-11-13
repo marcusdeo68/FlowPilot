@@ -43,7 +43,7 @@ def page(chromium, tmp_path, monkeypatch):
         context = chromium.new_context(viewport={"width": 1280, "height": 900})
         tab = context.new_page()
         tab.goto(f"http://127.0.0.1:{port}")
-        tab.locator("#task-list .task-row").first.wait_for()
+        tab.get_by_text("No tasks yet. Add one to get started.", exact=True).wait_for()
         yield tab
     finally:
         if context:
@@ -136,6 +136,45 @@ def test_empty_dialog_can_be_cancelled(page):
     page.get_by_role("button", name="New task").click()
     page.get_by_role("button", name="Cancel", exact=True).click()
     expect(page.locator("#task-dialog")).not_to_be_visible()
+
+
+def test_empty_database_has_no_due_tasks(page):
+    from playwright.sync_api import expect
+
+    expect(page.locator("#due-count")).to_have_text("0")
+    expect(page.locator("#task-list")).to_contain_text("No tasks yet")
+
+
+def test_failed_focus_is_unknown_then_recoverable(page):
+    from playwright.sync_api import expect
+
+    capture(page, "Saved before read outage")
+    page.route("**/api/v1/focus?*", lambda route: route.fulfill(status=503))
+    page.reload()
+    expect(page.locator("#task-list")).to_contain_text("Could not load")
+    expect(page.locator("#due-count")).to_have_text("—")
+    expect(page.locator(".task-row")).to_have_count(0)
+    page.unroute("**/api/v1/focus?*")
+    page.get_by_role("button", name="Retry loading").click()
+    expect(page.locator(".task-title")).to_have_text("Saved before read outage")
+
+
+def test_expand_recent_rows_without_synthetic_tasks(page):
+    from playwright.sync_api import expect
+
+    for number in range(6):
+        assert (
+            page.request.post(
+                page.url + "api/v1/commitments", data={"title": f"Saved {number}"}
+            ).status
+            == 201
+        )
+    page.reload()
+    expect(page.locator(".task-row")).to_have_count(4)
+    page.get_by_role("button", name="Show recent (6)").click()
+    expect(page.locator(".task-row")).to_have_count(6)
+    page.get_by_role("button", name="Show fewer").click()
+    expect(page.locator(".task-row")).to_have_count(4)
 
 
 def test_server_validation_is_readable_and_form_stays_open(page):

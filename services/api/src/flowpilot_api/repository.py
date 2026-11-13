@@ -1,7 +1,7 @@
 """Persistence operations; SQL values are always bound parameters."""
 
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 from flowpilot_api.database import transaction
@@ -96,6 +96,21 @@ def get_commitment(commitment_id: UUID) -> dict[str, object]:
     if row is None:
         raise CommitmentNotFound
     return row_to_commitment(row)
+
+
+def focus_snapshot(day: date) -> dict[str, object]:
+    """One read snapshot: global due count and at most 50 recent list rows."""
+    with transaction() as connection:
+        count = connection.execute(
+            """SELECT COUNT(*) FROM commitments WHERE due_date=?
+               AND status NOT IN ('completed','canceled')""",
+            (day.isoformat(),),
+        ).fetchone()[0]
+        rows = connection.execute(
+            """SELECT id, title, owner_name, due_date, status, version FROM commitments
+               ORDER BY updated_at DESC, id LIMIT 50"""
+        ).fetchall()
+    return {"items": [dict(row) for row in rows], "due_count": count}
 
 
 def transition_commitment(
