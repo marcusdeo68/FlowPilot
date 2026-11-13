@@ -49,7 +49,8 @@ are in [implementation 0007](implementation/0007-verified-workspace-api.md).
 It has no live provider or browser sign-in flow yet. Increment 0008 adds API
 workspace onboarding and membership administration using the same verified tokens.
 
-All resource endpoints require a verified bearer access token and `flowpilot:read`;
+All resource endpoints require a verified bearer access token or an enabled
+browser session (0012), plus `flowpilot:read`;
 writes additionally require `flowpilot:write`. Stored membership/role and object
 visibility determine actual access. The path workspace UUID is a selector, not
 authorization. Unknown JSON fields are rejected.
@@ -112,6 +113,27 @@ must explicitly grant another active owner before leaving. This is manual member
 granting, not a delivered email invitation or an invitation acceptance workflow.
 Workspace creation is not idempotent: do not retry automatically after an ambiguous
 timeout. See [implementation 0008](implementation/0008-workspace-onboarding.md).
+
+## Optional browser session contract (increment 0012)
+
+Enabled only with an exact loopback `FLOWPILOT_BROWSER_ORIGIN`. The configured
+origin must also be the API's origin. Existing bearer-only requests remain valid.
+
+| Method and path | Contract |
+| --- | --- |
+| `POST /api/v2/session` | Verified read-scoped bearer, exact Origin, no session cookie; 201 with `expires_at` (Unix seconds), `csrf_token` and HttpOnly session cookie |
+| `GET /api/v2/session` | Active cookie, safe same-origin read; same expiry/CSRF fields, no renewal |
+| `DELETE /api/v2/session` | Exact Origin, active cookie's `X-CSRF-Token`; atomic revocation then cookie deletion, 204 |
+
+Unsafe cookie requests require exact Origin plus CSRF. Foreign supplied Origin
+and cross-origin Fetch Metadata are denied on reads too. Missing/invalid/expired
+sessions return 401, origin/CSRF/scope failures 403, and session-storage outages
+503. Bearer-plus-cookie or duplicate credentials return 401. Expired/revoked or
+malformed cookies can be cleared by same-origin DELETE without CSRF or persisted
+state mutation. Retrying logout is safe. Session exchange is not idempotent: an
+ambiguous response may leave an unused row until expiry; no automatic retries.
+Scopes/expiry come from verified claims and permissions remain live service checks.
+See [0012](implementation/0012-browser-sessions.md) for limitations.
 
 ## Remaining cross-app contract (design only)
 
