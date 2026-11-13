@@ -7,7 +7,7 @@ This repository currently contains a local API foundation, a dependency-free das
 ## Current foundation
 
 - Same-origin local dashboard served at `/` for Today, inbox, tasks, schedule, and review/send workflow previews.
-- Dashboard task capture and lifecycle changes use the existing local API; empty workspaces show non-persisted sample cards.
+- Dashboard task capture and lifecycle changes use the existing local API; the task view distinguishes loading, empty, failed, and saved results. Inbox, schedule, and draft previews remain labeled samples.
 - FastAPI service with separate liveness and database-readiness endpoints.
 - SQLite-backed commitment records for local development.
 - Validated API inputs and explicit, server-enforced commitment state transitions.
