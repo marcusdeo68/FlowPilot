@@ -1,5 +1,7 @@
 # FlowPilot agent instructions
 
+At the start of every FlowPilot session, read [Project Engineering & Verification Rules](docs/ENGINEERING_GUARDRAILS.md) before planning or editing. Apply them to one requested deliverable at a time. Give each subagent this file and the companion rules.
+
 Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/SECURITY.md` before changing product behavior. Read `docs/ROADMAP.md` and the relevant `docs/implementation/` note before starting a feature.
 
 ## Working rules
@@ -14,7 +16,7 @@ Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/S
 - Do not introduce a new provider, integration, or deployment target without documenting its API support, minimum scopes, threat, and privacy implications.
 - Before finishing, describe what changed, why, the key concepts to understand, and what remains for the next increment.
 - Read and update `docs/STATUS.md` for each meaningful increment. Track discovered defects with a stable ID, reproduction/evidence, impact, next action, and verification required to close them. Distinguish defects from planned capabilities and testing gaps.
-- Run checks appropriate to the change before committing. Behavior changes require relevant regression tests; use the existing lint, formatting, test, JavaScript syntax, and package checks when affected. Inspect CI for the exact revision before merging and investigate failures. Documentation-only changes need link/content and diff checks, not repeated runtime tests.
+- Follow the independent verification and sign-off rules in the companion file. Verify links and content for documentation changes. Inspect CI for the exact revision before merging and investigate failures.
 - For each implementation note, explain the changed behavior, request/data path, why the code is structured that way, one concrete example, validation evidence, limitations, and the next increment. Update `docs/LEARNING.md` with a short exercise when introducing a new concept.
 - Checks run during active development and in CI on pushes/PRs. Do not claim unattended or continuous monitoring unless an actual scheduled mechanism is configured and verified.
 
