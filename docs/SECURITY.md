@@ -73,8 +73,8 @@ Sending email or messages, changing events, and editing provider data are extern
 For email, show sender account, recipients, subject, body, and attachments in a clear review step. A convenient send button is appropriate after the user sees and approves those details; do not silently send generated text.
 
 The intended Slack messaging flow must likewise show the sending account, exact
-channel/conversation and content. Creating a Google Keep note or list item is also
-a provider write: show the target account, note/list destination and exact content.
+channel/conversation and content. Creating a new Google Keep text or list note is
+also a provider write: show the target account, note title and exact text/list contents.
 These use the same version, expiry, permission recheck, idempotency and result
 verification rules above; a reminder or model suggestion cannot authorize them.
 

@@ -22,8 +22,8 @@ These are product targets; none is connected in the current implementation.
   items. Include control over timing, snoozing and dismissal; group related
   updates and avoid repeated alerts for the same item. Browser/OS delivery and
   closed-app behavior require a later design and implementation.
-- Compose and send Gmail email and Slack messages, and create Google Keep notes
-  or list items from the hub, where supported. Each provider write requires review
+- Compose and send Gmail email and Slack messages, and create new Google Keep
+  text or list notes from the hub, where supported. Each provider write requires review
   and explicit approval of the exact account, destination and content.
 
 Google Keep remains an intended integration with an account-access feasibility
