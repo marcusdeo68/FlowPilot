@@ -6,6 +6,10 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- The [application typecheck](implementation/application-typecheck.md) runs the
+  pinned Pyright command alongside lint and tests. The initial audit found nine
+  diagnostics in identity configuration, route annotations and stored work parsing.
+
 - Increment 0010: [manual-source inbox](implementation/0010-private-source-inbox.md)
   adds a paginated, owner-only read model with proposal status.
 - Increment 0009: [private task review](implementation/0009-private-task-review.md)

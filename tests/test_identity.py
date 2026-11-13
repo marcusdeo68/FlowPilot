@@ -117,6 +117,27 @@ def test_network_failure_never_accepts_token(token_tools):
         verifier.verify(sign())
 
 
+@pytest.mark.parametrize("field", ["ISSUER", "AUDIENCE", "JWKS_URL"])
+def test_identity_environment_requires_each_setting(monkeypatch, field):
+    values = {
+        "ISSUER": "https://identity.example",
+        "AUDIENCE": "flowpilot-api",
+        "JWKS_URL": "https://identity.example/keys",
+    }
+    for name, value in values.items():
+        monkeypatch.setenv("FLOWPILOT_OIDC_" + name, value)
+    assert IdentityConfig.from_environment() == IdentityConfig(
+        values["ISSUER"], values["AUDIENCE"], values["JWKS_URL"]
+    )
+    setting = "FLOWPILOT_OIDC_" + field
+    monkeypatch.setenv(setting, "")
+    with pytest.raises(ValueError, match="Configure issuer"):
+        IdentityConfig.from_environment()
+    monkeypatch.delenv(setting)
+    with pytest.raises(ValueError, match="Configure issuer"):
+        IdentityConfig.from_environment()
+
+
 def test_jwks_resolution_uses_configured_keys(token_tools, monkeypatch):
     config, _, sign = token_tools
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

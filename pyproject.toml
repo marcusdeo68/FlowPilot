@@ -32,6 +32,12 @@ markers = [
 [tool.uv]
 link-mode = "copy"
 
+[tool.pyright]
+include = ["services/api/src/flowpilot_api"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+
 [tool.setuptools.packages.find]
 where = ["services/api/src"]
 
