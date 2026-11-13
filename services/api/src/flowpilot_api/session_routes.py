@@ -19,11 +19,13 @@ from flowpilot_api.identity import AccessIdentity
 def session_cookie(request: Request) -> str | None:
     # Reject duplicate credentials rather than depend on cookie/header parsing order.
     count = sum(
-        part.strip().split("=", 1)[0] == COOKIE_NAME
+        "=" in part and part.split("=", 1)[0].strip() == COOKIE_NAME
         for header in request.headers.getlist("cookie")
         for part in header.split(";")
     )
-    if count > 1 or (count and "authorization" in request.headers):
+    if count > 1 or (
+        (count or COOKIE_NAME in request.cookies) and "authorization" in request.headers
+    ):
         raise HTTPException(401, "Ambiguous credentials")
     return request.cookies.get(COOKIE_NAME)
 

@@ -81,7 +81,14 @@ Initial local checks: 119 tests passed (including 13 existing Chromium workflows
 53 PostgreSQL-dependent checks skipped because no local test database is running.
 This includes 17 new ordinary session checks. Pinned Pyright reports zero errors.
 CI's browser job supplies PostgreSQL for two new authenticated Chromium workflows.
-Full candidate CI and independent audit are required before sign-off. Existing
+Initial candidate `5c0c91f` passed all six jobs in
+[CI run 43467252561](https://github.com/marcusdeo68/FlowPilot/actions/runs/43467252561):
+106 ordinary tests per platform/Python combination, 51 PostgreSQL tests and
+15 Chromium workflows. Independent audit caught FP-012: cookie-name whitespace
+could evade ambiguity detection. Five new regressions reproduced the failure;
+the parser fix passes those locally and requires revised CI/re-review before
+sign-off. [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14) records final
+revision checks and merge evidence. Existing
 tests are retained; PostgreSQL's dedicated job excludes browser-marked tests because
 those execute with Chromium in the browser job.
 

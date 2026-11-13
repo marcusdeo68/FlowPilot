@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 from alembic import command
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 from flowpilot_api.browser_sessions import (
     COOKIE_NAME,
@@ -17,11 +18,33 @@ from flowpilot_api.browser_sessions import (
     credential_digest,
     csrf_token,
 )
+from flowpilot_api.session_routes import session_cookie
 from flowpilot_api.workspace_api import create_workspace_app
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError
 
 ORIGIN = "http://127.0.0.1"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        [(b"cookie", b"flowpilot_session =first; flowpilot_session=second")],
+        [(b"cookie", b"flowpilot_session=first; flowpilot_session\t=second")],
+        [(b"cookie", b"flowpilot_session =first"), (b"cookie", b"flowpilot_session=second")],
+        [(b"cookie", b"flowpilot_session =first"), (b"authorization", b"Bearer ignored")],
+        [
+            (b"cookie", b"unrelated=x"),
+            (b"cookie", b"flowpilot_session =first"),
+            (b"authorization", b"Basic ignored"),
+        ],
+    ],
+)
+def test_cookie_whitespace_cannot_hide_duplicate_or_mixed_credentials(headers):
+    request = Request({"type": "http", "headers": headers})
+    with pytest.raises(HTTPException) as error:
+        session_cookie(request)
+    assert error.value.status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -316,6 +339,11 @@ def test_cookie_origin_ambiguity_and_stale_recovery(session_client):
         ).status_code
         == 401
     )
+    for headers in (
+        {"Cookie": f"{COOKIE_NAME} ={raw}; {COOKIE_NAME}={raw}"},
+        {"Cookie": f"{COOKIE_NAME} ={raw}", "Authorization": "Basic ignored"},
+    ):
+        assert client.get("/api/v2/me", headers=headers).status_code == 401
     with engine.begin() as connection:
         connection.execute(text("UPDATE browser_sessions SET expires_at=0"))
     assert client.get("/api/v2/session").status_code == 401

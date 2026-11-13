@@ -83,8 +83,9 @@ verification for each revision. Update this file when an item's state changes.
 
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
+| FP-012 | Defect / fix under verification | Independent audit reproduced whitespace around a cookie name bypassing duplicate/mixed-credential rejection. Five parser regressions failed before the fix. | Match framework cookie-name normalization and reject mixed Authorization; require passing regressions, full candidate CI and independent re-review to close. |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested. Live identity configuration, browser login/session, invitation consent, request limits, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested; optional browser sessions are increment 0012. Live identity configuration, sign-in/callback, invitation consent, request limits, session retention, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing

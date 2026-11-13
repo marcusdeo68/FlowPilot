@@ -49,7 +49,8 @@ are in [implementation 0007](implementation/0007-verified-workspace-api.md).
 It has no live provider or browser sign-in flow yet. Increment 0008 adds API
 workspace onboarding and membership administration using the same verified tokens.
 
-All resource endpoints require a verified bearer access token and `flowpilot:read`;
+All resource endpoints require a verified bearer access token or an enabled
+browser session (0012), plus `flowpilot:read`;
 writes additionally require `flowpilot:write`. Stored membership/role and object
 visibility determine actual access. The path workspace UUID is a selector, not
 authorization. Unknown JSON fields are rejected.
