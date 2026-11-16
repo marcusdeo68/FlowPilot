@@ -1,5 +1,6 @@
 """Separate bearer-authenticated API factory; the legacy demo is not mounted."""
 
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 from uuid import UUID
@@ -13,6 +14,12 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from flowpilot_api.access import AccessDenied, EvidenceVisibility, Role, Visibility
+from flowpilot_api.browser_sessions import (
+    BrowserConfig,
+    BrowserSessions,
+    InvalidSession,
+    SessionUnavailable,
+)
 from flowpilot_api.identity import (
     AccessIdentity,
     AccessTokenVerifier,
@@ -35,6 +42,7 @@ from flowpilot_api.membership_service import (
 from flowpilot_api.proposal_routes import proposal_routes
 from flowpilot_api.proposals import ProposalNotFound, ProposalService, ReviewConflict
 from flowpilot_api.repository import InvalidTransition, VersionConflict
+from flowpilot_api.session_routes import BrowserAuth, session_cookie
 from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
 from flowpilot_api.work import WorkItem
 from flowpilot_api.work_service import (
@@ -79,7 +87,10 @@ class ChangeMember(ExpectedVersion):
 
 
 def create_workspace_app(
-    *, engine: Engine | None = None, verifier: AccessTokenVerifier | None = None
+    *,
+    engine: Engine | None = None,
+    verifier: AccessTokenVerifier | None = None,
+    browser_origin: str | None = None,
 ) -> FastAPI:
     verifier = verifier or AccessTokenVerifier(IdentityConfig.from_environment())
     owns_engine = engine is None
@@ -87,6 +98,14 @@ def create_workspace_app(
     service = WorkService(engine)
     memberships = MembershipService(engine)
     inbox = InboxService(engine)
+    origin = (
+        browser_origin if browser_origin is not None else os.environ.get("FLOWPILOT_BROWSER_ORIGIN")
+    )
+    browser = (
+        BrowserAuth(BrowserSessions(engine, verifier.config, BrowserConfig(origin)))
+        if origin is not None
+        else None
+    )
 
     @asynccontextmanager
     async def lifespan(_):
@@ -100,9 +119,12 @@ def create_workspace_app(
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     bearer = HTTPBearer(auto_error=False)
 
-    def identity(
+    def bearer_identity(
+        request: Request,
         credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
     ) -> AccessIdentity:
+        if session_cookie(request) is not None or len(request.headers.getlist("authorization")) > 1:
+            raise HTTPException(401, "Bearer token without session cookie required")
         if credentials is None:
             raise HTTPException(
                 401, "Bearer access token required", headers={"WWW-Authenticate": "Bearer"}
@@ -117,6 +139,17 @@ def create_workspace_app(
             ) from exc
         except IdentityUnavailable as exc:
             raise HTTPException(503, "Identity verification temporarily unavailable") from exc
+
+    def identity(
+        request: Request,
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ) -> AccessIdentity:
+        credential = session_cookie(request)
+        if credential is not None:
+            if browser is None:
+                raise InvalidSession
+            return browser.authenticate(request, credential)
+        return bearer_identity(request, credentials)
 
     def read_identity(user: Annotated[AccessIdentity, Depends(identity)]) -> AccessIdentity:
         if "flowpilot:read" not in user.scopes:
@@ -135,6 +168,8 @@ def create_workspace_app(
         return handle
 
     for exception, code, message in (
+        (InvalidSession, 401, "Invalid or expired browser session"),
+        (SessionUnavailable, 503, "Session storage temporarily unavailable"),
         (ProposalNotFound, 404, "Proposal not found"),
         (
             ReviewConflict,
@@ -347,4 +382,6 @@ def create_workspace_app(
         return service.history(user.principal, workspace_id, work_id)
 
     app.include_router(proposal_routes(ProposalService(engine), read_identity, write_identity))
+    if browser is not None:
+        app.include_router(browser.routes(bearer_identity))
     return app

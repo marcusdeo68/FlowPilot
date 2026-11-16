@@ -106,7 +106,8 @@ The default dashboard remains a local, unauthenticated SQLite scaffold for
 synthetic/manual commitments. A separate PostgreSQL workspace API now has typed
 work/source/evidence storage, stored-membership authorization, and configured
 signed-access-token verification, API onboarding, and owner-controlled membership.
-It has no real identity provider, browser login, or invitation consent/delivery yet.
+Optional token-bounded browser sessions are increment 0012. It has no real identity
+provider, browser sign-in/callback, or invitation consent/delivery yet.
 Source owners can review, correct, accept or dismiss one private task suggestion
 per manual source. Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational

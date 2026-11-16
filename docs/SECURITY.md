@@ -28,6 +28,16 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 ## Required before multi-user or real provider data
 
+Increment 0012 optionally enables token-bounded opaque browser sessions on one
+explicit loopback origin. Credentials are hashed at rest; active-session writes
+and logout require exact Origin plus CSRF. Safe reads reject supplied foreign
+Origin/Fetch Metadata. SameSite alone does not isolate localhost ports. Cookie
+Secure is mandatory for configured HTTPS and omitted only for explicit loopback
+HTTP development. No proxy/public origin is supported. Revocation denies later
+authentication but cannot cancel admitted operations. Session/audit retention,
+request limits, provider revocation and full login remain deployment gaps; see
+[the session design](implementation/0012-browser-sessions.md).
+
 Increment 0007's separate API verifies configured RS256 access tokens and resolves
 stored memberships. It has no live identity-provider setup or browser login yet.
 The legacy dashboard remains unauthenticated. Signing-key refresh is throttled;

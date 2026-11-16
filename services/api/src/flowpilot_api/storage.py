@@ -5,7 +5,7 @@ import os
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import make_url
 
-SCHEMA_REVISION = "0004_source_inbox"
+SCHEMA_REVISION = "0005_browser_sessions"
 
 
 def create_database_engine(url: str | None = None) -> Engine:

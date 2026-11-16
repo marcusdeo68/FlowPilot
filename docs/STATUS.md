@@ -1,10 +1,22 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-12. This file records implementation evidence, known issues, and
+Updated: 2026-11-13. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
+
+- Increment 0012: [bounded browser sessions](implementation/0012-browser-sessions.md)
+  is implemented in [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14).
+  Optional exact loopback origin, opaque hashed
+  credentials, token-bounded expiry, CSRF, atomic logout and lifecycle audit are
+  implemented. Independent audit signed off source `2e31179` after fixing FP-012.
+  Local checks: 124 passed (13 Chromium), 53 real-database checks skipped locally;
+  lint, format, build and typecheck passed. All six jobs in
+  [run 43495939794](https://github.com/marcusdeo68/FlowPilot/actions/runs/43495939794)
+  passed: 111 ordinary tests per platform/Python combination, 51 PostgreSQL checks
+  and 15 Chromium workflows. The PR records final documentation-revision CI and
+  merge evidence. No sign-in UI, real provider or live account is connected.
 
 - Product direction clarified: Gmail, Google Calendar, Slack and Google Keep are
   the intended integrations. Configurable popup reminders, task organization and
@@ -77,7 +89,7 @@ verification for each revision. Update this file when an item's state changes.
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested. Live identity configuration, browser login/session, invitation consent, request limits, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested; optional browser sessions are increment 0012. Live identity configuration, sign-in/callback, invitation consent, request limits, session retention, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -88,6 +100,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-012 | Cookie-name normalization now matches the framework; whitespace cannot hide duplicate or mixed credentials. | Independent audit reproduced five failing regressions before the fix. All five and signed HTTP regressions pass in `2e31179`; independent re-review and all six CI jobs in run 43495939794 passed. |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
 | FP-011 | An empty DB showed 1 due task; outages showed sample tasks. Due counts over recent rows also missed older records. | Chromium initially failed with expected 0, actual 1. The focus endpoint now counts persisted work; empty, outage/retry, and older-due-item regressions pass locally. |
 | FP-004 | Python/PATH dependency addressed for this checkout | Managed `.venv`, committed dependency lock, and Cursor process tasks; fresh CI environments passed. |
@@ -109,8 +122,9 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    transactions. Remaining Stage 1 tables and live identity-provider setup are still planned.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
    Workspace creation/discovery and member administration are verified in 0008.
-   Next choose/configure a compatible identity provider, implement browser
-   login/session and invitation acceptance, and migrate the dashboard. Identity
+   Increment 0012 adds optional browser sessions. Next choose/configure a compatible
+   identity provider, implement login/callback and invitation acceptance, and
+   migrate the dashboard. Identity
    verification does not yet supply a working browser sign-in experience.
 3. Private task review (0009) and manual source discovery (0010) now have API
    implementations. Next: interactive review and authenticated browser coverage.

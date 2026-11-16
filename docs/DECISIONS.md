@@ -1,5 +1,15 @@
 # Architecture decisions
 
+## 0017 - Keep browser credentials opaque and server-revocable
+
+Exchange only a verified, read-scoped access token on an explicit loopback origin.
+Store a random credential's digest and verified identity/scopes rather than the
+provider token. Bound expiry to the original token; do not add sliding renewal.
+Origin and CSRF checks protect cookie writes while existing services keep checking
+membership. This supports future browser login without choosing a provider or
+weakening the current identity contract. Retention, full sign-in/callback and
+deployment controls remain separate work; see [0012](implementation/0012-browser-sessions.md).
+
 ## 0016 - Review a source-derived task before creating canonical work
 
 Keep one private proposal per manual source. A correction keeps the proposal

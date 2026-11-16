@@ -107,6 +107,13 @@ an empty audience at startup.
 
 ## Resources
 
+For [0012](implementation/0012-browser-sessions.md), compare authentication,
+workspace authorization and CSRF. Why must an unexpired browser session still
+check membership? Why does SameSite not protect two different localhost ports?
+Trace a logout audit failure and explain why the cookie must remain usable until
+the revocation transaction succeeds. Predict what a request already authenticated
+before logout can still do.
+
 For [0011](implementation/0011-dashboard-focus.md), compare a workspace with no
 records to an unreachable workspace. Which one can safely display zero? Explain
 why the 50 most recent rows cannot answer a question about every due commitment.

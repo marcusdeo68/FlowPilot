@@ -29,10 +29,17 @@ Workspace onboarding and owner-only membership administration are increment 0008
 Private task proposals and review history are increment 0009. Provider connections,
 projects, action proposals, approvals, and executions remain future
 records. Every tenant-owned record needs a workspace key and server-enforced
-authorization. The live authentication provider/session flow remains unconfigured;
+authorization. The live authentication provider/sign-in flow remains unconfigured;
 AWS is the planned later deployment target.
 
 ## Module boundaries
+
+Increment 0012 adds optional opaque browser sessions to the verified API.
+`browser_sessions.py` stores credential digests, verified identity/scopes, exact
+origin/audience binding, absolute expiry and atomic lifecycle audit.
+`session_routes.py` enforces origin, CSRF and cookie rules; existing business
+services continue to recheck stored permissions. It does not connect the dashboard
+or configure a login provider. See [0012](implementation/0012-browser-sessions.md).
 
 Increment 0008 adds `MembershipService` and a shared stored-membership resolver.
 Workspace creation establishes the verified caller as owner with an atomic audit.
@@ -45,7 +52,7 @@ browser login is implemented.
 Increment 0007 adds a separate `workspace_api:create_workspace_app` factory with
 signed access-token verification and API scopes before invoking the PostgreSQL
 service. Its request identities are verified issuer/subject pairs. It does not
-mount legacy routes or the dashboard. A real identity provider and browser login/session
+mount legacy routes or the dashboard. A real identity provider and browser sign-in
 flow remain unconfigured; API onboarding is now in 0008. See implementation 0007 for token-profile
 requirements and the explicit separation from the local demo.
 
