@@ -124,3 +124,10 @@ failure handlers must check the sequence number before changing the display.
 - [Pydantic model documentation](https://docs.pydantic.dev/latest/concepts/models/)
 - [SQLite transactions](https://www.sqlite.org/lang_transaction.html)
 - [PostgreSQL tutorial](https://www.postgresql.org/docs/current/tutorial.html)
+
+## Local PostgreSQL test isolation exercise
+
+Read [implementation 0013](implementation/0013-local-postgres-tests.md), then trace
+the `pg` fixture in `tests/conftest.py`. Explain the difference between a container,
+a persistent volume, a database and a schema. Why do both a separate test database
+and a random schema per test help protect development work?
