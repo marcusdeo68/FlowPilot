@@ -1,0 +1,20 @@
+# Disposable synthetic test data only; independent of the development project.
+name: flowpilot-tests
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: flowpilot
+      POSTGRES_PASSWORD: synthetic-test-only
+      POSTGRES_DB: flowpilot_test
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowpilot -d flowpilot_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres_test:

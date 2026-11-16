@@ -1,13 +1,26 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-13. This file records implementation evidence, known issues, and
+Updated: 2026-11-16. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0013: [local PostgreSQL verification](implementation/0013-local-postgres-tests.md)
+  adds a separate synthetic test Compose project on loopback port 5433. Docker
+  reports PostgreSQL 17.12 and database `flowpilot_test`. First local full run:
+  177 passed, one browser teardown error (FP-013). After the diagnosed fixture fix,
+  builder and independent full suites passed all 177 tests without skips. Independent
+  lint, format, typecheck, package build and JavaScript syntax passed; dedicated
+  PostgreSQL suite passed 51 tests. See the implementation note for commands.
+
+- Development resource recommendations and compact agent handoffs are saved in
+  [DEVELOPMENT_RESOURCES.md](DEVELOPMENT_RESOURCES.md), recorded 2026-11-15.
+  Docker installation and isolated test database startup are now verified;
+  local full-suite verification passed; remaining workflow improvements are planned.
+
 - Increment 0012: [bounded browser sessions](implementation/0012-browser-sessions.md)
-  is implemented in [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14).
+  merged as `7ac632b` in [PR #14](https://github.com/marcusdeo68/FlowPilot/pull/14).
   Optional exact loopback origin, opaque hashed
   credentials, token-bounded expiry, CSRF, atomic logout and lifecycle audit are
   implemented. Independent audit signed off source `2e31179` after fixing FP-012.
@@ -15,8 +28,9 @@ verification for each revision. Update this file when an item's state changes.
   lint, format, build and typecheck passed. All six jobs in
   [run 43495939794](https://github.com/marcusdeo68/FlowPilot/actions/runs/43495939794)
   passed: 111 ordinary tests per platform/Python combination, 51 PostgreSQL checks
-  and 15 Chromium workflows. The PR records final documentation-revision CI and
-  merge evidence. No sign-in UI, real provider or live account is connected.
+  and 15 Chromium workflows. Final candidate `05ee451` passed all six jobs in
+  [run 43500166899](https://github.com/marcusdeo68/FlowPilot/actions/runs/43500166899)
+  before merge. No sign-in UI, real provider or live account is connected.
 
 - Product direction clarified: Gmail, Google Calendar, Slack and Google Keep are
   the intended integrations. Configurable popup reminders, task organization and
@@ -100,6 +114,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-013 | Windows session-test server uses a fixture-local Selector loop to avoid Proactor reset cleanup leaking server connections. No assertion removed. | Reproduced twice before fix; debugger confirmed leaked active counts. Independent focused suite passed twice and full PostgreSQL/Chromium run passed all 177 tests with no skips. |
 | FP-012 | Cookie-name normalization now matches the framework; whitespace cannot hide duplicate or mixed credentials. | Independent audit reproduced five failing regressions before the fix. All five and signed HTTP regressions pass in `2e31179`; independent re-review and all six CI jobs in run 43495939794 passed. |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |
 | FP-011 | An empty DB showed 1 due task; outages showed sample tasks. Due counts over recent rows also missed older records. | Chromium initially failed with expected 0, actual 1. The focus endpoint now counts persisted work; empty, outage/retry, and older-due-item regressions pass locally. |

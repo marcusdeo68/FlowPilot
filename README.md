@@ -83,6 +83,20 @@ setup, test isolation, design, and remaining limits are documented in
 CI runs real-database checks separately; local runs skip them unless
 `FLOWPILOT_TEST_DATABASE_URL` points to a dedicated database ending in `_test`.
 
+For a separate local PostgreSQL 17 test database (Docker Desktop must be running):
+
+```powershell
+docker compose -f compose.test.yaml up -d --wait
+$env:FLOWPILOT_TEST_DATABASE_URL = 'postgresql+psycopg://flowpilot:synthetic-test-only@127.0.0.1:5433/flowpilot_test'
+uv run --locked --extra dev pytest -q -m 'postgres and not browser'
+```
+
+The test project uses its own volume and loopback port 5433; it does not use
+`flowpilot_dev`. Fixtures migrate and clean up isolated schemas automatically.
+Stop it with `docker compose -f compose.test.yaml stop`. See
+[local test environment](docs/implementation/0013-local-postgres-tests.md) for
+browser checks, full verification and troubleshooting.
+
 Chromium workflow checks and optional local browser setup are documented in
 [implementation 0006](docs/implementation/0006-browser-regressions.md). CI also
 supports manual dispatch and a daily 10:17 UTC maintenance check.

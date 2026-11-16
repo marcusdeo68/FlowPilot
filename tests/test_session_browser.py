@@ -31,7 +31,11 @@ def session_browser(pg, token_tools):
     def harness():
         return "<!doctype html><title>Synthetic session test</title>"
 
-    server = uvicorn.Server(uvicorn.Config(app, log_level="error"))
+    # Windows Proactor reset cleanup can leak asyncio server connections (FP-013).
+    # This socket-only server thread needs no subprocess support; Playwright runs
+    # separately. Keep real requests and the strict shutdown assertion below.
+    loop = "asyncio:SelectorEventLoop" if os.name == "nt" else "auto"
+    server = uvicorn.Server(uvicorn.Config(app, log_level="error", loop=loop))
     thread = threading.Thread(target=server.run, kwargs={"sockets": sockets}, daemon=True)
     thread.start()
     try:
