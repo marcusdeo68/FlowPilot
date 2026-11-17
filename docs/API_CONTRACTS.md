@@ -154,6 +154,13 @@ executions, and the authenticated frontend remain future work.
 
 ## Private task review (workspace API)
 
+Work browsing: `GET /api/v2/workspaces/{workspace_id}/work-page?limit=50&after=<UUID>`
+returns `{items, next_after}` in descending creation-time/UUID order. Omit `after`
+on the first request; null `next_after` ends traversal. Read scope and active stored
+membership are required; private work remains creator-only. Inaccessible/unknown
+pivots return 404, invalid limit/UUID 422. The existing `/work` list is preserved.
+See [work pagination](implementation/0014-work-pagination.md) for live-traversal limits.
+
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
 for source-to-proposal creation, listing, correction, and review contracts.
 

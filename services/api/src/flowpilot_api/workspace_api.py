@@ -50,6 +50,7 @@ from flowpilot_api.work_service import (
     SourceNotFound,
     StoredWork,
     WorkNotFound,
+    WorkPage,
     WorkService,
 )
 
@@ -283,6 +284,15 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
     ):
         return service.list_work(user.principal, workspace_id, limit=limit)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/work-page", response_model=WorkPage)
+    def work_page(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+        after: UUID | None = None,
+    ):
+        return service.list_work_page(user.principal, workspace_id, limit=limit, after=after)
 
     @app.post("/api/v2/workspaces/{workspace_id}/work", response_model=StoredWork, status_code=201)
     def create_work(
