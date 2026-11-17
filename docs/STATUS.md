@@ -6,6 +6,15 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0014: [authorized work pagination](implementation/0014-work-pagination.md)
+  is implemented. Additive `work-page` browsing preserves private visibility and
+  the existing list contract. Builder and independent full suites passed 181 tests
+  with zero skips: 111 ordinary, 55 PostgreSQL, 15 Chromium. Independent lint,
+  format, pinned Pyright, sdist/wheel build, JavaScript syntax and doc links passed.
+  Exact-candidate CI is required before merge.
+- Increment 0013 merged in PR #15 as `6209526`; all six post-merge jobs passed in
+  [run 43975170827](https://github.com/marcusdeo68/FlowPilot/actions/runs/43975170827).
+
 - Increment 0013: [local PostgreSQL verification](implementation/0013-local-postgres-tests.md)
   adds a separate synthetic test Compose project on loopback port 5433. Docker
   reports PostgreSQL 17.12 and database `flowpilot_test`. First local full run:

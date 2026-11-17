@@ -67,6 +67,12 @@ class StoredWork:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class WorkPage:
+    items: list[StoredWork]
+    next_after: UUID | None
+
+
 class _StoredWorkPayload(RootModel[WorkItem]):
     """Validate a database projection against the same tagged union used by the API."""
 
@@ -234,6 +240,40 @@ class WorkService:
                 {"workspace": workspace_id, "user": member.user_id, "limit": limit},
             ).mappings()
             return [_stored(row) for row in rows]
+
+    def list_work_page(
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        *,
+        limit: int = 50,
+        after: UUID | None = None,
+    ) -> WorkPage:
+        if not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
+            boundary = ""
+            if after is not None:
+                pivot = self._work(connection, member, after)
+                boundary = " AND (created_at, id) < (:created, :after)"
+                params.update(created=pivot.created_at, after=pivot.id)
+            rows = (
+                connection.execute(
+                    text(
+                        """SELECT * FROM work_items WHERE workspace_id=:workspace
+                    AND (visibility='workspace' OR creator_id=:user)"""
+                        + boundary
+                        + " ORDER BY created_at DESC, id DESC LIMIT :limit"
+                    ),
+                    params,
+                )
+                .mappings()
+                .all()
+            )
+            items = [_stored(row) for row in rows[:limit]]
+            return WorkPage(items, items[-1].id if len(rows) > limit else None)
 
     def transition(
         self,

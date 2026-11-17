@@ -131,3 +131,10 @@ Read [implementation 0013](implementation/0013-local-postgres-tests.md), then tr
 the `pg` fixture in `tests/conftest.py`. Explain the difference between a container,
 a persistent volume, a database and a schema. Why do both a separate test database
 and a random schema per test help protect development work?
+
+## Work pagination exercise
+
+Read [implementation 0014](implementation/0014-work-pagination.md). Sketch two
+pages of tasks with equal creation timestamps. Explain why UUID breaks the tie,
+why an update-time cursor could skip a task after a status change, and why the
+cursor lookup needs the same privacy check as reading a task.

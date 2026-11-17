@@ -1,5 +1,17 @@
 # Session handoff
 
+## Latest increment - work pagination
+
+User authorized the next autonomous development increment. Base `6209526` is
+merged main with all six CI checks passed. Increment 0014 adds an authorized,
+creation-order cursor endpoint for work browsing beyond 100 rows, preparing the
+future task screen while sign-in/provider configuration remains pending.
+Independent full suite: 181 passed, no skips (111 ordinary, 55 PostgreSQL,
+15 Chromium). Lint, format, typecheck, sdist/wheel build and documentation links passed; final CI
+and commit/PR evidence must be checked before merge. Read STATUS and the 0014
+implementation note for final evidence. Preserve unrelated `.playwright-mcp/`.
+No ongoing background worker is configured; this handoff records session work.
+
 ## Current checkpoint - 2026-11-16
 
 User resumed development and deferred further GitHub remote MCP troubleshooting.
