@@ -1,5 +1,13 @@
 # Architecture decisions
 
+## 0018 - Claim pending logins before code exchange
+
+Persist only digests of independent state and verifier secrets. Bind the attempt
+to trusted issuer/audience/client/callback settings, expire it after five minutes,
+and consume it atomically with append-only audit. Consumption never establishes
+identity; returned access tokens still require strict verification. Keep provider
+HTTP and cookie behavior in a future adapter. See [0015](implementation/0015-login-transactions.md).
+
 ## 0017 - Keep browser credentials opaque and server-revocable
 
 Exchange only a verified, read-scoped access token on an explicit loopback origin.

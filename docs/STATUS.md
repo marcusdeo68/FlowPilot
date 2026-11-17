@@ -6,6 +6,14 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0015: [login transactions](implementation/0015-login-transactions.md)
+  is implemented internally; eight targeted tests passed. Builder and independent
+  full suites passed 189 tests with no skips (113 ordinary, 61 PostgreSQL,
+  15 Chromium). Independent lint, format, pinned Pyright, sdist/wheel build,
+  JavaScript syntax and doc links passed. Exact-candidate CI remains required before merge. No login routes, provider, or new authenticated UI exists.
+- Increment 0014 merged in PR #16 as `46cb903`; all six post-merge checks passed
+  in [run 44016668450](https://github.com/marcusdeo68/FlowPilot/actions/runs/44016668450).
+
 - Increment 0014: [authorized work pagination](implementation/0014-work-pagination.md)
   is implemented. Additive `work-page` browsing preserves private visibility and
   the existing list contract. Builder and independent full suites passed 181 tests
@@ -123,6 +131,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-014 | Pending-login expiry is checked after acquiring the row lock. | Independent audit and failing regression reproduced consumption after expiry while waiting on an unchanged row lock. Lock-first fix passed eight focused tests and independent full suite of 189 without skips. |
 | FP-013 | Windows session-test server uses a fixture-local Selector loop to avoid Proactor reset cleanup leaking server connections. No assertion removed. | Reproduced twice before fix; debugger confirmed leaked active counts. Independent focused suite passed twice and full PostgreSQL/Chromium run passed all 177 tests with no skips. |
 | FP-012 | Cookie-name normalization now matches the framework; whitespace cannot hide duplicate or mixed credentials. | Independent audit reproduced five failing regressions before the fix. All five and signed HTTP regressions pass in `2e31179`; independent re-review and all six CI jobs in run 43495939794 passed. |
 | FP-003 | GitHub CLI and repository connection verified | Initial push succeeded; PR #1 created and merged using CLI. Sandboxed credential access can still differ from normal host access. |

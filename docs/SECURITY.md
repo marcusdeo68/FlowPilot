@@ -28,6 +28,12 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 ## Required before multi-user or real provider data
 
+Increment 0015 adds digest-only, five-minute, single-use pending login records
+bound to issuer/audience/client/callback configuration. Consumption is audited
+atomically and does not authenticate a user. Browser initiation/callback protections,
+provider review and returned-token verification are still required before exposing
+login routes. See [0015](implementation/0015-login-transactions.md).
+
 Increment 0012 optionally enables token-bounded opaque browser sessions on one
 explicit loopback origin. Credentials are hashed at rest; active-session writes
 and logout require exact Origin plus CSRF. Safe reads reject supplied foreign
