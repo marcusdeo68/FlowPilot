@@ -138,3 +138,11 @@ Read [implementation 0014](implementation/0014-work-pagination.md). Sketch two
 pages of tasks with equal creation timestamps. Explain why UUID breaks the tie,
 why an update-time cursor could skip a task after a status change, and why the
 cursor lookup needs the same privacy check as reading a task.
+
+## Pending login exercise
+
+Read [0015](implementation/0015-login-transactions.md). Explain what state and
+PKCE each protect, why a database digest cannot redeem an authorization code,
+and why two callback workers need both a row lock and a conditional update.
+Why would an unlocked read followed by a write race? Why does claiming a transaction not prove user identity?
+Then explain why expiry must be checked after acquiring the row lock (FP-014).

@@ -33,6 +33,7 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Cursor-paginated owner-only source inbox with current review state (0010).
 - [x] Optional token-bounded browser sessions with CSRF, revocation and real-browser coverage (0012).
 - [x] Authorized creation-order work pagination for browsing beyond capped lists (0014).
+- [x] Internal single-use, browser-bound PKCE login transaction storage and audit (0015).
 - [ ] Live identity-provider setup, login/callback, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.

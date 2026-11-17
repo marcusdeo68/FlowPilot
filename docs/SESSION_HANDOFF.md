@@ -1,5 +1,22 @@
 # Session handoff
 
+## Latest increment - pending login transactions
+
+User authorized autonomous development. Base `46cb903` is merged main; PR #16
+and post-merge run 44016668450 passed all six jobs. Increment 0015 adds internal
+digest-only state/PKCE login transactions, fixed expiry, atomic consumption and
+append-only audit. Eight targeted tests passed. Independent full suite: 189 passed, no skips.
+Audit found FP-014 expiry-under-lock race; regression reproduced and lock-first
+fix passed. Independent lint, format, typecheck, build, JavaScript syntax and doc
+links passed. Inspect exact-revision PR CI before merging. Apply migration 0006 before
+starting the workspace API. No HTTP login routes, provider or live accounts exist.
+
+Next is a reviewed authorization redirect/callback adapter, bounded token exchange,
+unchanged strict access-token verification, then session/UI wiring with synthetic
+browser tests. Keep provider compatibility/scopes/privacy review explicit; no
+credentials or live provider data have been introduced. `.playwright-mcp/` is an
+unrelated local artifact to preserve. Earlier checkpoints below are historical.
+
 ## Latest increment - work pagination
 
 User authorized the next autonomous development increment. Base `6209526` is

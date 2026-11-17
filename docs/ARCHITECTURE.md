@@ -34,6 +34,11 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0015 adds internal `login_transactions.py`: digest-only pending login
+records, trusted configuration binding, fixed expiry and atomic one-time
+consumption with lifecycle audit. It has no HTTP/provider adapter and grants no
+identity. See [0015](implementation/0015-login-transactions.md).
+
 Increment 0012 adds optional opaque browser sessions to the verified API.
 `browser_sessions.py` stores credential digests, verified identity/scopes, exact
 origin/audience binding, absolute expiry and atomic lifecycle audit.
