@@ -116,7 +116,7 @@ class TokenExchange:
         connection = HTTPSConnection(
             endpoint.hostname or "", endpoint.port, timeout=EXCHANGE_SECONDS
         )
-        deadline = 0.0
+        started = 0.0
         active_socket: socket | None = None
 
         def abort():
@@ -130,7 +130,7 @@ class TokenExchange:
                     pass
 
         def remaining():
-            left = deadline - time.monotonic()
+            left = EXCHANGE_SECONDS - (time.monotonic() - started)
             if left <= 0:
                 raise TimeoutError
             # HTTPResponse closes a Connection:close socket at body EOF.
@@ -145,7 +145,7 @@ class TokenExchange:
             # starts after TLS so its watchdog always has the actual TLS socket.
             connection.connect()
             active_socket = connection.sock
-            deadline = time.monotonic() + EXCHANGE_SECONDS
+            started = time.monotonic()
             watchdog = Timer(EXCHANGE_SECONDS, abort)
             watchdog.daemon = True
             watchdog.start()
