@@ -109,7 +109,8 @@ signed-access-token verification, API onboarding, and owner-controlled membershi
 Optional token-bounded browser sessions are increment 0012. It has no real identity
 provider or invitation consent/delivery yet. Increment 0016 adds an opt-in generic
 browser sign-in/callback adapter verified with synthetic providers; live identity
-configuration and the authenticated workspace UI remain pending.
+configuration remains pending. Increment 0017 adds workspace selection,
+creation, work browsing and sign-out in the verified browser app.
 Source owners can review, correct, accept or dismiss one private task suggestion
 per manual source. Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational

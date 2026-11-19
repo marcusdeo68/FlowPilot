@@ -23,6 +23,7 @@ from flowpilot_api.browser_sessions import COOKIE_NAME
 from flowpilot_api.identity import AccessTokenVerifier, IdentityConfig
 from flowpilot_api.login import LOGIN_PATH, PENDING_COOKIE, LoginConfig
 from flowpilot_api.workspace_api import create_workspace_app
+from sqlalchemy import text
 
 pytestmark = [pytest.mark.browser, pytest.mark.postgres]
 
@@ -292,3 +293,175 @@ def test_cross_site_callback_cannot_replace_session_hidden_by_strict_cookie(logi
     )
     assert not any(cookie["name"] == PENDING_COOKIE for cookie in context.cookies())
     assert fetch(incumbent, "/api/v2/session")["status"] == 200
+
+
+def open_workspace(page, origin, provider):
+    go_to_provider(page, provider)
+    page.get_by_role("link", name="Return to FlowPilot").click()
+    page.get_by_role("button", name="Continue sign-in").click()
+    page.get_by_role("link", name="Open workspace").click()
+    page.wait_for_url(origin + "/api/v2/workspace")
+    page.get_by_role("heading", name="Workspaces", exact=True).wait_for()
+
+
+def create_workspace_in_browser(page, origin, name):
+    page.get_by_role("textbox", name="Workspace name").fill(name)
+    with page.expect_response(
+        lambda response: (
+            response.url == origin + "/api/v2/workspaces" and response.request.method == "POST"
+        )
+    ) as creation:
+        page.get_by_role("button", name="Create workspace").click()
+    assert creation.value.status == 201
+    return creation.value.json()["id"]
+
+
+def seed_browser_work(page, workspace_id, titles):
+    session = fetch(page, "/api/v2/session")
+    assert session["status"] == 200
+    headers = {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": json.loads(session["text"])["csrf_token"],
+    }
+    for title in titles:
+        created = fetch(
+            page,
+            f"/api/v2/workspaces/{workspace_id}/work",
+            method="POST",
+            headers=headers,
+            body=json.dumps({"item": {"kind": "task", "title": title}}),
+        )
+        assert created["status"] == 201
+
+
+def test_workspace_browser_onboards_browses_and_signs_out(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    expect(page.get_by_text("Create your first workspace to get started.")).to_be_visible()
+    selector = page.get_by_label("Workspace", exact=True)
+    expect(selector).to_be_disabled()
+    name = "Synthetic browser workspace"
+    workspace_id = create_workspace_in_browser(page, origin, name)
+    expect(selector).to_have_value(workspace_id)
+    expect(page.get_by_text("No work items yet.", exact=True)).to_be_visible()
+
+    oldest = "Oldest task on the next page"
+    literal_title = "<strong>Synthetic title</strong>"
+    titles = [oldest, *(f"Synthetic task {index:02}" for index in range(1, 20)), literal_title]
+    seed_browser_work(page, workspace_id, titles)
+    page.reload()
+    expect(selector).to_have_value(workspace_id)
+    expect(selector.locator("option:checked")).to_have_text(name)
+    newest_item = page.get_by_text(literal_title, exact=True)
+    oldest_item = page.get_by_text(oldest, exact=True)
+    expect(newest_item).to_be_visible()
+    load_more = page.get_by_role("button", name="Load more", exact=True)
+    expect(load_more).to_be_visible()
+    expect(oldest_item).to_have_count(0)
+    load_more.click()
+    expect(oldest_item).to_be_visible()
+    expect(newest_item).to_be_visible()
+    expect(load_more).to_be_hidden()
+
+    with page.expect_response(
+        lambda response: (
+            response.url == origin + "/api/v2/session" and response.request.method == "DELETE"
+        )
+    ) as logout:
+        page.get_by_role("button", name="Sign out", exact=True).click()
+    assert logout.value.status == 204
+    expect(page.get_by_role("link", name="Sign in", exact=True)).to_be_visible()
+    expect(newest_item).to_have_count(0)
+    assert not any(cookie["name"] == COOKIE_NAME for cookie in context.cookies())
+    page.reload()
+    expect(page.get_by_role("link", name="Sign in", exact=True)).to_be_visible()
+
+
+def test_workspace_browser_clears_visible_work_when_session_expires(login_browser, pg):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First synthetic workspace")
+    title = "Previously visible private task"
+    seed_browser_work(page, first, [title])
+    second = create_workspace_in_browser(page, origin, "Second synthetic workspace")
+    selector = page.get_by_label("Workspace", exact=True)
+    expect(selector).to_have_value(second)
+    selector.select_option(first)
+    visible_work = page.get_by_text(title, exact=True)
+    expect(visible_work).to_be_visible()
+
+    with pg[0].begin() as connection:
+        connection.execute(text("UPDATE browser_sessions SET expires_at=0"))
+    with page.expect_response(origin + f"/api/v2/workspaces/{second}/work-page?**") as denied:
+        selector.select_option(second)
+    assert denied.value.status == 401
+    expect(page.get_by_role("link", name="Sign in", exact=True)).to_be_visible()
+    expect(visible_work).to_have_count(0)
+    expect(page.get_by_role("textbox", name="Workspace name")).to_be_hidden()
+
+
+@pytest.mark.parametrize("delayed_status", [200, 401])
+def test_workspace_browser_ignores_late_work_from_previous_selection(login_browser, delayed_status):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First synthetic workspace")
+    first_title = "Task from previous selection"
+    seed_browser_work(page, first, [first_title])
+    second = create_workspace_in_browser(page, origin, "Second synthetic workspace")
+    selector = page.get_by_label("Workspace", exact=True)
+    expect(selector).to_have_value(second)
+    expect(page.get_by_text("No work items yet.", exact=True)).to_be_visible()
+    second_title = "Task from current selection"
+    seed_browser_work(page, second, [second_title])
+
+    delayed_path = f"/api/v2/workspaces/{first}/work-page"
+    # Signal in the next task so the app has processed the error or parsed work.
+    page.evaluate(
+        """path => {
+            const fetchOriginal = window.fetch.bind(window);
+            const signal = () => setTimeout(() => { window.delayedWorkHandled = true; }, 0);
+            window.fetch = async (url, options) => {
+                const response = await fetchOriginal(url, options);
+                if (new URL(url, location.href).pathname !== path) return response;
+                if (!response.ok) {
+                    signal();
+                    return response;
+                }
+                const json = response.json.bind(response);
+                response.json = async () => {
+                    const body = await json();
+                    signal();
+                    return body;
+                };
+                return response;
+            };
+        }""",
+        delayed_path,
+    )
+    held: list[Route] = []
+    delayed_url = origin + delayed_path + "?**"
+    page.route(delayed_url, lambda route: held.append(route), times=1)
+    with page.expect_request(delayed_url):
+        selector.select_option(first)
+    expect(page.get_by_text("Loading work items…", exact=True)).to_be_visible()
+
+    selector.select_option(second)
+    current_item = page.get_by_text(second_title, exact=True)
+    expect(current_item).to_be_visible()
+    assert len(held) == 1
+    if delayed_status == 200:
+        stale = held[0].fetch()
+        assert stale.ok and stale.json()["items"][0]["data"]["title"] == first_title
+        held[0].fulfill(response=stale)
+    else:
+        held[0].fulfill(status=401, json={"detail": "Unauthorized"})
+    page.wait_for_function("window.delayedWorkHandled === true")
+    expect(selector).to_have_value(second)
+    expect(current_item).to_be_visible()
+    expect(page.get_by_text(first_title, exact=True)).to_have_count(0)

@@ -153,3 +153,9 @@ Read [0016](implementation/0016-browser-login.md). Trace the Lax pending cookie 
 Strict session cookie through provider navigation, callback GET and completion
 POST. Explain why the callback presents a form, why hidden fields need validation,
 and why successful code exchange still requires signature/client verification.
+
+## Workspace screen exercise
+
+Read [0017](implementation/0017-workspace-screen.md). Simulate a work page returning
+after a workspace switch. Explain which state makes that response obsolete and
+why the service still has to authorize every request.

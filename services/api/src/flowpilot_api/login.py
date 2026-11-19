@@ -30,6 +30,7 @@ from flowpilot_api.login_transactions import (
     LoginTransactions,
 )
 from flowpilot_api.session_routes import BrowserAuth, session_cookie
+from flowpilot_api.workspace_ui import WORKSPACE_URL
 
 LOGIN_PATH = "/api/v2/login"
 PENDING_COOKIE = "flowpilot_login"
@@ -316,7 +317,9 @@ class LoginFlow:
                 raise InvalidAccessToken
             credential = self.browser.sessions.issue(identity)
             response = self._page(
-                "<h1>Signed in to FlowPilot</h1><p>Your workspace session is ready.</p>"
+                '<h1>Signed in to FlowPilot</h1><p><a href="'
+                + WORKSPACE_URL
+                + '">Open workspace</a></p>'
             )
             response.set_cookie(
                 COOKIE_NAME,

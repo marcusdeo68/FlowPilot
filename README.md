@@ -66,6 +66,7 @@ uv run --locked --extra dev ruff format --check .
 npx --yes --package pyright@1.1.407 pyright
 uv run --locked --extra dev python -m build
 node --check services/api/src/flowpilot_api/web/app.js
+node --check services/api/src/flowpilot_api/web/workspace.js
 ```
 
 GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
@@ -123,4 +124,6 @@ An opt-in generic authorization-code sign-in adapter is documented in
 [implementation 0016](docs/implementation/0016-browser-login.md). It is disabled
 by default and tested synthetically; no real provider is configured. Review its
 token compatibility requirements and suppress callback query access logs before
-configuring any provider. The authenticated workspace dashboard remains future work.
+configuring any provider. The first signed-in workspace screen is available at
+`/api/v2/workspace` when browser sessions are enabled. See
+[increment 0017](docs/implementation/0017-workspace-screen.md).
