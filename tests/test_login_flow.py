@@ -9,6 +9,7 @@ import threading
 import time
 from email.message import Message
 from http.client import HTTPConnection, RemoteDisconnected
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
@@ -140,7 +141,11 @@ def stub_transport(monkeypatch, response=None, error=None):
     return calls
 
 
-def test_code_transport_uses_bounded_post_no_proxy_redirect_or_retry(monkeypatch):
+@pytest.mark.parametrize("same_tick", [False, True])
+def test_code_transport_uses_bounded_post_no_proxy_redirect_or_retry(monkeypatch, same_tick):
+    if same_tick:
+        # Adding five at this tick crosses a floating-point precision boundary.
+        monkeypatch.setattr(login, "time", SimpleNamespace(monotonic=lambda: 251.004))
     response = TokenResponse(b'{"access_token":"signed-token","token_type":"bearer"}')
     calls = stub_transport(monkeypatch, response)
     monkeypatch.setenv("HTTPS_PROXY", "http://untrusted-proxy.invalid:1")
