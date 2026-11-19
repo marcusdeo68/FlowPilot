@@ -46,8 +46,9 @@ Allowed transitions are documented in `docs/ROADMAP.md` and enforced by server-s
 Factory: `flowpilot_api.workspace_api:create_workspace_app`. This factory mounts
 no legacy `/api/v1` endpoints or dashboard. Configuration and accepted token profile
 are in [implementation 0007](implementation/0007-verified-workspace-api.md).
-It has no live provider or browser sign-in flow yet. Increment 0008 adds API
-workspace onboarding and membership administration using the same verified tokens.
+The optional browser sign-in adapter appears below. A live identity provider
+remains unconfigured. Increment 0008 adds API workspace onboarding and membership
+administration using the same verified tokens.
 
 All resource endpoints require a verified bearer access token or an enabled
 browser session (0012), plus `flowpilot:read`;
@@ -115,6 +116,13 @@ Workspace creation is not idempotent: do not retry automatically after an ambigu
 timeout. See [implementation 0008](implementation/0008-workspace-onboarding.md).
 
 ## Optional browser session contract (increment 0012)
+
+Opt-in browser login (0016) adds GET/POST `/api/v2/login`, GET
+`/api/v2/login/callback` and POST `/api/v2/login/complete`. Default-disabled;
+explicit endpoints/client and browser origin are required. Callback GET presents
+a form; exact-Origin completion POST consumes/exchanges/verifies before issuing
+the existing session. No live provider is configured. See
+[login contracts and compatibility](implementation/0016-browser-login.md).
 
 Enabled only with an exact loopback `FLOWPILOT_BROWSER_ORIGIN`. The configured
 origin must also be the API's origin. Existing bearer-only requests remain valid.

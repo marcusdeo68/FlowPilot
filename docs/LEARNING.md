@@ -146,3 +146,10 @@ PKCE each protect, why a database digest cannot redeem an authorization code,
 and why two callback workers need both a row lock and a conditional update.
 Why would an unlocked read followed by a write race? Why does claiming a transaction not prove user identity?
 Then explain why expiry must be checked after acquiring the row lock (FP-014).
+
+## Browser login exercise
+
+Read [0016](implementation/0016-browser-login.md). Trace the Lax pending cookie and
+Strict session cookie through provider navigation, callback GET and completion
+POST. Explain why the callback presents a form, why hidden fields need validation,
+and why successful code exchange still requires signature/client verification.

@@ -28,6 +28,8 @@ from flowpilot_api.identity import (
     InvalidAccessToken,
 )
 from flowpilot_api.inbox import InboxPage, InboxService
+from flowpilot_api.login import Exchange, LoginConfig, LoginFlow
+from flowpilot_api.login_transactions import InvalidLoginTransaction, LoginStorageUnavailable
 from flowpilot_api.membership_service import (
     LastOwnerConflict,
     MemberInfo,
@@ -92,6 +94,8 @@ def create_workspace_app(
     engine: Engine | None = None,
     verifier: AccessTokenVerifier | None = None,
     browser_origin: str | None = None,
+    login_config: LoginConfig | None = None,
+    login_exchange: Exchange | None = None,
 ) -> FastAPI:
     verifier = verifier or AccessTokenVerifier(IdentityConfig.from_environment())
     owns_engine = engine is None
@@ -107,6 +111,9 @@ def create_workspace_app(
         if origin is not None
         else None
     )
+    login_config = login_config or LoginConfig.from_environment()
+    if login_config is not None and browser is None:
+        raise ValueError("Login requires an explicit browser origin")
 
     @asynccontextmanager
     async def lifespan(_):
@@ -171,6 +178,8 @@ def create_workspace_app(
     for exception, code, message in (
         (InvalidSession, 401, "Invalid or expired browser session"),
         (SessionUnavailable, 503, "Session storage temporarily unavailable"),
+        (InvalidLoginTransaction, 400, "Invalid login transaction"),
+        (LoginStorageUnavailable, 503, "Login storage temporarily unavailable"),
         (ProposalNotFound, 404, "Proposal not found"),
         (
             ReviewConflict,
@@ -195,7 +204,7 @@ def create_workspace_app(
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers["X-Frame-Options"] = "DENY"
         return response
 
@@ -394,4 +403,6 @@ def create_workspace_app(
     app.include_router(proposal_routes(ProposalService(engine), read_identity, write_identity))
     if browser is not None:
         app.include_router(browser.routes(bearer_identity))
+        if login_config is not None:
+            app.include_router(LoginFlow(browser, verifier, login_config, login_exchange).routes())
     return app
