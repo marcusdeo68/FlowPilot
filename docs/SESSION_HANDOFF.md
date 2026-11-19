@@ -1,5 +1,13 @@
 # Session handoff
 
+## Latest increment - signed-in workspace screen
+
+Increment 0017 builds on merged PR #22 and adds a same-origin workspace screen
+at `/api/v2/workspace`. It can create and select workspaces, page through authorized
+work and sign out with the existing browser session. Live identity provider setup
+remains pending. See STATUS and the PR for verification on the reviewed revision.
+Next, build an authenticated manual work or private review workflow.
+
 ## Latest increment - browser login adapter (2026-11-19)
 
 Base `a7dc846` is merged main (PR #17, post-merge CI 44026104641 all six passed).

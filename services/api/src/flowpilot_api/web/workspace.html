@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workspaces · FlowPilot</title>
+  <link rel="stylesheet" href="/api/v2/workspace.css">
+  <script src="/api/v2/workspace.js" defer></script>
+</head>
+<body>
+  <header>
+    <span class="brand">FlowPilot</span>
+    <button id="sign-out" type="button" hidden>Sign out</button>
+  </header>
+  <main>
+    <h1>Workspaces</h1>
+    <p id="session-status" role="status"></p>
+    <noscript><p>Enable JavaScript to open your workspace.</p></noscript>
+    <div class="actions">
+      <a id="sign-in" href="/api/v2/login" hidden>Sign in</a>
+      <button id="reset-session" type="button" hidden>Clear expired session</button>
+      <button id="retry-session" type="button" hidden>Retry</button>
+    </div>
+    <div id="workspace" hidden>
+      <section aria-labelledby="choose-heading">
+        <h2 id="choose-heading">Choose a workspace</h2>
+        <label for="workspace-select">Workspace</label>
+        <select id="workspace-select" disabled></select>
+        <p id="workspace-status" role="status"></p>
+        <button id="refresh-workspaces" type="button" hidden>Refresh workspaces</button>
+        <form id="create-workspace">
+          <label for="workspace-name">Workspace name</label>
+          <div class="actions">
+            <input id="workspace-name" required maxlength="200">
+            <button type="submit">Create workspace</button>
+          </div>
+          <p id="create-status" role="status"></p>
+        </form>
+      </section>
+      <section aria-labelledby="work-heading">
+        <h2 id="work-heading">Work items</h2>
+        <p id="work-status" role="status"></p>
+        <ul id="work-items"></ul>
+        <button id="more-work" type="button" hidden>Load more</button>
+        <button id="retry-work" type="button" hidden>Retry work list</button>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

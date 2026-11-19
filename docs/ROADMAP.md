@@ -35,6 +35,7 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Authorized creation-order work pagination for browsing beyond capped lists (0014).
 - [x] Internal single-use, browser-bound PKCE login transaction storage and audit (0015).
 - [x] Opt-in generic authorization-code browser adapter with synthetic provider tests (0016).
+- [x] Browser workspace selection, creation, and authorized work browsing (0017).
 - [ ] Live identity-provider setup, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.

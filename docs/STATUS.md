@@ -6,6 +6,10 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0017 adds the [signed-in workspace screen](implementation/0017-workspace-screen.md)
+  to the verified browser app. It supports selection, creation, paginated work,
+  and sign-out with the existing session.
+
 - Increment 0016: [browser login adapter](implementation/0016-browser-login.md)
   adds opt-in provider-neutral redirects, same-origin completion, bounded code
   exchange and strict token/client verification before session issuance. Builder
@@ -140,6 +144,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-020 | Ignore obsolete work responses before processing session errors. | Review found a delayed 401 from the previous selection could clear the current view. The new Chromium test holds an old 200 or 401 until the new list is visible. |
+| FP-021 | Include a newly created workspace in the current selection even when the capped list omits it. | Review traced creation of a name sorted past the first 100 through the alphabetical API list. The UI now includes and selects the authorized creation response, then loads work through the membership-checked API. |
 | FP-019 | Callback GET and rejected cross-origin completion leave login cookies untouched. | Independent review found unsolicited requests could cancel pending sign-in. HTTP regressions assert no cookie deletion and no exchange for those requests. |
 | FP-018 | Browser form pages use `strict-origin` referrers. | Chromium first rejected a legitimate form POST with null Origin. Real HTTPS provider journeys now verify exact Origin, origin-only referrer, and incumbent Strict cookie preservation. |
 | FP-017 | Login checks the expected client during strict token verification. | Existing session round-trip tests caught the extra identity field. Restoring the original result shape preserved their assertions and the new wrong-client check passed. |

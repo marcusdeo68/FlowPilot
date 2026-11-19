@@ -55,6 +55,7 @@ from flowpilot_api.work_service import (
     WorkPage,
     WorkService,
 )
+from flowpilot_api.workspace_ui import workspace_ui
 
 
 class Command(BaseModel):
@@ -403,6 +404,7 @@ def create_workspace_app(
     app.include_router(proposal_routes(ProposalService(engine), read_identity, write_identity))
     if browser is not None:
         app.include_router(browser.routes(bearer_identity))
+        app.include_router(workspace_ui(browser, login_enabled=login_config is not None))
         if login_config is not None:
             app.include_router(LoginFlow(browser, verifier, login_config, login_exchange).routes())
     return app
