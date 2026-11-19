@@ -1,10 +1,19 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-16. This file records implementation evidence, known issues, and
+Updated: 2026-11-19. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
+
+- Increment 0016: [browser login adapter](implementation/0016-browser-login.md)
+  adds opt-in provider-neutral redirects, same-origin completion, bounded code
+  exchange and strict token/client verification before session issuance. Builder
+  and independent full runs passed 251 tests without skips (147 ordinary, 87
+  PostgreSQL, 17 Chromium). Ruff, Pyright, package builds, JavaScript syntax and
+  documentation link checks passed. Live identity provider setup remains open.
+- Increment 0015 merged in PR #17 as `a7dc846`; all six post-merge jobs passed in
+  [run 44026104641](https://github.com/marcusdeo68/FlowPilot/actions/runs/44026104641).
 
 - Increment 0015: [login transactions](implementation/0015-login-transactions.md)
   is implemented internally; eight targeted tests passed. Builder and independent
@@ -120,7 +129,7 @@ verification for each revision. Update this file when an item's state changes.
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API and onboarding/admin API are implemented and tested; optional browser sessions are increment 0012. Live identity configuration, sign-in/callback, invitation consent, request limits, session retention, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | Verified API, onboarding/admin API, browser sessions, and the opt-in sign-in adapter have synthetic coverage. Live identity configuration, invitation consent, request limits, session retention, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -131,6 +140,11 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-019 | Callback GET and rejected cross-origin completion leave login cookies untouched. | Independent review found unsolicited requests could cancel pending sign-in. HTTP regressions assert no cookie deletion and no exchange for those requests. |
+| FP-018 | Browser form pages use `strict-origin` referrers. | Chromium first rejected a legitimate form POST with null Origin. Real HTTPS provider journeys now verify exact Origin, origin-only referrer, and incumbent Strict cookie preservation. |
+| FP-017 | Login checks the expected client during strict token verification. | Existing session round-trip tests caught the extra identity field. Restoring the original result shape preserved their assertions and the new wrong-client check passed. |
+| FP-016 | Deadline checks avoid adjusting sockets closed after response EOF. | An independent real-socket probe reproduced a valid JSON response rejected on Windows. The `Connection: close` success regression passes. |
+| FP-015 | Code exchange applies a response deadline that interrupts the connection. | Real socket tests exercise slow headers and body while the connection remains active. Connection and DNS limits are documented in [0016](implementation/0016-browser-login.md). |
 | FP-014 | Pending-login expiry is checked after acquiring the row lock. | Independent audit and failing regression reproduced consumption after expiry while waiting on an unchanged row lock. Lock-first fix passed eight focused tests and independent full suite of 189 without skips. |
 | FP-013 | Windows session-test server uses a fixture-local Selector loop to avoid Proactor reset cleanup leaking server connections. No assertion removed. | Reproduced twice before fix; debugger confirmed leaked active counts. Independent focused suite passed twice and full PostgreSQL/Chromium run passed all 177 tests with no skips. |
 | FP-012 | Cookie-name normalization now matches the framework; whitespace cannot hide duplicate or mixed credentials. | Independent audit reproduced five failing regressions before the fix. All five and signed HTTP regressions pass in `2e31179`; independent re-review and all six CI jobs in run 43495939794 passed. |
@@ -155,10 +169,9 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
    transactions. Remaining Stage 1 tables and live identity-provider setup are still planned.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
    Workspace creation/discovery and member administration are verified in 0008.
-   Increment 0012 adds optional browser sessions. Next choose/configure a compatible
-   identity provider, implement login/callback and invitation acceptance, and
-   migrate the dashboard. Identity
-   verification does not yet supply a working browser sign-in experience.
+   Increment 0012 adds optional browser sessions and 0016 adds opt-in browser
+   login with synthetic provider coverage. Next choose and configure a compatible
+   identity provider, implement invitation acceptance, and migrate the dashboard.
 3. Private task review (0009) and manual source discovery (0010) now have API
    implementations. Next: interactive review and authenticated browser coverage.
 4. Only after access controls: provider review and one read-only pilot. AWS

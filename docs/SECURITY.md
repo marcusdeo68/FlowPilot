@@ -28,6 +28,13 @@ The first browser dashboard is also local-only. It uses same-origin calls to the
 
 ## Required before multi-user or real provider data
 
+Increment 0016 optionally exposes generic authorization-code login, requiring
+explicit same-issuer HTTPS endpoints, PKCE, issuer response binding, bounded code
+exchange and existing strict token verification plus exact client/API scopes.
+Callback GET never issues a session; same-origin completion POST checks existing
+Strict cookies before issuance. Disable callback query access logging. No provider
+is configured and no live data is permitted. See [0016](implementation/0016-browser-login.md).
+
 Increment 0015 adds digest-only, five-minute, single-use pending login records
 bound to issuer/audience/client/callback configuration. Consumption is audited
 atomically and does not authenticate a user. Browser initiation/callback protections,
@@ -45,9 +52,9 @@ request limits, provider revocation and full login remain deployment gaps; see
 [the session design](implementation/0012-browser-sessions.md).
 
 Increment 0007's separate API verifies configured RS256 access tokens and resolves
-stored memberships. It has no live identity-provider setup or browser login yet.
+stored memberships. Configuration of a live identity provider remains open.
 The legacy dashboard remains unauthenticated. Signing-key refresh is throttled;
-request limits, HTTPS/proxy deployment, browser login, invitation consent, retention, and operational
+request limits, HTTPS/proxy deployment, invitation consent, retention, and operational
 controls remain open; keep both factories local and synthetic. See implementation
 0007 for the accepted token profile, trusted key endpoint, and provider review.
 

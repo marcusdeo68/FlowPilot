@@ -1,5 +1,14 @@
 # Architecture decisions
 
+## 0019 - Complete login from a same-origin document
+
+Present a script-free callback form and perform code exchange/session issuance on
+an exact-Origin POST. This restores Strict session cookies omitted during provider
+navigation, permitting rejection of credentials already present. Keep endpoint
+configuration explicit, deny redirects/proxies during exchange, verify returned
+tokens and exact client, and request only FlowPilot API capabilities. No provider
+is selected. See [0016](implementation/0016-browser-login.md).
+
 ## 0018 - Claim pending logins before code exchange
 
 Persist only digests of independent state and verifier secrets. Bind the attempt

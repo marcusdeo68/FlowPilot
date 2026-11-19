@@ -95,7 +95,7 @@ class AccessTokenVerifier:
         self._keys = _ThrottledJWKClient(config.jwks_url)
         self._resolve = key_resolver or self._keys.get_signing_key_from_jwt
 
-    def verify(self, token: str) -> AccessIdentity:
+    def verify(self, token: str, *, expected_client_id: str | None = None) -> AccessIdentity:
         if not isinstance(token, str) or len(token) > 16384:
             raise InvalidAccessToken
         try:
@@ -135,6 +135,8 @@ class AccessTokenVerifier:
                 raise InvalidAccessToken
             scope = claims.get("scope", "")
             if not isinstance(scope, str) or len(scope) > 1000:
+                raise InvalidAccessToken
+            if expected_client_id is not None and claims["client_id"] != expected_client_id:
                 raise InvalidAccessToken
             return AccessIdentity(
                 Principal(self.config.issuer, claims["sub"]),

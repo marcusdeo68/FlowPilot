@@ -107,7 +107,9 @@ synthetic/manual commitments. A separate PostgreSQL workspace API now has typed
 work/source/evidence storage, stored-membership authorization, and configured
 signed-access-token verification, API onboarding, and owner-controlled membership.
 Optional token-bounded browser sessions are increment 0012. It has no real identity
-provider, browser sign-in/callback, or invitation consent/delivery yet.
+provider or invitation consent/delivery yet. Increment 0016 adds an opt-in generic
+browser sign-in/callback adapter verified with synthetic providers; live identity
+configuration and the authenticated workspace UI remain pending.
 Source owners can review, correct, accept or dismiss one private task suggestion
 per manual source. Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational

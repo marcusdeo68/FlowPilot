@@ -34,6 +34,11 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0016 adds opt-in `login.py`: explicit trusted endpoint configuration,
+PKCE redirect, callback presentation, same-origin completion, bounded HTTPS code
+exchange and strict token/client verification before opaque session issuance.
+No real provider is configured. See [0016](implementation/0016-browser-login.md).
+
 Increment 0015 adds internal `login_transactions.py`: digest-only pending login
 records, trusted configuration binding, fixed expiry and atomic one-time
 consumption with lifecycle audit. It has no HTTP/provider adapter and grants no
@@ -51,14 +56,14 @@ Workspace creation establishes the verified caller as owner with an atomic audit
 Role/active-state changes lock the workspace before actor/target memberships and
 require the target version, serializing last-owner decisions. The new migration
 adds membership versions and immutable workspace history; it rejects pre-existing
-ownerless workspaces rather than guessing an owner. No invitation delivery or
-browser login is implemented.
+ownerless workspaces rather than guessing an owner. Invitation delivery remains
+future work.
 
 Increment 0007 adds a separate `workspace_api:create_workspace_app` factory with
 signed access-token verification and API scopes before invoking the PostgreSQL
 service. Its request identities are verified issuer/subject pairs. It does not
-mount legacy routes or the dashboard. A real identity provider and browser sign-in
-flow remain unconfigured; API onboarding is now in 0008. See implementation 0007 for token-profile
+mount legacy routes or the dashboard. A real identity provider remains unconfigured.
+API onboarding is in 0008. See implementation 0007 for token-profile
 requirements and the explicit separation from the local demo.
 
 Increment 0005 adds PostgreSQL migrations and an internal `WorkService` using

@@ -103,8 +103,8 @@ supports manual dispatch and a daily 10:17 UTC maintenance check.
 
 The separate bearer-verified workspace API is described in
 [implementation 0007](docs/implementation/0007-verified-workspace-api.md). It requires
-explicit identity/PostgreSQL configuration and does not provide browser login or
-replace the local dashboard. Keep both applications on loopback with synthetic data.
+explicit identity and PostgreSQL configuration. It runs separately from the local
+dashboard. Keep both applications on loopback with synthetic data.
 
 Verified-user workspace creation/discovery and owner-only membership management
 are documented in [implementation 0008](docs/implementation/0008-workspace-onboarding.md).
@@ -116,5 +116,11 @@ see [the source review walkthrough](docs/implementation/0009-private-task-review
 
 Optional bounded browser sessions for the verified API are described in
 [implementation 0012](docs/implementation/0012-browser-sessions.md). These require
-a compatible verified access token and explicit loopback origin; they do not yet
-provide a sign-in screen. CI tests their lifecycle in Chromium with PostgreSQL.
+a compatible verified access token and explicit loopback origin. CI tests their
+lifecycle in Chromium with PostgreSQL.
+
+An opt-in generic authorization-code sign-in adapter is documented in
+[implementation 0016](docs/implementation/0016-browser-login.md). It is disabled
+by default and tested synthetically; no real provider is configured. Review its
+token compatibility requirements and suppress callback query access logs before
+configuring any provider. The authenticated workspace dashboard remains future work.

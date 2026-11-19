@@ -1,5 +1,22 @@
 # Session handoff
 
+## Latest increment - browser login adapter (2026-11-19)
+
+Base `a7dc846` is merged main (PR #17, post-merge CI 44026104641 all six passed).
+User authorized next autonomous increment without preference/approval prompts.
+0016 adds default-disabled generic code/PKCE login: trusted endpoint config,
+same-origin initiation, Lax verifier cookie, script-free callback form, same-origin
+completion POST, one-time consume/exchange, strict token/client checks, opaque
+session issuance. No live provider is configured and no provider data is connected.
+Local full verification passed 251 tests with no skips. See STATUS for review
+findings FP-015 through FP-019 and follow the PR for CI on the reviewed revision.
+Preserve unrelated `.playwright-mcp/`.
+
+Next: authenticated workspace onboarding/selection using synthetic browser tests,
+and real provider compatibility review when account resources are available.
+No scheduled development process runs after this session ends. Earlier checkpoints
+below are historical.
+
 ## Latest increment - pending login transactions
 
 User authorized autonomous development. Base `46cb903` is merged main; PR #16

@@ -34,7 +34,8 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Optional token-bounded browser sessions with CSRF, revocation and real-browser coverage (0012).
 - [x] Authorized creation-order work pagination for browsing beyond capped lists (0014).
 - [x] Internal single-use, browser-bound PKCE login transaction storage and audit (0015).
-- [ ] Live identity-provider setup, login/callback, invitation consent, remaining Stage 1 records,
+- [x] Opt-in generic authorization-code browser adapter with synthetic provider tests (0016).
+- [ ] Live identity-provider setup, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.
 - Provider connections with owner, provider, granted scopes, and connection/revocation status.
