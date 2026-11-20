@@ -131,3 +131,5 @@ configuring any provider. The first signed-in workspace screen is available at
 The signed-in workspace can create private tasks and edit their details. Apply
 `alembic upgrade head` to the workspace database before starting the updated
 verified API. See [increment 0018](docs/implementation/0018-manual-task-editing.md).
+Task status controls and the Due tasks view are described in
+[increment 0019](docs/implementation/0019-task-lifecycle-and-due-view.md).

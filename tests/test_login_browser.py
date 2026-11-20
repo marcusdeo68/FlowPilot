@@ -68,7 +68,7 @@ def login_browser(pg, tmp_path):
     verifier = AccessTokenVerifier(identity, key_resolver=lambda _: key.public_key())
     calls = []
 
-    def sign(subject):
+    def sign(subject, *, scope="flowpilot:read flowpilot:write"):
         issued = int(time.time())
         return jwt.encode(
             {
@@ -79,7 +79,7 @@ def login_browser(pg, tmp_path):
                 "exp": issued + 300,
                 "jti": str(uuid4()),
                 "client_id": "synthetic-client",
-                "scope": "flowpilot:read flowpilot:write",
+                "scope": scope,
             },
             key,
             algorithm="RS256",
@@ -316,7 +316,7 @@ def create_workspace_in_browser(page, origin, name):
     return creation.value.json()["id"]
 
 
-def seed_browser_work(page, workspace_id, titles):
+def seed_browser_work(page, workspace_id, titles, *, due_date=None):
     session = fetch(page, "/api/v2/session")
     assert session["status"] == 200
     headers = {
@@ -329,7 +329,7 @@ def seed_browser_work(page, workspace_id, titles):
             f"/api/v2/workspaces/{workspace_id}/work",
             method="POST",
             headers=headers,
-            body=json.dumps({"item": {"kind": "task", "title": title}}),
+            body=json.dumps({"item": {"kind": "task", "title": title, "due_date": due_date}}),
         )
         assert created["status"] == 201
 
@@ -485,6 +485,177 @@ def test_workspace_browser_creates_edits_and_recovers_from_stale_task(login_brow
         **json.loads(changed["text"])["data"],
         "due_date": "2030-03-04",
     }
+
+
+def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Task lifecycle workspace")
+    urgent = "Old task with the earliest deadline"
+    seed_browser_work(page, workspace_id, [urgent], due_date="2026-01-02")
+    titles = [f"Dated item {index:02d}" for index in range(20)]
+    seed_browser_work(page, workspace_id, titles, due_date="2026-01-03")
+    page.reload()
+    work_view = page.get_by_label("Work view", exact=True)
+    row = page.get_by_role("listitem").filter(has_text=urgent)
+    expect(page.get_by_role("button", name="Load more", exact=True)).to_be_visible()
+    expect(row).to_have_count(0)
+
+    work_view.select_option("due")
+    expect(page.get_by_role("listitem").first).to_contain_text(urgent)
+    expect(page.get_by_text("Showing the 20 earliest deadlines.", exact=False)).to_be_visible()
+    expect(page.get_by_role("listitem")).to_have_count(20)
+    expect(page.get_by_text(titles[0], exact=True)).to_have_count(0)
+    expect(page.get_by_role("button", name="Load more", exact=True)).to_be_hidden()
+    row.get_by_role("button", name="Edit task", exact=True).click()
+    expect(work_view).to_be_disabled()
+    expect(row.get_by_role("button", name="Start task", exact=True)).to_be_disabled()
+    page.get_by_role("button", name="Cancel", exact=True).click()
+    expect(work_view).to_have_value("due")
+
+    def click_status(label):
+        with page.expect_response("**/transitions") as update:
+            row.get_by_role("button", name=label, exact=True).click()
+        assert update.value.status == 200
+        return update.value.json()
+
+    def check_pending_update(route: Route) -> None:
+        expect(row.get_by_role("button", name="Edit task", exact=True)).to_be_disabled()
+        expect(page.get_by_role("button", name="New task", exact=True)).to_be_disabled()
+        expect(work_view).to_be_disabled()
+        route.continue_()
+
+    page.route("**/transitions", check_pending_update, times=1)
+    started = click_status("Start task")
+    assert started["data"]["status"] == "active" and started["version"] == 2
+    blocked = click_status("Block task")
+    assert blocked["data"]["status"] == "blocked" and blocked["version"] == 3
+    resumed = click_status("Resume task")
+    assert resumed["data"]["status"] == "active" and resumed["version"] == 4
+    expect(row.get_by_role("button", name="Complete task", exact=True)).to_be_enabled()
+    page.route("**/work-due?**", lambda route: route.fulfill(status=503), times=1)
+    completed = click_status("Complete task")
+    assert completed["data"]["status"] == "completed" and completed["version"] == 5
+    expect(page.get_by_text("Could not load work items.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Task status updated.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(page.get_by_text(titles[0], exact=True)).to_be_visible()
+    expect(row).to_have_count(0)
+    expect(page.get_by_role("listitem")).to_have_count(20)
+    expect(page.get_by_text("Showing the 20 earliest deadlines.", exact=False)).to_have_count(0)
+
+    other = page.get_by_role("listitem").filter(has_text=titles[-1])
+    cancel = other.get_by_role("button", name="Cancel task", exact=True)
+    page.once("dialog", lambda dialog: dialog.dismiss())
+    cancel.click()
+    expect(other).to_be_visible()
+    page.once("dialog", lambda dialog: dialog.accept())
+    with page.expect_response("**/transitions") as cancellation:
+        cancel.click()
+    assert cancellation.value.status == 200
+    assert cancellation.value.json()["data"]["status"] == "canceled"
+    expect(other).to_have_count(0)
+
+    work_view.select_option("all")
+    page.get_by_role("button", name="Load more", exact=True).click()
+    expect(row).to_contain_text("completed")
+    expect(row.get_by_role("button", name="Start task", exact=True)).to_have_count(0)
+    next_task = page.get_by_role("listitem").filter(has_text=titles[-2])
+    next_task.get_by_role("button", name="Start task", exact=True).click()
+    expect(next_task.get_by_role("button", name="Complete task", exact=True)).to_be_visible()
+    expect(row).to_be_visible()
+    expect(page.get_by_role("listitem")).to_have_count(21)
+
+
+def test_workspace_browser_transition_refreshes_stale_task_and_hides_read_only_controls(
+    login_browser,
+):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Task conflict workspace")
+    title = "One versioned task"
+    seed_browser_work(page, workspace_id, [title])
+    page.reload()
+    row = page.get_by_role("listitem").filter(has_text=title)
+    expect(row).to_be_visible()
+    path = f"/api/v2/workspaces/{workspace_id}/work-page"
+    task = json.loads(fetch(page, path)["text"])["items"][0]
+    session = json.loads(fetch(page, "/api/v2/session")["text"])
+    assert session["can_write"] is True
+    changed = fetch(
+        page,
+        f"/api/v2/workspaces/{workspace_id}/work/{task['id']}/transitions",
+        method="POST",
+        headers={"Content-Type": "application/json", "X-CSRF-Token": session["csrf_token"]},
+        body=json.dumps({"target": "active", "expected_version": task["version"]}),
+    )
+    assert changed["status"] == 200
+    start_task = row.get_by_role("button", name="Start task", exact=True)
+    with page.expect_response("**/transitions") as conflict:
+        start_task.click()
+    assert conflict.value.status == 409
+    expect(start_task).to_be_disabled()
+    expect(page.get_by_label("Work view", exact=True)).to_be_enabled()
+    expect(page.get_by_text("This task changed.", exact=False)).to_be_visible()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(row.get_by_role("button", name="Complete task", exact=True)).to_be_enabled()
+
+    context.clear_cookies()
+    page.goto(origin + "/api/v2/test-login-browser")
+    exchanged = fetch(
+        page,
+        "/api/v2/session",
+        method="POST",
+        headers={"Authorization": f"Bearer {sign('new-browser-user', scope='flowpilot:read')}"},
+    )
+    assert exchanged["status"] == 201
+    assert json.loads(exchanged["text"])["can_write"] is False
+    page.goto(origin + "/api/v2/workspace")
+    expect(row).to_contain_text("active")
+    expect(row.get_by_role("button")).to_have_count(0)
+    expect(page.get_by_role("button", name="New task", exact=True)).to_be_hidden()
+
+
+def test_workspace_browser_ignores_late_transition_after_workspace_switch(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First task workspace")
+    seed_browser_work(page, first, ["Visible only in first workspace"])
+    second = create_workspace_in_browser(page, origin, "Second task workspace")
+    selector = page.get_by_label("Workspace", exact=True)
+    expect(selector).to_have_value(second)
+    selector.select_option(first)
+    page.evaluate(
+        """() => {
+            const fetchOriginal = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await fetchOriginal(url, options);
+                if (url.endsWith('/transitions')) {
+                    setTimeout(() => { window.transitionHandled = true; }, 0);
+                }
+                return response;
+            };
+        }"""
+    )
+    held: list[Route] = []
+    page.route("**/transitions", lambda route: held.append(route), times=1)
+    with page.expect_request("**/transitions"):
+        page.get_by_role("button", name="Start task", exact=True).click()
+    selector.select_option(second)
+    empty = page.get_by_text("No work items yet.", exact=True)
+    expect(empty).to_be_visible()
+    assert len(held) == 1
+    held[0].fulfill(status=401, json={"detail": "Unauthorized"})
+    page.wait_for_function("window.transitionHandled === true")
+    expect(selector).to_have_value(second)
+    expect(empty).to_be_visible()
+    expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
 
 
 def test_workspace_browser_clears_visible_work_when_session_expires(login_browser, pg):

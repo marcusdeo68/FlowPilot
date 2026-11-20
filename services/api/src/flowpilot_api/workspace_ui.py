@@ -1,11 +1,14 @@
 """Serve the same-origin workspace shell and its fixed assets."""
 
+import json
+from html import escape
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
 from flowpilot_api.session_routes import BrowserAuth
+from flowpilot_api.work import TASK_TRANSITIONS
 
 WORKSPACE_URL = "/api/v2/workspace"
 ASSETS = Path(__file__).with_name("web")
@@ -14,8 +17,13 @@ ASSETS = Path(__file__).with_name("web")
 def workspace_ui(browser: BrowserAuth, *, login_enabled: bool) -> APIRouter:
     router = APIRouter()
     shell = (ASSETS / "workspace.html").read_text(encoding="utf-8")
-    if login_enabled:
-        shell = shell.replace("<body>", '<body data-login-enabled="true">', 1)
+    transitions = escape(json.dumps(TASK_TRANSITIONS), quote=True)
+    shell = shell.replace(
+        "<body>",
+        f'<body data-login-enabled="{str(login_enabled).lower()}" '
+        f'data-task-transitions="{transitions}">',
+        1,
+    )
 
     @router.get(WORKSPACE_URL, include_in_schema=False)
     def workspace(request: Request):

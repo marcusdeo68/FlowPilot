@@ -37,6 +37,7 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Opt-in generic authorization-code browser adapter with synthetic provider tests (0016).
 - [x] Browser workspace selection, creation, and authorized work browsing (0017).
 - [x] Create private tasks and edit owned task details in the signed-in workspace (0018).
+- [x] Track a task through its status changes and find the earliest unfinished deadlines (0019).
 - [ ] Live identity-provider setup, invitation consent, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.

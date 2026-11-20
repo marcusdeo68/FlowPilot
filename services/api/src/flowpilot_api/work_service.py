@@ -9,7 +9,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
-from sqlalchemy import Connection, Engine, text
+from sqlalchemy import Connection, Engine, bindparam, text
 
 from flowpilot_api.access import (
     AccessDenied,
@@ -22,6 +22,7 @@ from flowpilot_api.access import (
 from flowpilot_api.member_context import resolve_member
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.work import (
+    TASK_TRANSITIONS,
     Commitment,
     Event,
     Task,
@@ -78,6 +79,12 @@ class StoredWork:
 class WorkPage:
     items: list[StoredWork]
     next_after: UUID | None
+
+
+@dataclass(frozen=True)
+class DueTasks:
+    items: list[StoredWork]
+    has_more: bool
 
 
 class _StoredWorkPayload(RootModel[WorkItem]):
@@ -281,6 +288,33 @@ class WorkService:
             )
             items = [_stored(row) for row in rows[:limit]]
             return WorkPage(items, items[-1].id if len(rows) > limit else None)
+
+    def list_due_tasks(
+        self, principal: Principal, workspace_id: UUID, *, limit: int = 20
+    ) -> DueTasks:
+        if not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            rows = (
+                connection.execute(
+                    text("""SELECT * FROM work_items WHERE workspace_id = :workspace
+                        AND (visibility = 'workspace' OR creator_id = :user)
+                        AND kind = 'task' AND due_date IS NOT NULL AND status IN :unfinished
+                        ORDER BY due_date ASC, created_at DESC, id DESC LIMIT :limit""").bindparams(
+                        bindparam("unfinished", expanding=True)
+                    ),
+                    {
+                        "workspace": workspace_id,
+                        "user": member.user_id,
+                        "unfinished": tuple(TASK_TRANSITIONS),
+                        "limit": limit + 1,
+                    },
+                )
+                .mappings()
+                .all()
+            )
+            return DueTasks([_stored(row) for row in rows[:limit]], len(rows) > limit)
 
     def edit_task(
         self,

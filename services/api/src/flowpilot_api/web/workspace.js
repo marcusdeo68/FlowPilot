@@ -13,6 +13,7 @@ const form = document.querySelector("#create-workspace");
 const nameInput = document.querySelector("#workspace-name");
 const createButton = form.querySelector("button");
 const createStatus = document.querySelector("#create-status");
+const workView = document.querySelector("#work-view");
 const workStatus = document.querySelector("#work-status");
 const items = document.querySelector("#work-items");
 const more = document.querySelector("#more-work");
@@ -27,6 +28,7 @@ const saveTask = document.querySelector("#save-task");
 const cancelTask = document.querySelector("#cancel-task");
 const taskFeedback = document.querySelector("#task-feedback");
 const loginEnabled = document.body.dataset.loginEnabled === "true";
+const taskTransitions = JSON.parse(document.body.dataset.taskTransitions);
 
 let session;
 let sessionVersion = 0;
@@ -38,6 +40,7 @@ let editingTask;
 let loadedTitle;
 let loadedDescription;
 let editorVersion = 0;
+let taskUpdate;
 
 async function request(path, options) {
   const response = await fetch("/api/v2/" + path, {
@@ -59,6 +62,7 @@ function closeTaskEditor() {
   cancelTask.disabled = false;
   taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = false;
   taskFeedback.textContent = "";
+  syncWorkControls();
 }
 
 function clearWork() {
@@ -69,6 +73,7 @@ function clearWork() {
   more.hidden = retryWork.hidden = true;
   more.disabled = false;
   newTask.hidden = true;
+  taskUpdate = undefined;
   closeTaskEditor();
 }
 
@@ -80,6 +85,8 @@ function clearSession() {
   clearWork();
   select.replaceChildren();
   select.disabled = true;
+  workView.value = "all";
+  workView.disabled = true;
   workspaceStatus.textContent = createStatus.textContent = "";
   form.reset();
   workspace.hidden = signOut.hidden = signIn.hidden = true;
@@ -99,13 +106,22 @@ function expired(status) {
   return true;
 }
 
-function canCreateTask() {
+function canWriteWork() {
   const role = select.selectedOptions[0]?.dataset.role;
-  return Boolean(session && ownId && (role === "owner" || role === "member"));
+  return Boolean(session?.can_write && ownId && (role === "owner" || role === "member"));
+}
+
+function syncWorkControls() {
+  const editorOpen = !taskEditor.hidden;
+  workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
+  newTask.disabled = Boolean(taskUpdate) || editorOpen;
+  for (const button of items.querySelectorAll("button")) {
+    button.disabled = Boolean(taskUpdate) || editorOpen;
+  }
 }
 
 function openTaskEditor(task) {
-  if (newTask.hidden || !taskEditor.hidden) return;
+  if (newTask.hidden || newTask.disabled) return;
   closeTaskEditor();
   editingTask = task;
   taskHeading.textContent = task ? "Edit task" : "New task";
@@ -117,7 +133,48 @@ function openTaskEditor(task) {
   loadedTitle = taskTitle.value;
   loadedDescription = taskDescription.value;
   taskEditor.hidden = false;
+  syncWorkControls();
   taskTitle.focus();
+}
+
+async function changeTaskStatus(item, target, row) {
+  if (!canWriteWork() || taskUpdate || !taskEditor.hidden || !row.isConnected) return;
+  if (target === "canceled" && !window.confirm("Cancel this task? It cannot be reopened.")) return;
+  taskUpdate = "pending";
+  syncWorkControls();
+  taskFeedback.textContent = "Updating task…";
+  const path = "workspaces/" + encodeURIComponent(select.value) + "/work/"
+    + encodeURIComponent(item.id) + "/transitions";
+  try {
+    const updated = await request(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
+      body: JSON.stringify({ expected_version: item.version, target }),
+    });
+    if (!row.isConnected) return;
+    const message = "Task status updated.";
+    if (workView.value === "due") {
+      void loadWork(false, message);
+    } else {
+      row.replaceWith(renderItem(updated));
+      taskUpdate = undefined;
+      syncWorkControls();
+      taskFeedback.textContent = message;
+    }
+  } catch (status) {
+    if (!row.isConnected || expired(status)) return;
+    if (status === 403 || status === 404) {
+      clearWork();
+      taskFeedback.textContent = "You no longer have permission to update this task.";
+    } else {
+      taskUpdate = "refresh";
+      syncWorkControls();
+      taskFeedback.textContent = status === 409
+        ? "This task changed. Refresh the work list to see its current status."
+        : "Could not confirm the update. Refresh the work list before trying again.";
+    }
+    retryWork.hidden = false;
+  }
 }
 
 function renderItem(item) {
@@ -136,22 +193,44 @@ function renderItem(item) {
     description.textContent = item.data.description;
     row.append(description);
   }
-  if (item.data.kind === "task" && canCreateTask() && item.creator_id === ownId) {
-    const edit = document.createElement("button");
-    edit.type = "button";
-    edit.textContent = "Edit task";
-    edit.addEventListener("click", () => openTaskEditor(item));
-    row.append(edit);
+  if (item.data.kind === "task" && canWriteWork()) {
+    const actions = document.createElement("div");
+    actions.className = "actions task-actions";
+    if (item.creator_id === ownId) {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.textContent = "Edit task";
+      edit.addEventListener("click", () => openTaskEditor(item));
+      actions.append(edit);
+    }
+    const labels = {
+      active: item.data.status === "blocked" ? "Resume task" : "Start task",
+      blocked: "Block task",
+      completed: "Complete task",
+      canceled: "Cancel task",
+    };
+    for (const target of taskTransitions[item.data.status] ?? []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = labels[target];
+      button.addEventListener("click", () => changeTaskStatus(item, target, row));
+      actions.append(button);
+    }
+    if (actions.childElementCount) row.append(actions);
   }
   return row;
 }
 
-async function loadWork(append = false) {
-  if (!append) clearWork();
+async function loadWork(append = false, savedMessage = "") {
+  if (!append) {
+    clearWork();
+    taskFeedback.textContent = savedMessage;
+  }
   if (!session || !select.value) return;
+  const dueOnly = workView.value === "due";
   const version = ++workVersion;
   const active = sessionVersion;
-  const path = "workspaces/" + encodeURIComponent(select.value) + "/work-page";
+  const path = "workspaces/" + encodeURIComponent(select.value) + (dueOnly ? "/work-due" : "/work-page");
   const query = new URLSearchParams({ limit: "20" });
   if (append && nextCursor) query.set("after", nextCursor);
   workStatus.textContent = "Loading work items…";
@@ -160,11 +239,18 @@ async function loadWork(append = false) {
     const page = await request(path + "?" + query);
     if (version !== workVersion || !session) return;
     items.append(...page.items.map(renderItem));
-    newTask.hidden = !canCreateTask();
+    newTask.hidden = !canWriteWork();
+    syncWorkControls();
     nextCursor = page.next_after;
     more.hidden = !nextCursor;
     more.disabled = false;
-    workStatus.textContent = items.childElementCount ? "" : "No work items yet.";
+    if (dueOnly) {
+      workStatus.textContent = page.has_more
+        ? "Showing the 20 earliest deadlines. Switch to All work for the full list."
+        : items.childElementCount ? "" : "No unfinished tasks with due dates.";
+    } else {
+      workStatus.textContent = items.childElementCount ? "" : "No work items yet.";
+    }
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
     if (append && status !== 403 && status !== 404) {
@@ -173,6 +259,7 @@ async function loadWork(append = false) {
       return;
     }
     clearWork();
+    taskFeedback.textContent = savedMessage;
     workStatus.textContent = status === 403 || status === 404
       ? "This work list is unavailable. Refresh your workspaces or retry."
       : "Could not load work items.";
@@ -186,6 +273,7 @@ async function loadWorkspaces(created) {
   const preferred = created?.id ?? select.value;
   clearWork();
   select.replaceChildren();
+  workView.disabled = true;
   select.disabled = createButton.disabled = refreshWorkspaces.disabled = true;
   workspaceStatus.textContent = "Loading workspaces…";
   try {
@@ -305,7 +393,7 @@ form.addEventListener("submit", async (event) => {
 
 taskEditor.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!session || taskEditor.hidden || saveTask.disabled || !canCreateTask()) return;
+  if (!session || taskEditor.hidden || saveTask.disabled || !canWriteWork()) return;
   const task = editingTask;
   const title = task && taskTitle.value === loadedTitle ? task.data.title : taskTitle.value.trim();
   if (!title) {
@@ -333,8 +421,7 @@ taskEditor.addEventListener("submit", async (event) => {
         : { item: { kind: "task", ...details } }),
     });
     if (version !== editorVersion) return;
-    void loadWork();
-    taskFeedback.textContent = task ? "Task updated." : "Task created.";
+    void loadWork(false, task ? "Task updated." : "Task created.");
   } catch (status) {
     if (version !== editorVersion || expired(status)) return;
     if (status === 409 && task) {
@@ -362,6 +449,7 @@ taskEditor.addEventListener("submit", async (event) => {
 newTask.addEventListener("click", () => openTaskEditor());
 cancelTask.addEventListener("click", closeTaskEditor);
 select.addEventListener("change", () => loadWork());
+workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());
 refreshWorkspaces.addEventListener("click", () => loadWorkspaces());
