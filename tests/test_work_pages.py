@@ -1,4 +1,6 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from flowpilot_api.access import AccessDenied, Visibility
@@ -194,4 +196,91 @@ def test_due_tasks_order_scope_and_limit(workspace_client):
         "Newer tied",
         "Older tied",
         "Later active",
+    ]
+
+
+def test_upcoming_events_filter_order_scope_and_limit(workspace_client):
+    client, workspace, other, _, sign = workspace_client
+    base = f"/api/v2/workspaces/{workspace}"
+    path = base + "/work-events"
+    now = datetime.now(UTC)
+
+    def authorization(name, **overrides):
+        return {"Authorization": "Bearer " + sign(name, overrides=overrides)}
+
+    def create(
+        title,
+        start_hours,
+        end_hours,
+        *,
+        visibility="workspace",
+        user="member",
+        target=base,
+        zone="UTC",
+    ):
+        start = (now + timedelta(hours=start_hours)).astimezone(ZoneInfo(zone))
+        end = (now + timedelta(hours=end_hours)).astimezone(ZoneInfo(zone))
+        response = client.post(
+            target + "/work",
+            headers=authorization(user),
+            json={
+                "visibility": visibility,
+                "item": {
+                    "kind": "event",
+                    "title": title,
+                    "starts_at": start.isoformat(),
+                    "ends_at": end.isoformat(),
+                    "time_zone": zone,
+                },
+            },
+        )
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    observer = authorization("observer", scope="flowpilot:read")
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers=authorization("outsider")).status_code == 403
+    assert (
+        client.get(path, headers=authorization("observer", scope="flowpilot:write")).status_code
+        == 403
+    )
+    for limit in (0, 101, "invalid"):
+        assert client.get(path, params={"limit": limit}, headers=observer).status_code == 422
+    assert client.get(path, headers=observer).json() == {"items": [], "has_more": False}
+
+    create("Foreign", -3, 2, target=f"/api/v2/workspaces/{other}", user="outsider")
+    private = create("Private", -2, 2, visibility="private")
+    create("Ended", -3, -1)
+    create("Beyond window", 169, 170)
+    canceled = create("Canceled", -2, 1)
+    response = client.post(
+        base + f"/work/{canceled}/transitions",
+        headers=authorization("owner"),
+        json={"target": "canceled", "expected_version": 1},
+    )
+    assert response.status_code == 200
+    task = client.post(
+        base + "/work",
+        headers=authorization("member"),
+        json={"visibility": "workspace", "item": {"kind": "task", "title": "Not an event"}},
+    )
+    assert task.status_code == 201
+    later = create("Later", 12, 13, zone="America/New_York")
+    ongoing = create("Ongoing", -1, 1)
+    first = create("First tied event", 3, 4)
+    second = create("Same instant in a different zone", 3, 5, zone="America/Los_Angeles")
+
+    capped = client.get(path, params={"limit": 1}, headers=observer).json()
+    assert [item["id"] for item in capped["items"]] == [ongoing]
+    assert capped["has_more"] is True
+    visible = client.get(path, headers=observer).json()
+    assert [item["id"] for item in visible["items"]] == [ongoing, *sorted((first, second)), later]
+    assert visible["items"][-1]["data"]["time_zone"] == "America/New_York"
+    assert visible["has_more"] is False
+    own = client.get(path, headers=authorization("member")).json()
+    assert [item["id"] for item in own["items"]] == [
+        private,
+        ongoing,
+        *sorted((first, second)),
+        later,
     ]

@@ -187,3 +187,10 @@ Read [0021](implementation/0021-today-due-work.md). At 10:30 p.m. in Los Angeles
 on January 2, imagine 20 unfinished tasks due January 2 and one due January 3.
 Explain which tasks appear and why a 21st row with a later date cannot trigger
 the overflow notice.
+
+## Upcoming events exercise
+
+Read [0023](implementation/0023-today-upcoming-events.md). Compare 9 a.m. Eastern
+and 8 a.m. Central on the same day. Explain why the database orders event
+instants using offset-bearing timestamps, and why it uses the record ID to break
+a tie before limiting the results.

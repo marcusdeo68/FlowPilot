@@ -6,7 +6,11 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
-- Increment 0022 adds [recent pending reviews in Today](implementation/0022-today-pending-reviews.md).
+- Increment 0023 adds [upcoming events in Today](implementation/0023-today-upcoming-events.md).
+  The window covers the next 168 hours and includes ongoing events.
+- Increment 0022 adds [recent pending reviews in Today](implementation/0022-today-pending-reviews.md)
+  and merged in [PR #29](https://github.com/marcusdeo68/FlowPilot/pull/29) as `1a8f5f5`.
+  Independent verification passed 273 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44687589352) passed.
 - Increment 0021 adds [due work in Today](implementation/0021-today-due-work.md) and
   merged as `8926287` in [PR #28](https://github.com/marcusdeo68/FlowPilot/pull/28).
   All 271 local tests and all six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44665476923) passed.

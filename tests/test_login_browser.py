@@ -882,6 +882,101 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     expect(page.get_by_role("listitem")).to_have_count(21)
 
 
+def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_change(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Workspace for Today events")
+    base = f"/api/v2/workspaces/{workspace_id}"
+    path = base + "/work-events?limit=5"
+    seed_browser_work(page, workspace_id, ["Overdue next to events"], due_date="2020-01-02")
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    now = datetime.now(UTC).replace(microsecond=0)
+    zone = "America/New_York"
+    title = "<strong>Planning session</strong>"
+    starts_at = now - timedelta(hours=1)
+    ends_at = now + timedelta(hours=1)
+    for index in range(6):
+        event = {
+            "kind": "event",
+            "title": title if not index else f"Later synthetic event {index}",
+            "starts_at": (starts_at + timedelta(hours=2 * index)).isoformat(),
+            "ends_at": (ends_at + timedelta(hours=2 * index)).isoformat(),
+            "time_zone": zone,
+        }
+        saved = fetch(
+            page,
+            base + "/work",
+            method="POST",
+            headers={"Content-Type": "application/json", "X-CSRF-Token": csrf},
+            body=json.dumps({"item": event}),
+        )
+        assert saved["status"] == 201
+
+    today = page.get_by_role("button", name="Today", exact=True)
+    work = page.get_by_role("button", name="Work items", exact=True)
+    page.route(origin + path, lambda route: route.fulfill(status=503), times=1)
+    today.click()
+    expect(page.get_by_text("Could not load upcoming events.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Overdue next to events", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry upcoming events", exact=True).click()
+    events = page.get_by_role("list", name="Upcoming events", exact=True)
+    rows = events.get_by_role("listitem")
+    expect(rows).to_have_count(5)
+    expect(rows.first.get_by_text(title, exact=True)).to_be_visible()
+    expect(page.get_by_text("Showing the five earliest events.", exact=True)).to_be_visible()
+    timestamps = rows.first.locator("time")
+    assert datetime.fromisoformat(timestamps.nth(0).get_attribute("datetime")) == starts_at
+    assert datetime.fromisoformat(timestamps.nth(1).get_attribute("datetime")) == ends_at
+    zone_label = page.evaluate(
+        """({ value, zone }) => new Intl.DateTimeFormat(undefined, {
+            hour: 'numeric', timeZone: zone, timeZoneName: 'short'
+        }).formatToParts(new Date(value)).find(part => part.type === 'timeZoneName').value""",
+        {"value": starts_at.isoformat(), "zone": zone},
+    )
+    expect(timestamps.first).to_contain_text(zone_label)
+
+    work.click()
+    page.route(origin + path, lambda route: route.fulfill(status=403), times=1)
+    today.click()
+    expect(page.get_by_text("Today is unavailable.", exact=False)).to_be_visible()
+    expect(page.get_by_text("Overdue next to events", exact=True)).to_have_count(0)
+    expect(rows).to_have_count(0)
+    page.get_by_role("button", name="Refresh workspaces", exact=True).click()
+    expect(rows.first.get_by_text(title, exact=True)).to_be_visible()
+
+    work.click()
+    page.evaluate(
+        """path => {
+            const actualFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await actualFetch(url, options);
+                if (url !== path) return response;
+                await new Promise(resolve => { window.releaseOldEvents = resolve; });
+                const json = response.json.bind(response);
+                response.json = async () => {
+                    const value = await json();
+                    setTimeout(() => { window.oldEventsParsed = true; }, 0);
+                    return value;
+                };
+                return response;
+            };
+        }""",
+        path,
+    )
+    today.click()
+    page.wait_for_function("() => typeof window.releaseOldEvents === 'function'")
+    second = create_workspace_in_browser(page, origin, "Workspace without events")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    empty = page.get_by_text("No events in the next seven days.", exact=True)
+    expect(empty).to_be_visible()
+    page.evaluate("() => window.releaseOldEvents()")
+    page.wait_for_function("() => window.oldEventsParsed === true")
+    expect(empty).to_be_visible()
+    expect(rows).to_have_count(0)
+
+
 def test_workspace_browser_today_shows_pending_reviews_separately_from_due_work(login_browser):
     from playwright.sync_api import Route, expect
 

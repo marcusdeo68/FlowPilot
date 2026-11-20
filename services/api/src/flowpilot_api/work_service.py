@@ -87,6 +87,12 @@ class DueTasks:
     has_more: bool
 
 
+@dataclass(frozen=True)
+class UpcomingEvents:
+    items: list[StoredWork]
+    has_more: bool
+
+
 class _StoredWorkPayload(RootModel[WorkItem]):
     """Validate a database projection against the same tagged union used by the API."""
 
@@ -315,6 +321,28 @@ class WorkService:
                 .all()
             )
             return DueTasks([_stored(row) for row in rows[:limit]], len(rows) > limit)
+
+    def list_upcoming_events(
+        self, principal: Principal, workspace_id: UUID, *, limit: int = 5
+    ) -> UpcomingEvents:
+        if not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            rows = (
+                connection.execute(
+                    text("""SELECT * FROM work_items WHERE workspace_id = :workspace
+                        AND (visibility = 'workspace' OR creator_id = :user)
+                        AND kind = 'event' AND status = 'scheduled'
+                        AND ends_at > CURRENT_TIMESTAMP
+                        AND starts_at < CURRENT_TIMESTAMP + INTERVAL '168 hours'
+                        ORDER BY starts_at ASC, id ASC LIMIT :limit"""),
+                    {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1},
+                )
+                .mappings()
+                .all()
+            )
+            return UpcomingEvents([_stored(row) for row in rows[:limit]], len(rows) > limit)
 
     def edit_task(
         self,

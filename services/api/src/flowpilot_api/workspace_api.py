@@ -52,6 +52,7 @@ from flowpilot_api.work_service import (
     ManualSource,
     SourceNotFound,
     StoredWork,
+    UpcomingEvents,
     WorkNotFound,
     WorkPage,
     WorkService,
@@ -316,6 +317,14 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
     ):
         return service.list_due_tasks(user.principal, workspace_id, limit=limit)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/work-events", response_model=UpcomingEvents)
+    def work_events(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 5,
+    ):
+        return service.list_upcoming_events(user.principal, workspace_id, limit=limit)
 
     @app.post("/api/v2/workspaces/{workspace_id}/work", response_model=StoredWork, status_code=201)
     def create_work(
