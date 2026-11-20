@@ -1,10 +1,11 @@
 """Typed canonical-work contracts. Not yet exposed by the local commitment API."""
 
-from datetime import date, datetime
+import re
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from flowpilot_api.domain import CommitmentStatus
 
@@ -63,12 +64,11 @@ class TaskDetails(WorkDetails):
         raise ValueError("Due date must be a YYYY-MM-DD calendar date or null")
 
 
-class Event(WorkBase):
-    kind: Literal["event"] = "event"
-    status: Literal["scheduled", "canceled"] = "scheduled"
+class EventSchedule(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    time_zone: str = Field(min_length=1, max_length=100)
     starts_at: datetime
     ends_at: datetime
-    time_zone: str = Field(min_length=1, max_length=100)
 
     @field_validator("time_zone")
     @classmethod
@@ -80,12 +80,52 @@ class Event(WorkBase):
         return value
 
     @model_validator(mode="after")
-    def valid_interval(self) -> "Event":
+    def valid_interval(self) -> "EventSchedule":
         if self.starts_at.utcoffset() is None or self.ends_at.utcoffset() is None:
             raise ValueError("Event timestamps must include an offset")
-        if self.ends_at <= self.starts_at:
+        try:
+            starts_at = self.starts_at.astimezone(UTC)
+            ends_at = self.ends_at.astimezone(UTC)
+        except OverflowError as exc:
+            raise ValueError("Time is outside the supported date range") from exc
+        if ends_at <= starts_at:
             raise ValueError("Event end must follow start")
         return self
+
+
+class Event(WorkBase, EventSchedule):
+    kind: Literal["event"] = "event"
+    status: Literal["scheduled", "canceled"] = "scheduled"
+
+
+class LocalEventSchedule(EventSchedule):
+    """Resolve wall times without guessing during daylight-saving transitions."""
+
+    @field_validator("starts_at", "ends_at", mode="before")
+    @classmethod
+    def resolve_local_time(cls, value: object, info: ValidationInfo) -> datetime:
+        if not isinstance(value, str) or not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]{1,6})?)?",
+            value,
+        ):
+            raise ValueError("Use a local date and time without an offset")
+        local = datetime.fromisoformat(value)
+        if "time_zone" not in info.data:
+            raise ValueError("Choose a valid IANA time zone")
+        zone = ZoneInfo(info.data["time_zone"])
+        candidates = set()
+        try:
+            for fold in (0, 1):
+                instant = local.replace(tzinfo=zone, fold=fold).astimezone(UTC)
+                if instant.astimezone(zone).replace(tzinfo=None) == local:
+                    candidates.add(instant)
+        except OverflowError as exc:
+            raise ValueError("Time is outside the supported date range") from exc
+        if not candidates:
+            raise ValueError("This local time does not exist in the selected zone")
+        if len(candidates) > 1:
+            raise ValueError("This local time occurs twice. Choose another time or enter it in UTC")
+        return candidates.pop()
 
 
 WorkItem = Annotated[Commitment | Task | Event, Field(discriminator="kind")]

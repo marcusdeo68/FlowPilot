@@ -2,7 +2,7 @@
 
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -48,7 +48,14 @@ from flowpilot_api.proposals import ProposalNotFound, ProposalService, ReviewCon
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.session_routes import BrowserAuth, session_cookie
 from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
-from flowpilot_api.work import TaskDetails, WorkItem
+from flowpilot_api.work import (
+    Event,
+    LocalEventSchedule,
+    TaskDetails,
+    WorkBase,
+    WorkDetails,
+    WorkItem,
+)
 from flowpilot_api.work_service import (
     DueTasks,
     ManualSource,
@@ -81,6 +88,15 @@ class TransitionWork(ExpectedVersion):
 
 class EditTask(ExpectedVersion):
     details: TaskDetails
+
+
+class CreateManualEvent(WorkBase):
+    schedule: LocalEventSchedule
+
+
+class EditManualEvent(ExpectedVersion):
+    details: WorkDetails
+    schedule: LocalEventSchedule | None = None
 
 
 class LinkEvidence(ExpectedVersion):
@@ -310,8 +326,11 @@ def create_workspace_app(
         user: Annotated[AccessIdentity, Depends(read_identity)],
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
         after: UUID | None = None,
+        kind: Literal["event"] | None = None,
     ):
-        return service.list_work_page(user.principal, workspace_id, limit=limit, after=after)
+        return service.list_work_page(
+            user.principal, workspace_id, limit=limit, after=after, kind=kind
+        )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work-due", response_model=DueTasks)
     def work_due(
@@ -328,6 +347,26 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 5,
     ):
         return service.list_upcoming_events(user.principal, workspace_id, limit=limit)
+
+    @app.post(
+        "/api/v2/workspaces/{workspace_id}/work-events", response_model=StoredWork, status_code=201
+    )
+    def create_manual_event(
+        workspace_id: UUID,
+        payload: CreateManualEvent,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return service.create_work(
+            user.principal,
+            workspace_id,
+            Event(
+                title=payload.title,
+                description=payload.description,
+                time_zone=payload.schedule.time_zone,
+                starts_at=payload.schedule.starts_at,
+                ends_at=payload.schedule.ends_at,
+            ),
+        )
 
     @app.post("/api/v2/workspaces/{workspace_id}/work", response_model=StoredWork, status_code=201)
     def create_work(
@@ -360,6 +399,25 @@ def create_workspace_app(
             workspace_id,
             work_id,
             details=payload.details,
+            expected_version=payload.expected_version,
+        )
+
+    @app.patch(
+        "/api/v2/workspaces/{workspace_id}/work/{work_id}/event-details",
+        response_model=StoredWork,
+    )
+    def edit_manual_event(
+        workspace_id: UUID,
+        work_id: UUID,
+        payload: EditManualEvent,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return service.edit_event(
+            user.principal,
+            workspace_id,
+            work_id,
+            details=payload.details,
+            schedule=payload.schedule,
             expected_version=payload.expected_version,
         )
 

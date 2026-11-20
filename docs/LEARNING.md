@@ -201,3 +201,10 @@ Read [0024](implementation/0024-private-sticky-notes.md). Open a synthetic note
 in two tabs, then save two different edits. Explain why the second save needs
 the current version and why the audit event and successful edit belong in the
 same transaction.
+
+## Manual event exercise
+
+Read [0025](implementation/0025-manual-workspace-events.md). Try scheduling a
+synthetic event at 1:30 a.m. in New York on November 3, 2030. Enter that time
+again in UTC using the instant you intend. Explain why the date, wall time,
+and zone can identify two instants during the fall clock change.

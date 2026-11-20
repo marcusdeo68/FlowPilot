@@ -193,6 +193,28 @@ the query starts and start before its 168-hour cutoff, including ongoing events.
 The limit accepts 1–100. Sort is start time, then ID, ascending. See
 [increment 0023](implementation/0023-today-upcoming-events.md).
 
+### Manual events
+
+`POST /api/v2/workspaces/{workspace_id}/work-events` creates a private event with
+`title`, optional `description`, and `schedule`. The schedule contains
+`starts_at`, `ends_at`, and `time_zone`. For example, pair `2030-06-14T23:30`
+and `2030-06-15T00:30` with `America/New_York`. Local timestamps use ISO date and
+time without an offset. Seconds and up to six fractional digits are optional.
+A skipped or repeated wall time, unknown zone, or reversed interval returns 422.
+
+`PATCH /api/v2/workspaces/{workspace_id}/work/{work_id}/event-details` replaces
+the scheduled event's `details` (`title` and nullable `description`) and accepts
+the same `schedule`. Omit it or send null to preserve the saved instants and zone.
+Send `expected_version`. This action is creator-only. A stale version or canceled
+event returns 409. The existing versioned `/transitions` endpoint accepts
+`target: "canceled"` for a scheduled event. Writes require the verified write
+scope, active write membership, and CSRF for cookies.
+
+To browse events, pass `kind=event` to `GET /api/v2/workspaces/{workspace_id}/work-page`.
+This filter uses the same creation order and pagination contract. An `after` ID
+for a different work kind returns 404. See
+[increment 0025](implementation/0025-manual-workspace-events.md).
+
 ### Private notes
 
 Paths below are relative to `/api/v2/workspaces/{workspace_id}/notes`.

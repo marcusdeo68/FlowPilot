@@ -6,8 +6,13 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0025 adds [manual workspace events](implementation/0025-manual-workspace-events.md).
+  Events can be created, browsed, rescheduled and canceled in the signed-in workspace.
+  The existing work schema supports the increment. In-app reminders are next.
 - Increment 0024 adds [private sticky notes](implementation/0024-private-sticky-notes.md).
   Apply migration `0008_private_notes` before using the updated workspace API.
+  Merged in [PR #31](https://github.com/marcusdeo68/FlowPilot/pull/31) as `f37cc67`.
+  Independent verification passed 281 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44703461529) passed.
 - Increment 0023 adds [upcoming events in Today](implementation/0023-today-upcoming-events.md)
   and merged in [PR #30](https://github.com/marcusdeo68/FlowPilot/pull/30) as `ede9df1`.
   Independent verification passed 275 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44696407800) passed.

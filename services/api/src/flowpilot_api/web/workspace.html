@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/api/v2/workspace.css">
   <script src="/api/v2/workspace-inbox.js" defer></script>
   <script src="/api/v2/workspace-notes.js" defer></script>
+  <script src="/api/v2/workspace-events.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -52,8 +53,10 @@
           <select id="work-view" disabled>
             <option value="all">All work</option>
             <option value="due">Due tasks</option>
+            <option value="events">Events</option>
           </select>
           <button id="new-task" type="button" hidden>New task</button>
+          <button id="new-event" type="button" hidden>New event</button>
         </div>
         <form id="task-editor" aria-labelledby="task-editor-heading" hidden>
           <h3 id="task-editor-heading">New task</h3>
@@ -68,7 +71,30 @@
             <button id="cancel-task" type="button">Cancel</button>
           </div>
         </form>
+        <form id="event-editor" aria-labelledby="event-editor-heading" hidden>
+          <h3 id="event-editor-heading">New event</h3>
+          <fieldset id="event-fields">
+            <label for="event-title">Event title</label>
+            <textarea id="event-title" required maxlength="200" rows="1"></textarea>
+            <label for="event-description">Event description</label>
+            <textarea id="event-description" maxlength="4000" rows="3"></textarea>
+            <label for="event-zone">Time zone</label>
+            <input id="event-zone" required maxlength="100" spellcheck="false"
+              aria-describedby="event-zone-help">
+            <p id="event-zone-help">Use an IANA time zone such as America/New_York or UTC.
+              Start and end use this zone.</p>
+            <label for="event-start">Start date and time</label>
+            <input id="event-start" type="datetime-local" step="any" required>
+            <label for="event-end">End date and time</label>
+            <input id="event-end" type="datetime-local" step="any" required>
+          </fieldset>
+          <div class="actions">
+            <button id="save-event" type="submit">Create event</button>
+            <button id="close-event-editor" type="button">Close event editor</button>
+          </div>
+        </form>
         <p id="task-feedback" role="status"></p>
+        <p id="event-feedback" role="status"></p>
         <p id="work-status" role="status"></p>
         <ul id="work-items"></ul>
         <button id="more-work" type="button" hidden>Load more</button>
@@ -78,6 +104,7 @@
           <p id="today-events-status" role="status"></p>
           <ul id="today-event-items" aria-label="Upcoming events"></ul>
           <button id="retry-today-events" type="button" hidden>Retry upcoming events</button>
+          <button id="open-events" type="button" disabled>Open events</button>
         </section>
         <section id="today-reviews" aria-labelledby="today-reviews-heading" hidden>
           <h3 id="today-reviews-heading">Recent pending reviews</h3>

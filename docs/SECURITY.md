@@ -107,6 +107,15 @@ actor, operation, time, and version without copying the note body into audit.
 Use synthetic content on loopback while deletion, retention, and production
 database access controls are pending. See [0024](implementation/0024-private-sticky-notes.md).
 
+## Manual workspace events
+
+The signed-in event editor creates private work. Browsing applies active
+membership and work visibility before pagination. Only the creator can edit a
+scheduled event's fields. The existing versioned cancellation policy permits
+active writers to cancel events visible to them, including shared events.
+Cookie writes require CSRF. Changes and metadata-only audit events commit together.
+See [0025](implementation/0025-manual-workspace-events.md).
+
 ## Planned reminder privacy
 
 Popup reminders must respect the viewer's source/work visibility. Permission to

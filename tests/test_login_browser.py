@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from html import escape
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import jwt
 import pytest
@@ -1036,6 +1037,151 @@ def test_workspace_browser_discards_a_late_private_note_page(login_browser):
     page.wait_for_function("() => window.oldNotesParsed === true")
     expect(empty).to_be_visible()
     expect(page.get_by_text(note, exact=True)).to_have_count(0)
+
+
+def test_workspace_browser_event_lifecycle_in_work_and_today(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Manual event workshop")
+    seed_browser_work(page, workspace, ["Task omitted from Events"])
+    page.get_by_role("button", name="Today", exact=True).click()
+    page.get_by_role("button", name="Open events", exact=True).click()
+    expect(page.get_by_label("Work view", exact=True)).to_have_value("events")
+    expect(page.get_by_text("No events yet.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Task omitted from Events", exact=True)).to_have_count(0)
+
+    title = "<b>Manual workshop</b>"
+    page.get_by_role("button", name="New event", exact=True).click()
+    page.get_by_label("Event title", exact=True).fill(title)
+    page.get_by_label("Event description", exact=True).fill("Bring the synthetic agenda.")
+    zone = page.get_by_label("Time zone", exact=True)
+    default_zone = page.evaluate("() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'")
+    expect(zone).to_have_value(default_zone)
+    zone.fill("America/New_York")
+    start = page.get_by_label("Start date and time")
+    end = page.get_by_label("End date and time")
+    start.fill("2030-03-10T02:30")
+    end.fill("2030-03-10T04:00")
+    save = page.get_by_role("button", name="Create event", exact=True)
+    save.click()
+    expect(page.get_by_text("This local time does not exist", exact=False)).to_be_visible()
+    expect(page.get_by_label("Event title", exact=True)).to_have_value(title)
+    expect(page.get_by_label("Workspace", exact=True)).to_be_disabled()
+    expect(page.get_by_role("button", name="Refresh workspaces", exact=True)).to_be_disabled()
+    expect(page.get_by_role("button", name="Today", exact=True)).to_be_disabled()
+
+    eastern = ZoneInfo("America/New_York")
+    starts_at = (datetime.now(eastern) + timedelta(days=1)).replace(
+        hour=12, minute=0, second=0, microsecond=0
+    )
+    ends_at = starts_at + timedelta(hours=1)
+    local_format = "%Y-%m-%dT%H:%M"
+    start.fill(starts_at.strftime(local_format))
+    end.fill(ends_at.strftime(local_format))
+    with page.expect_response("**/work-events") as created:
+        save.click()
+    assert created.value.status == 201
+    record = created.value.json()
+    assert record["visibility"] == "private"
+    assert datetime.fromisoformat(record["data"]["starts_at"]) == starts_at
+    expect(page.get_by_text("Event created.", exact=True)).to_be_visible()
+    row = page.get_by_role("listitem").filter(has_text=title)
+    expect(row.get_by_text(title, exact=True)).to_be_visible()
+    expect(row).to_contain_text("Private")
+    expect(row).to_contain_text("Bring the synthetic agenda.")
+    today = page.get_by_role("button", name="Today", exact=True)
+    today.click()
+    upcoming = page.get_by_role("list", name="Upcoming events")
+    expect(upcoming.get_by_text(title, exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Open events", exact=True).click()
+    row.get_by_role("button", name="Edit event", exact=True).click()
+    expect(start).to_have_value(starts_at.strftime(local_format))
+    revised_end = ends_at + timedelta(hours=1)
+    end.fill(revised_end.strftime(local_format))
+    changed_title = "Rescheduled workshop"
+    page.get_by_label("Event title", exact=True).fill(changed_title)
+    with page.expect_response("**/event-details") as edited:
+        page.get_by_role("button", name="Save event changes", exact=True).click()
+    assert edited.value.status == 200
+    assert datetime.fromisoformat(edited.value.json()["data"]["ends_at"]) == revised_end
+    expect(page.get_by_text("Event updated.", exact=True)).to_be_visible()
+    revised = page.get_by_role("listitem").filter(has_text=changed_title)
+    page.once("dialog", lambda dialog: dialog.accept())
+    revised.get_by_role("button", name="Cancel event", exact=True).click()
+    expect(page.get_by_text("Event canceled.", exact=True)).to_be_visible()
+    expect(revised).to_contain_text("canceled")
+    expect(revised.get_by_role("button")).to_have_count(0)
+    today.click()
+    expect(page.get_by_text("No events in the next seven days.", exact=True)).to_be_visible()
+
+    context.clear_cookies()
+    page.goto(origin + "/api/v2/test-login-browser")
+    response = fetch(
+        page,
+        "/api/v2/session",
+        method="POST",
+        headers={"Authorization": f"Bearer {sign('new-browser-user', scope='flowpilot:read')}"},
+    )
+    assert response["status"] == 201
+    page.goto(origin + "/api/v2/workspace")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(workspace)
+    expect(revised).to_be_visible()
+    expect(page.get_by_role("button", name="New event", exact=True)).to_be_hidden()
+
+
+def test_workspace_browser_preserves_an_event_draft_after_stale_save(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Concurrent event workspace")
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    headers = {"Content-Type": "application/json", "X-CSRF-Token": csrf}
+    base = f"/api/v2/workspaces/{workspace}"
+    created = fetch(
+        page,
+        base + "/work-events",
+        method="POST",
+        headers=headers,
+        body=json.dumps(
+            {
+                "title": "Original event",
+                "schedule": {
+                    "starts_at": "2030-06-15T09:30",
+                    "ends_at": "2030-06-15T10:30",
+                    "time_zone": "UTC",
+                },
+            }
+        ),
+    )
+    assert created["status"] == 201
+    path = base + "/work/" + json.loads(created["text"])["id"] + "/event-details"
+    page.reload()
+    page.get_by_role("button", name="Edit event", exact=True).click()
+    title = page.get_by_label("Event title", exact=True)
+    title.fill("My stale draft")
+    changed = fetch(
+        page,
+        path,
+        method="PATCH",
+        headers=headers,
+        body=json.dumps(
+            {"expected_version": 1, "details": {"title": "Current event", "description": None}}
+        ),
+    )
+    assert changed["status"] == 200
+    save = page.get_by_role("button", name="Save event changes", exact=True)
+    save.click()
+    expect(page.get_by_text("This event changed.", exact=False)).to_be_visible()
+    expect(title).to_have_value("My stale draft")
+    expect(save).to_be_disabled()
+    page.get_by_role("button", name="Close event editor", exact=True).click()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(page.get_by_text("Current event", exact=True)).to_be_visible()
+    expect(page.get_by_text("My stale draft", exact=True)).to_have_count(0)
 
 
 def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_change(login_browser):
