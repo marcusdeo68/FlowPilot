@@ -882,6 +882,113 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     expect(page.get_by_role("listitem")).to_have_count(21)
 
 
+def test_workspace_browser_today_shows_pending_reviews_separately_from_due_work(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Today reviews workspace")
+    seed_browser_work(page, workspace_id, ["Overdue synthetic task"], due_date="2020-01-02")
+    page.get_by_role("button", name="Private inbox", exact=True).click()
+    title = "<strong>Review the draft</strong>"
+    capture_source_in_browser(page, "today-review", title, "Synthetic excerpt")
+    page.get_by_role("button", name=title, exact=True).click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    expect(page.get_by_role("button", name="Accept and create task", exact=True)).to_be_enabled()
+
+    today = page.get_by_role("button", name="Today", exact=True)
+    queue_url = origin + f"/api/v2/workspaces/{workspace_id}/proposals?limit=5"
+    page.route(queue_url, lambda route: route.fulfill(status=503), times=1)
+    today.click()
+    expect(page.get_by_text("Could not load pending reviews.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Overdue synthetic task", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry pending reviews", exact=True).click()
+    reviews = page.get_by_role("list", name="Pending reviews", exact=True)
+    expect(reviews.get_by_text(title, exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Open private inbox", exact=True).click()
+    expect(reviews.get_by_text(title, exact=True)).to_have_count(0)
+    page.get_by_role("button", name=title, exact=True).click()
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Dismiss suggestion", exact=True).click()
+    expect(page.get_by_text("Suggestion dismissed.", exact=True)).to_be_visible()
+    today.click()
+    expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Work items", exact=True).click()
+    page.evaluate(
+        """path => {
+            const actualFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await actualFetch(url, options);
+                if (url === path) setTimeout(() => { window.oldReviewsHandled = true; }, 0);
+                return response;
+            };
+        }""",
+        queue_url.removeprefix(origin),
+    )
+    held: list[Route] = []
+    page.route(queue_url, lambda route: held.append(route), times=1)
+    with page.expect_request(queue_url):
+        today.click()
+    second = create_workspace_in_browser(page, origin, "Other Today reviews workspace")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
+    assert len(held) == 1
+    held[0].fulfill(status=401)
+    page.wait_for_function("() => window.oldReviewsHandled === true")
+    expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+
+
+def test_workspace_browser_today_discards_pending_reviews_after_access_denial(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Workspace with private review")
+    page.get_by_role("button", name="Private inbox", exact=True).click()
+    title = "Private proposal title"
+    capture_source_in_browser(page, "today-permission", title, "Synthetic excerpt")
+    page.get_by_role("button", name=title, exact=True).click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    expect(page.get_by_role("button", name="Accept and create task", exact=True)).to_be_enabled()
+
+    base = f"/api/v2/workspaces/{workspace_id}"
+    path = base + "/proposals?limit=5"
+    page.evaluate(
+        """path => {
+            const actualFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await actualFetch(url, options);
+                if (url === path) {
+                    window.lateReviewTitle = (await response.clone().json())[0].title;
+                    await new Promise(resolve => { window.releaseLateReview = resolve; });
+                    const json = response.json.bind(response);
+                    response.json = async () => {
+                        const value = await json();
+                        setTimeout(() => { window.lateReviewParsed = true; }, 0);
+                        return value;
+                    };
+                }
+                return response;
+            };
+        }""",
+        path,
+    )
+    page.route(
+        origin + base + "/work-due?limit=21", lambda route: route.fulfill(status=403), times=1
+    )
+    page.get_by_role("button", name="Today", exact=True).click()
+    unavailable = page.get_by_text("Today is unavailable. Refresh your workspaces to try again.")
+    expect(unavailable).to_be_visible()
+    page.wait_for_function("() => typeof window.releaseLateReview === 'function'")
+    assert page.evaluate("window.lateReviewTitle") == title
+    page.evaluate("() => window.releaseLateReview()")
+    page.wait_for_function("() => window.lateReviewParsed === true")
+    expect(page.get_by_text(title, exact=True)).to_have_count(0)
+
+
 def test_workspace_browser_today_uses_local_date_and_bounds_due_work(login_browser):
     from playwright.sync_api import expect
 

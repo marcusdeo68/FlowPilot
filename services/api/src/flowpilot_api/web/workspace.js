@@ -19,6 +19,11 @@ const showInbox = document.querySelector("#show-inbox");
 const inboxPanel = document.querySelector("#inbox-panel");
 const workPanel = document.querySelector("#work-panel");
 const workHeading = document.querySelector("#work-heading");
+const todayReviews = document.querySelector("#today-reviews");
+const reviewsStatus = document.querySelector("#today-reviews-status");
+const reviewItems = document.querySelector("#today-review-items");
+const retryReviews = document.querySelector("#retry-today-reviews");
+const reviewInInbox = document.querySelector("#review-in-inbox");
 const workViewLabel = document.querySelector("#work-view-label");
 const workView = document.querySelector("#work-view");
 const workStatus = document.querySelector("#work-status");
@@ -40,6 +45,7 @@ const taskTransitions = JSON.parse(document.body.dataset.taskTransitions);
 let session;
 let sessionVersion = 0;
 let workVersion = 0;
+let reviewVersion = 0;
 let expiresTimer;
 let nextCursor;
 let ownId;
@@ -110,6 +116,7 @@ function clearSession() {
   ownId = undefined;
   clearTimeout(expiresTimer);
   inbox.clear();
+  clearTodayReviews();
   workspaceView = "work";
   syncWorkspaceNavigation();
   clearWork();
@@ -147,6 +154,7 @@ function syncWorkspaceNavigation() {
   workPanel.hidden = workspaceView === "inbox";
   inboxPanel.hidden = workspaceView !== "inbox";
   workHeading.textContent = today ? "Today" : "Work items";
+  todayReviews.hidden = !today;
   workViewLabel.hidden = workView.hidden = today;
   showToday.setAttribute("aria-pressed", String(today));
   showWork.setAttribute("aria-pressed", String(workspaceView === "work"));
@@ -155,11 +163,13 @@ function syncWorkspaceNavigation() {
 
 function loadSelectedWorkspaceView() {
   inbox.clear();
+  clearTodayReviews();
   if (workspaceView === "inbox") {
     clearWork();
     if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
   } else {
     void loadWork();
+    if (workspaceView === "today") void loadTodayReviews();
   }
 }
 
@@ -174,6 +184,7 @@ function syncWorkControls() {
   const editorOpen = !taskEditor.hidden;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
   showToday.disabled = showWork.disabled = showInbox.disabled = workView.disabled || inboxSaving;
+  reviewInInbox.disabled = showInbox.disabled;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
   for (const button of items.querySelectorAll("button")) {
     button.disabled = Boolean(taskUpdate) || editorOpen;
@@ -331,6 +342,10 @@ async function loadWork(append = false, savedMessage = "") {
     }
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
+    if (clearDeniedToday(status)) {
+      taskFeedback.textContent = savedMessage;
+      return;
+    }
     if (append && status !== 403 && status !== 404) {
       workStatus.textContent = "Could not load more work items. Try again.";
       more.disabled = false;
@@ -345,11 +360,51 @@ async function loadWork(append = false, savedMessage = "") {
   }
 }
 
+function clearTodayReviews() {
+  reviewVersion += 1;
+  reviewItems.replaceChildren();
+  reviewsStatus.textContent = "";
+  retryReviews.hidden = true;
+}
+
+function clearDeniedToday(status) {
+  if (status !== 403 || workspaceView !== "today") return false;
+  clearWork();
+  clearTodayReviews();
+  workStatus.textContent = "Today is unavailable. Refresh your workspaces to try again.";
+  return true;
+}
+
+async function loadTodayReviews() {
+  if (workspaceView !== "today" || !session || !select.value) return;
+  clearTodayReviews();
+  const version = reviewVersion;
+  reviewsStatus.textContent = "Loading pending reviews…";
+  try {
+    const path = "workspaces/" + encodeURIComponent(select.value) + "/proposals?limit=5";
+    const proposals = await request(path);
+    if (version !== reviewVersion) return;
+    for (const proposal of proposals) {
+      const item = document.createElement("li");
+      item.textContent = proposal.title;
+      reviewItems.append(item);
+    }
+    reviewsStatus.textContent = proposals.length ? "" : "No pending reviews.";
+  } catch (status) {
+    if (version !== reviewVersion || expired(status) || clearDeniedToday(status)) return;
+    reviewsStatus.textContent = status === 404
+      ? "Pending reviews are unavailable."
+      : "Could not load pending reviews.";
+    retryReviews.hidden = false;
+  }
+}
+
 async function loadWorkspaces(created) {
   if (!session) return;
   const version = sessionVersion;
   const preferred = created?.id ?? select.value;
   inbox.clear();
+  clearTodayReviews();
   clearWork();
   select.replaceChildren();
   syncWorkControls();
@@ -531,6 +586,11 @@ select.addEventListener("change", loadSelectedWorkspaceView);
 showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));
 showInbox.addEventListener("click", () => switchWorkspaceView("inbox"));
+reviewInInbox.addEventListener("click", () => {
+  switchWorkspaceView("inbox");
+  showInbox.focus();
+});
+retryReviews.addEventListener("click", loadTodayReviews);
 workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());

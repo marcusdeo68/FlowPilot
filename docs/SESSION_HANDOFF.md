@@ -1,6 +1,12 @@
 # Session handoff
 
-## Latest increment — due work in Today
+## Latest increment — pending reviews in Today
+
+Increment 0022 puts a recent private review list alongside due tasks in Today.
+Review decisions remain in Private inbox. See STATUS and the PR for validation.
+The next increment can add upcoming calendar events to signed-in Today.
+
+## Previous increment — due work in Today
 
 Increment 0021 adds overdue and due-today tasks to signed-in Today. See STATUS
 for verification. The next increment is pending private reviews in Today.

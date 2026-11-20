@@ -6,8 +6,10 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
-- Increment 0021 adds [due work in Today](implementation/0021-today-due-work.md).
-  It uses the same workspace permissions and due-task query as Work items.
+- Increment 0022 adds [recent pending reviews in Today](implementation/0022-today-pending-reviews.md).
+- Increment 0021 adds [due work in Today](implementation/0021-today-due-work.md) and
+  merged as `8926287` in [PR #28](https://github.com/marcusdeo68/FlowPilot/pull/28).
+  All 271 local tests and all six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44665476923) passed.
 - Increment 0020 merged as `14c3826` in [PR #27](https://github.com/marcusdeo68/FlowPilot/pull/27).
   Both local runs passed 270 tests. All six post-merge checks passed in
   [run 44662271014](https://github.com/marcusdeo68/FlowPilot/actions/runs/44662271014).
@@ -171,6 +173,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-030 | Clear both Today lists after a current workspace access denial. | The two reads can finish in either order during a permission change. Chromium returns a successful pending-review response after a 403 and verifies the private title stays hidden. |
 | FP-029 | Pause suggestion review when the date field contains a partial entry. | Chromium can show part of a date while reporting an empty value. The browser regression verifies it blocks acceptance until the entry is completed or cleared. |
 | FP-028 | Require a fresh workspace role before showing inbox write controls after a 403. | Review traced a member-to-observer downgrade followed by a successful inbox refresh using a stale role. Chromium verifies the user can reread their source while writes stay hidden. |
 | FP-027 | Pause Work items navigation while an inbox write is pending. | Opening Work items before an acceptance committed could show a list without the new task. Chromium holds the review response and verifies the Work items button is paused until the request settles. |

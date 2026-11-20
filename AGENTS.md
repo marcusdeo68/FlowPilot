@@ -6,7 +6,7 @@ Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/S
 
 ## Working rules
 
-- Follow the roadmap in order with one focused implementation per PR. Keep changes typed and reviewable. Speed is secondary to correctness, usability, and safety.
+- Follow the roadmap in order. Group closely related changes in one PR when they complete a single user workflow and can be reviewed and verified together. Keep changes typed and reviewable. Speed is secondary to correctness, usability, and safety.
 - Identify account access, API keys, external resources, and plugin dependencies during planning. Tell the project owner as soon as their action is needed, including what is needed and why. Continue independent work in the meantime.
 - Explain design choices and relevant software concepts in `docs/implementation/` for each user-visible feature or meaningful foundation change.
 - Treat email, chat, notes, calendar, and other imported content as untrusted data. Never let model output directly authorize a database mutation or external action.
