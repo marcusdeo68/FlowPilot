@@ -175,6 +175,44 @@ def test_manual_event_auth_and_wall_time_validation(workspace_client):
     assert canceled.status_code == 200
 
 
+def test_event_edit_preserves_interval_across_postgres_clock_fold(setup):
+    service, workspace, _, _ = setup
+    actor = Principal("test", "member")
+    with service.engine.begin() as connection:
+        connection.execute(text("SET TIME ZONE 'America/New_York'"))
+    start = datetime(2030, 11, 3, 5, 45, tzinfo=UTC)
+    end = datetime(2030, 11, 3, 6, 15, tzinfo=UTC)
+    item = service.create_work(
+        actor,
+        workspace,
+        Event(title="Repeated hour", starts_at=start, ends_at=end, time_zone="America/New_York"),
+    )
+    assert item.data.starts_at.hour == item.data.ends_at.hour == 1
+    assert item.data.starts_at.fold == 0 and item.data.ends_at.fold == 1
+    updated = service.edit_event(
+        actor,
+        workspace,
+        item.id,
+        expected_version=1,
+        details=WorkDetails(title="Renamed", description=None),
+        schedule=EventScheduleChange(time_zone="America/New_York"),
+    )
+    assert updated.version == 2
+    assert updated.data.starts_at.astimezone(UTC) == start
+    assert updated.data.ends_at.astimezone(UTC) == end
+    assert (
+        service.edit_event(
+            actor,
+            workspace,
+            item.id,
+            expected_version=2,
+            details=WorkDetails(title="Renamed", description=None),
+            schedule=EventScheduleChange(time_zone="America/New_York"),
+        )
+        == updated
+    )
+
+
 def test_event_edit_serializes_with_cancellation_and_rolls_back_on_audit_failure(setup):
     service, workspace, _, _ = setup
     actor = Principal("test", "member")

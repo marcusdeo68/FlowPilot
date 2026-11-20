@@ -5,7 +5,7 @@ No request is permitted to assert its own issuer/subject or role.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -418,11 +418,16 @@ class WorkService:
                 raise VersionConflict
             if current.data.status != "scheduled":
                 raise InvalidTransition
-            starts_at, ends_at, time_zone = (
-                current.data.starts_at,
-                current.data.ends_at,
-                current.data.time_zone,
-            )
+            starts_at = current.data.starts_at.astimezone(UTC)
+            ends_at = current.data.ends_at.astimezone(UTC)
+            time_zone = current.data.time_zone
+            previous = {
+                "title": current.data.title,
+                "description": current.data.description,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "time_zone": time_zone,
+            }
             if schedule is not None:
                 if schedule.time_zone != time_zone and (
                     schedule.starts_at is None or schedule.ends_at is None
@@ -440,7 +445,7 @@ class WorkService:
                 "ends_at": ends_at,
                 "time_zone": time_zone,
             }
-            if all(getattr(current.data, field) == value for field, value in changes.items()):
+            if changes == previous:
                 return current
             row = (
                 connection.execute(
