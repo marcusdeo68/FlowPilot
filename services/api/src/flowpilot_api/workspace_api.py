@@ -46,7 +46,7 @@ from flowpilot_api.proposals import ProposalNotFound, ProposalService, ReviewCon
 from flowpilot_api.repository import InvalidTransition, VersionConflict
 from flowpilot_api.session_routes import BrowserAuth, session_cookie
 from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
-from flowpilot_api.work import WorkItem
+from flowpilot_api.work import TaskDetails, WorkItem
 from flowpilot_api.work_service import (
     ManualSource,
     SourceNotFound,
@@ -73,6 +73,10 @@ class ExpectedVersion(Command):
 
 class TransitionWork(ExpectedVersion):
     target: str = Field(min_length=1, max_length=20)
+
+
+class EditTask(ExpectedVersion):
+    details: TaskDetails
 
 
 class LinkEvidence(ExpectedVersion):
@@ -319,6 +323,24 @@ def create_workspace_app(
         workspace_id: UUID, work_id: UUID, user: Annotated[AccessIdentity, Depends(read_identity)]
     ):
         return service.get_work(user.principal, workspace_id, work_id)
+
+    @app.patch(
+        "/api/v2/workspaces/{workspace_id}/work/{work_id}/task-details",
+        response_model=StoredWork,
+    )
+    def edit_task(
+        workspace_id: UUID,
+        work_id: UUID,
+        payload: EditTask,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return service.edit_task(
+            user.principal,
+            workspace_id,
+            work_id,
+            details=payload.details,
+            expected_version=payload.expected_version,
+        )
 
     @app.post(
         "/api/v2/workspaces/{workspace_id}/work/{work_id}/transitions", response_model=StoredWork

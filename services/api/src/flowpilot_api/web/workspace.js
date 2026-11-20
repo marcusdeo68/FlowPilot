@@ -17,6 +17,15 @@ const workStatus = document.querySelector("#work-status");
 const items = document.querySelector("#work-items");
 const more = document.querySelector("#more-work");
 const retryWork = document.querySelector("#retry-work");
+const newTask = document.querySelector("#new-task");
+const taskEditor = document.querySelector("#task-editor");
+const taskHeading = document.querySelector("#task-editor-heading");
+const taskTitle = document.querySelector("#task-title");
+const taskDescription = document.querySelector("#task-description");
+const taskDueDate = document.querySelector("#task-due-date");
+const saveTask = document.querySelector("#save-task");
+const cancelTask = document.querySelector("#cancel-task");
+const taskFeedback = document.querySelector("#task-feedback");
 const loginEnabled = document.body.dataset.loginEnabled === "true";
 
 let session;
@@ -24,6 +33,11 @@ let sessionVersion = 0;
 let workVersion = 0;
 let expiresTimer;
 let nextCursor;
+let ownId;
+let editingTask;
+let loadedTitle;
+let loadedDescription;
+let editorVersion = 0;
 
 async function request(path, options) {
   const response = await fetch("/api/v2/" + path, {
@@ -35,6 +49,18 @@ async function request(path, options) {
   if (response.status !== 204) return response.json();
 }
 
+function closeTaskEditor() {
+  editorVersion += 1;
+  editingTask = undefined;
+  loadedTitle = loadedDescription = undefined;
+  taskEditor.reset();
+  taskEditor.hidden = true;
+  saveTask.disabled = false;
+  cancelTask.disabled = false;
+  taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = false;
+  taskFeedback.textContent = "";
+}
+
 function clearWork() {
   workVersion += 1;
   nextCursor = undefined;
@@ -42,11 +68,14 @@ function clearWork() {
   workStatus.textContent = "";
   more.hidden = retryWork.hidden = true;
   more.disabled = false;
+  newTask.hidden = true;
+  closeTaskEditor();
 }
 
 function clearSession() {
   sessionVersion += 1;
   session = undefined;
+  ownId = undefined;
   clearTimeout(expiresTimer);
   clearWork();
   select.replaceChildren();
@@ -70,13 +99,50 @@ function expired(status) {
   return true;
 }
 
+function canCreateTask() {
+  const role = select.selectedOptions[0]?.dataset.role;
+  return Boolean(session && ownId && (role === "owner" || role === "member"));
+}
+
+function openTaskEditor(task) {
+  if (newTask.hidden || !taskEditor.hidden) return;
+  closeTaskEditor();
+  editingTask = task;
+  taskHeading.textContent = task ? "Edit task" : "New task";
+  saveTask.textContent = task ? "Save changes" : "Create task";
+  taskTitle.value = task?.data.title ?? "";
+  taskDescription.value = task?.data.description ?? "";
+  taskDueDate.value = task?.data.due_date ?? "";
+  // Textareas normalize line endings. Keep the saved text when it was left alone.
+  loadedTitle = taskTitle.value;
+  loadedDescription = taskDescription.value;
+  taskEditor.hidden = false;
+  taskTitle.focus();
+}
+
 function renderItem(item) {
   const row = document.createElement("li");
   const title = document.createElement("strong");
   const detail = document.createElement("span");
   title.textContent = item.data.title;
-  detail.textContent = [item.data.kind, item.data.status].join(" · ");
+  const metadata = [item.data.kind, item.data.status];
+  if (item.data.kind === "task" && item.data.due_date) {
+    metadata.push("Due " + item.data.due_date);
+  }
+  detail.textContent = metadata.join(" · ");
   row.append(title, detail);
+  if (item.data.kind === "task" && item.data.description) {
+    const description = document.createElement("p");
+    description.textContent = item.data.description;
+    row.append(description);
+  }
+  if (item.data.kind === "task" && canCreateTask() && item.creator_id === ownId) {
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "Edit task";
+    edit.addEventListener("click", () => openTaskEditor(item));
+    row.append(edit);
+  }
   return row;
 }
 
@@ -94,12 +160,18 @@ async function loadWork(append = false) {
     const page = await request(path + "?" + query);
     if (version !== workVersion || !session) return;
     items.append(...page.items.map(renderItem));
+    newTask.hidden = !canCreateTask();
     nextCursor = page.next_after;
     more.hidden = !nextCursor;
     more.disabled = false;
     workStatus.textContent = items.childElementCount ? "" : "No work items yet.";
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
+    if (append && status !== 403 && status !== 404) {
+      workStatus.textContent = "Could not load more work items. Try again.";
+      more.disabled = false;
+      return;
+    }
     clearWork();
     workStatus.textContent = status === 403 || status === 404
       ? "This work list is unavailable. Refresh your workspaces or retry."
@@ -119,15 +191,31 @@ async function loadWorkspaces(created) {
   try {
     const workspaces = await request("workspaces?limit=100");
     if (version !== sessionVersion) return;
+    if (workspaces.length && !ownId) {
+      try {
+        const profile = await request("me");
+        if (version !== sessionVersion) return;
+        ownId = profile.id;
+      } catch (status) {
+        if (version !== sessionVersion || expired(status)) return;
+      }
+    }
     const listed = workspaces.some(({ id }) => id === preferred);
-    select.append(...workspaces.map(({ id, name }) => new Option(name, id)));
-    if (created && !listed) select.append(new Option(created.name, created.id));
+    const options = created && !listed ? [...workspaces, created] : workspaces;
+    select.append(...options.map(({ id, name, role }) => {
+      const option = new Option(name, id);
+      option.dataset.role = role;
+      return option;
+    }));
     if (listed || created) select.value = preferred;
     select.disabled = workspaces.length === 0;
     if (workspaces.length === 100) {
       workspaceStatus.textContent = "Showing the first 100 workspaces.";
     } else {
       workspaceStatus.textContent = workspaces.length ? "" : "Create your first workspace to get started.";
+    }
+    if (workspaces.length && !ownId) {
+      workspaceStatus.textContent += " Could not load your profile. Refresh workspaces to edit tasks.";
     }
     void loadWork();
   } catch (status) {
@@ -215,6 +303,64 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+taskEditor.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!session || taskEditor.hidden || saveTask.disabled || !canCreateTask()) return;
+  const task = editingTask;
+  const title = task && taskTitle.value === loadedTitle ? task.data.title : taskTitle.value.trim();
+  if (!title) {
+    taskFeedback.textContent = "Enter a task title.";
+    return;
+  }
+  const version = editorVersion;
+  const path = "workspaces/" + encodeURIComponent(select.value) + "/work";
+  const details = {
+    title,
+    description: task && taskDescription.value === loadedDescription
+      ? task.data.description
+      : taskDescription.value.trim() || null,
+    due_date: taskDueDate.value || null,
+  };
+  saveTask.disabled = cancelTask.disabled = true;
+  taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = true;
+  taskFeedback.textContent = "Saving task…";
+  try {
+    await request(task ? path + "/" + encodeURIComponent(task.id) + "/task-details" : path, {
+      method: task ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
+      body: JSON.stringify(task
+        ? { expected_version: task.version, details }
+        : { item: { kind: "task", ...details } }),
+    });
+    if (version !== editorVersion) return;
+    void loadWork();
+    taskFeedback.textContent = task ? "Task updated." : "Task created.";
+  } catch (status) {
+    if (version !== editorVersion || expired(status)) return;
+    if (status === 409 && task) {
+      taskFeedback.textContent = "This task changed. Close the editor, refresh the work list, and reopen the task.";
+      retryWork.hidden = false;
+    } else if (status === 403 || status === 404) {
+      clearWork();
+      taskFeedback.textContent = "You no longer have permission to save this task.";
+      retryWork.hidden = false;
+    } else {
+      taskFeedback.textContent = status === 422
+        ? "Check the title, description, and due date."
+        : "Could not confirm the save. Refresh the work list before trying again.";
+      if (status !== 422) retryWork.hidden = false;
+      saveTask.disabled = status !== 422;
+    }
+  } finally {
+    if (version === editorVersion) {
+      cancelTask.disabled = false;
+      taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = false;
+    }
+  }
+});
+
+newTask.addEventListener("click", () => openTaskEditor());
+cancelTask.addEventListener("click", closeTaskEditor);
 select.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());

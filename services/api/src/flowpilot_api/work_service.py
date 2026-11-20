@@ -21,7 +21,14 @@ from flowpilot_api.access import (
 )
 from flowpilot_api.member_context import resolve_member
 from flowpilot_api.repository import InvalidTransition, VersionConflict
-from flowpilot_api.work import Commitment, Event, Task, WorkItem, can_change_work_status
+from flowpilot_api.work import (
+    Commitment,
+    Event,
+    Task,
+    TaskDetails,
+    WorkItem,
+    can_change_work_status,
+)
 
 
 @dataclass(frozen=True)
@@ -274,6 +281,52 @@ class WorkService:
             )
             items = [_stored(row) for row in rows[:limit]]
             return WorkPage(items, items[-1].id if len(rows) > limit else None)
+
+    def edit_task(
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        work_id: UUID,
+        *,
+        details: TaskDetails,
+        expected_version: int,
+    ) -> StoredWork:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id, write=True)
+            current = self._work(connection, member, work_id, write=True)
+            if not isinstance(current.data, Task):
+                raise WorkNotFound
+            if current.creator_id != member.user_id:
+                raise AccessDenied
+            if current.version != expected_version:
+                raise VersionConflict
+            if (
+                current.data.title == details.title
+                and current.data.description == details.description
+                and current.data.due_date == details.due_date
+            ):
+                return current
+            row = (
+                connection.execute(
+                    text("""UPDATE work_items SET title = :title, description = :description,
+                    due_date = :due_date, version = version + 1, updated_at = now()
+                    WHERE workspace_id = :workspace AND id = :id AND version = :version
+                    RETURNING *"""),
+                    {
+                        "title": details.title,
+                        "description": details.description,
+                        "due_date": details.due_date,
+                        "workspace": workspace_id,
+                        "id": work_id,
+                        "version": expected_version,
+                    },
+                )
+                .mappings()
+                .one()
+            )
+            updated = _stored(row)
+            self._audit(connection, member, updated, "details_changed")
+            return updated
 
     def transition(
         self,

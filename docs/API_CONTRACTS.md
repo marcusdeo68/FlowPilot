@@ -77,6 +77,14 @@ Example create body:
 {"item":{"kind":"task","title":"Review synthetic plan"},"visibility":"private"}
 ```
 
+The task creator can replace task details with
+`PATCH /api/v2/workspaces/{workspace_id}/work/{work_id}/task-details`. Send
+`{"expected_version":1,"details":{"title":"Confirm venue","description":null,"due_date":"2026-12-04"}}`.
+All three detail keys are required. Use null to clear description or due date.
+The endpoint requires active write membership and the existing API write scopes.
+It returns the updated stored work or 409 for a stale version. See
+[increment 0018](implementation/0018-manual-task-editing.md).
+
 A transition body is `{"target":"active","expected_version":1}`. Sharing uses
 `{"expected_version":1}`. Linking evidence uses `source_id`, `visibility`
 (`private`, `summary_shared`, or `excerpt_shared`), and `expected_version`.

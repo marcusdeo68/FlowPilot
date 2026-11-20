@@ -127,3 +127,7 @@ token compatibility requirements and suppress callback query access logs before
 configuring any provider. The first signed-in workspace screen is available at
 `/api/v2/workspace` when browser sessions are enabled. See
 [increment 0017](docs/implementation/0017-workspace-screen.md).
+
+The signed-in workspace can create private tasks and edit their details. Apply
+`alembic upgrade head` to the workspace database before starting the updated
+verified API. See [increment 0018](docs/implementation/0018-manual-task-editing.md).
