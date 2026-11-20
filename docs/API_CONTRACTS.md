@@ -186,6 +186,13 @@ as tie breakers. The limit accepts 1–100 and `has_more` counts only eligible,
 authorized tasks. Use `work-page` to browse all work. See
 [increment 0019](implementation/0019-task-lifecycle-and-due-view.md).
 
+Upcoming events: `GET /api/v2/workspaces/{workspace_id}/work-events?limit=5`
+returns `{items, has_more}`. It requires read scope and active workspace
+membership. The response contains authorized scheduled events that end after
+the query starts and start before its 168-hour cutoff, including ongoing events.
+The limit accepts 1–100. Sort is start time, then ID, ascending. See
+[increment 0023](implementation/0023-today-upcoming-events.md).
+
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
 for source-to-proposal creation, listing, correction, and review contracts.
 

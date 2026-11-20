@@ -1,6 +1,12 @@
 # Session handoff
 
-## Latest increment — pending reviews in Today
+## Latest increment — upcoming events in Today
+
+Increment 0023 shows up to five scheduled events in the next seven days,
+including events already in progress. Existing signed API clients can create
+manual events. See STATUS for validation. Next, add a manual event entry form.
+
+## Previous increment — pending reviews in Today
 
 Increment 0022 puts a recent private review list alongside due tasks in Today.
 Review decisions remain in Private inbox. See STATUS and the PR for validation.

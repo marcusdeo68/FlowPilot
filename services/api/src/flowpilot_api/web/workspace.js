@@ -20,6 +20,10 @@ const inboxPanel = document.querySelector("#inbox-panel");
 const workPanel = document.querySelector("#work-panel");
 const workHeading = document.querySelector("#work-heading");
 const todayReviews = document.querySelector("#today-reviews");
+const todayEvents = document.querySelector("#today-events");
+const eventsStatus = document.querySelector("#today-events-status");
+const eventItems = document.querySelector("#today-event-items");
+const retryEvents = document.querySelector("#retry-today-events");
 const reviewsStatus = document.querySelector("#today-reviews-status");
 const reviewItems = document.querySelector("#today-review-items");
 const retryReviews = document.querySelector("#retry-today-reviews");
@@ -46,6 +50,7 @@ let session;
 let sessionVersion = 0;
 let workVersion = 0;
 let reviewVersion = 0;
+let eventVersion = 0;
 let expiresTimer;
 let nextCursor;
 let ownId;
@@ -116,7 +121,7 @@ function clearSession() {
   ownId = undefined;
   clearTimeout(expiresTimer);
   inbox.clear();
-  clearTodayReviews();
+  clearTodayLists();
   workspaceView = "work";
   syncWorkspaceNavigation();
   clearWork();
@@ -155,6 +160,7 @@ function syncWorkspaceNavigation() {
   inboxPanel.hidden = workspaceView !== "inbox";
   workHeading.textContent = today ? "Today" : "Work items";
   todayReviews.hidden = !today;
+  todayEvents.hidden = !today;
   workViewLabel.hidden = workView.hidden = today;
   showToday.setAttribute("aria-pressed", String(today));
   showWork.setAttribute("aria-pressed", String(workspaceView === "work"));
@@ -163,13 +169,16 @@ function syncWorkspaceNavigation() {
 
 function loadSelectedWorkspaceView() {
   inbox.clear();
-  clearTodayReviews();
+  clearTodayLists();
   if (workspaceView === "inbox") {
     clearWork();
     if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
   } else {
     void loadWork();
-    if (workspaceView === "today") void loadTodayReviews();
+    if (workspaceView === "today") {
+      void loadTodayReviews();
+      void loadTodayEvents();
+    }
   }
 }
 
@@ -367,10 +376,22 @@ function clearTodayReviews() {
   retryReviews.hidden = true;
 }
 
+function clearTodayEvents() {
+  eventVersion += 1;
+  eventItems.replaceChildren();
+  eventsStatus.textContent = "";
+  retryEvents.hidden = true;
+}
+
+function clearTodayLists() {
+  clearTodayReviews();
+  clearTodayEvents();
+}
+
 function clearDeniedToday(status) {
   if (status !== 403 || workspaceView !== "today") return false;
   clearWork();
-  clearTodayReviews();
+  clearTodayLists();
   workStatus.textContent = "Today is unavailable. Refresh your workspaces to try again.";
   return true;
 }
@@ -399,12 +420,62 @@ async function loadTodayReviews() {
   }
 }
 
+function renderTodayEvent({ data: event }) {
+  const options = {
+    year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    timeZoneName: "short", timeZone: event.time_zone,
+  };
+  let formatter;
+  try {
+    formatter = new Intl.DateTimeFormat(undefined, options);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // The API may know a time zone identifier that this browser does not.
+    formatter = new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" });
+  }
+  const row = document.createElement("li");
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+  row.append(title);
+  for (const [label, value] of [["Starts ", event.starts_at], ["Ends ", event.ends_at]]) {
+    const line = document.createElement("span");
+    const timestamp = document.createElement("time");
+    timestamp.dateTime = value;
+    timestamp.textContent = formatter.format(new Date(value));
+    line.append(label, timestamp);
+    row.append(line);
+  }
+  return row;
+}
+
+async function loadTodayEvents() {
+  if (workspaceView !== "today" || !session || !select.value) return;
+  clearTodayEvents();
+  const version = eventVersion;
+  eventsStatus.textContent = "Loading upcoming events…";
+  try {
+    const path = "workspaces/" + encodeURIComponent(select.value) + "/work-events?limit=5";
+    const page = await request(path);
+    if (version !== eventVersion) return;
+    eventItems.append(...page.items.map(renderTodayEvent));
+    eventsStatus.textContent = page.has_more
+      ? "Showing the five earliest events."
+      : page.items.length ? "" : "No events in the next seven days.";
+  } catch (status) {
+    if (version !== eventVersion || expired(status) || clearDeniedToday(status)) return;
+    eventsStatus.textContent = status === 404
+      ? "Upcoming events are unavailable."
+      : "Could not load upcoming events.";
+    retryEvents.hidden = false;
+  }
+}
+
 async function loadWorkspaces(created) {
   if (!session) return;
   const version = sessionVersion;
   const preferred = created?.id ?? select.value;
   inbox.clear();
-  clearTodayReviews();
+  clearTodayLists();
   clearWork();
   select.replaceChildren();
   syncWorkControls();
@@ -591,6 +662,7 @@ reviewInInbox.addEventListener("click", () => {
   showInbox.focus();
 });
 retryReviews.addEventListener("click", loadTodayReviews);
+retryEvents.addEventListener("click", loadTodayEvents);
 workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());
