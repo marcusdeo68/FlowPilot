@@ -113,6 +113,8 @@ Increment 0019 adds task status controls and a view of the earliest unfinished t
 Increment 0020 adds a signed-in Private inbox where source owners can capture
 synthetic notes, read the evidence, and review, correct, accept, or dismiss one
 task suggestion per source. Signed-in Today shows due tasks, pending reviews,
-and upcoming or ongoing manual events. Provider integrations, AI inference, outbound actions,
+and upcoming or ongoing manual events. Increment 0024 adds private sticky notes.
+Increment 0025 lets users create, browse, reschedule, and cancel manual events.
+Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational
 controls before introducing real connectors or personal data.

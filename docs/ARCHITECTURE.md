@@ -34,6 +34,11 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0025 resolves local event times with `zoneinfo` before writing canonical
+events through `WorkService`. The browser Events filter uses the existing authorized
+work pagination, and event edits follow its record-version and audit rules. See
+[0025](implementation/0025-manual-workspace-events.md).
+
 Increment 0024 adds `notes.py` for private sticky notes and their metadata-only
 audit history. Each read and write resolves stored membership and binds the
 record to its author and workspace. The signed-in Notes view keeps draft state

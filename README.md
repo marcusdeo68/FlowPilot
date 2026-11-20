@@ -67,6 +67,7 @@ npx --yes --package pyright@1.1.407 pyright
 uv run --locked --extra dev python -m build
 node --check services/api/src/flowpilot_api/web/app.js
 node --check services/api/src/flowpilot_api/web/workspace.js
+node --check services/api/src/flowpilot_api/web/workspace-events.js
 ```
 
 GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
@@ -140,3 +141,7 @@ and review it into a private task. See
 Open **Notes** in the signed-in workspace to create private sticky notes. Apply
 `alembic upgrade head` before starting this version of the workspace API. See
 [increment 0024](docs/implementation/0024-private-sticky-notes.md).
+
+Open **Events** under **Work items** in the signed-in workspace to create a
+private event, reschedule it, or cancel it. **Today** shows upcoming and ongoing
+events. See [increment 0025](docs/implementation/0025-manual-workspace-events.md).

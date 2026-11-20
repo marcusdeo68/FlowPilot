@@ -5,7 +5,8 @@ No request is permitted to assert its own issuer/subject or role.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
@@ -25,8 +26,11 @@ from flowpilot_api.work import (
     TASK_TRANSITIONS,
     Commitment,
     Event,
+    EventScheduleChange,
+    InvalidEventSchedule,
     Task,
     TaskDetails,
+    WorkDetails,
     WorkItem,
     can_change_work_status,
 )
@@ -268,16 +272,19 @@ class WorkService:
         *,
         limit: int = 50,
         after: UUID | None = None,
+        kind: Literal["event"] | None = None,
     ) -> WorkPage:
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
         with self.engine.begin() as connection:
             member = self._member(connection, principal, workspace_id)
             params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
-            boundary = ""
+            boundary = " AND kind = 'event'" if kind == "event" else ""
             if after is not None:
                 pivot = self._work(connection, member, after)
-                boundary = " AND (created_at, id) < (:created, :after)"
+                if kind is not None and pivot.data.kind != kind:
+                    raise WorkNotFound
+                boundary += " AND (created_at, id) < (:created, :after)"
                 params.update(created=pivot.created_at, after=pivot.id)
             rows = (
                 connection.execute(
@@ -378,6 +385,77 @@ class WorkService:
                         "title": details.title,
                         "description": details.description,
                         "due_date": details.due_date,
+                        "workspace": workspace_id,
+                        "id": work_id,
+                        "version": expected_version,
+                    },
+                )
+                .mappings()
+                .one()
+            )
+            updated = _stored(row)
+            self._audit(connection, member, updated, "details_changed")
+            return updated
+
+    def edit_event(
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        work_id: UUID,
+        *,
+        details: WorkDetails,
+        schedule: EventScheduleChange | None,
+        expected_version: int,
+    ) -> StoredWork:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id, write=True)
+            current = self._work(connection, member, work_id, write=True)
+            if not isinstance(current.data, Event):
+                raise WorkNotFound
+            if current.creator_id != member.user_id:
+                raise AccessDenied
+            if current.version != expected_version:
+                raise VersionConflict
+            if current.data.status != "scheduled":
+                raise InvalidTransition
+            starts_at = current.data.starts_at.astimezone(UTC)
+            ends_at = current.data.ends_at.astimezone(UTC)
+            time_zone = current.data.time_zone
+            previous = {
+                "title": current.data.title,
+                "description": current.data.description,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "time_zone": time_zone,
+            }
+            if schedule is not None:
+                if schedule.time_zone != time_zone and (
+                    schedule.starts_at is None or schedule.ends_at is None
+                ):
+                    raise InvalidEventSchedule("Provide both times when changing time zone")
+                starts_at = schedule.starts_at or starts_at
+                ends_at = schedule.ends_at or ends_at
+                time_zone = schedule.time_zone
+                if ends_at <= starts_at:
+                    raise InvalidEventSchedule("Event end must follow start")
+            changes = {
+                "title": details.title,
+                "description": details.description,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "time_zone": time_zone,
+            }
+            if changes == previous:
+                return current
+            row = (
+                connection.execute(
+                    text("""UPDATE work_items SET title = :title, description = :description,
+                    starts_at = :starts_at, ends_at = :ends_at, time_zone = :time_zone,
+                    version = version + 1, updated_at = now()
+                    WHERE workspace_id = :workspace AND id = :id AND version = :version
+                    RETURNING *"""),
+                    {
+                        **changes,
                         "workspace": workspace_id,
                         "id": work_id,
                         "version": expected_version,

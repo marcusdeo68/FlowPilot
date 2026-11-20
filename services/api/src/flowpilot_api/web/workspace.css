@@ -23,8 +23,9 @@ ul { padding: 0; list-style: none; }
 li { border-top: 1px solid #d8e2dd; padding: .75rem 0; overflow-wrap: anywhere; }
 li span { display: block; margin-top: .25rem; color: #456359; }
 li p { white-space: pre-wrap; }
-.task-actions, #task-editor .actions { margin-top: .65rem; }
-#task-title, #task-description { width: min(100%, 35rem); }
+.task-actions, .event-actions, #task-editor .actions, #event-editor .actions { margin-top: .65rem; }
+#task-title, #task-description, #event-title, #event-description { width: min(100%, 35rem); }
+#event-fields { padding: 0; margin: 0; border: 0; min-width: 0; }
 nav [aria-pressed="false"] { background: #fff; color: #275745; }
 #source-fields { padding: 0; margin: 0 0 .55rem; border: 0; min-width: 0; }
 #source-fields input, #source-fields textarea, #proposal-title { width: min(100%, 35rem); }

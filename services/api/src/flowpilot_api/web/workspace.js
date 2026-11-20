@@ -26,6 +26,7 @@ const todayEvents = document.querySelector("#today-events");
 const eventsStatus = document.querySelector("#today-events-status");
 const eventItems = document.querySelector("#today-event-items");
 const retryEvents = document.querySelector("#retry-today-events");
+const openEvents = document.querySelector("#open-events");
 const reviewsStatus = document.querySelector("#today-reviews-status");
 const reviewItems = document.querySelector("#today-review-items");
 const retryReviews = document.querySelector("#retry-today-reviews");
@@ -91,17 +92,39 @@ const notes = createWorkspaceNotes({
   denyWrites: clearWorkspaceWriteHint,
 });
 
+const events = createWorkspaceEvents({
+  request,
+  expired,
+  context() {
+    if (!canWriteWork() || workspaceSelectionBusy) return;
+    return { path: "workspaces/" + encodeURIComponent(select.value), csrf: session.csrf_token };
+  },
+  reload(message) { void loadWork(false, "", message); },
+  offerReload() { retryWork.hidden = false; },
+  deny(status) {
+    if (status === 403) clearWorkspaceWriteHint();
+    clearWork();
+    events.showFeedback("You no longer have permission to save this event.");
+    retryWork.hidden = false;
+  },
+  syncControls: syncWorkControls,
+});
+
 function clearWorkspaceWriteHint() {
   const option = select.selectedOptions[0];
   if (option) delete option.dataset.role;
 }
 
-async function request(path, options) {
+async function request(path, options, onValidation) {
   const response = await fetch("/api/v2/" + path, {
     credentials: "same-origin",
     cache: "no-store",
     ...options,
   });
+  if (response.status === 422 && onValidation) {
+    const error = await response.json().catch(() => null);
+    onValidation(error?.detail);
+  }
   if (!response.ok) throw response.status;
   if (response.status !== 204) return response.json();
 }
@@ -128,6 +151,7 @@ function clearWork() {
   more.disabled = false;
   newTask.hidden = true;
   taskUpdate = undefined;
+  events.clear();
   closeTaskEditor();
 }
 
@@ -213,18 +237,22 @@ function switchWorkspaceView(view) {
 }
 
 function syncWorkControls() {
-  const editorOpen = !taskEditor.hidden;
-  select.disabled = workspaceSelectionBusy || notesBusy || !select.options.length;
-  createButton.disabled = refreshWorkspaces.disabled = workspaceSelectionBusy || notesBusy;
-  nameInput.disabled = notesBusy;
+  const eventLocked = events.locked();
+  const editorOpen = !taskEditor.hidden || eventLocked;
+  select.disabled = workspaceSelectionBusy || notesBusy || eventLocked || !select.options.length;
+  createButton.disabled = refreshWorkspaces.disabled = workspaceSelectionBusy || notesBusy || eventLocked;
+  nameInput.disabled = notesBusy || eventLocked;
   notesPanel.inert = workspaceSelectionBusy;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
   const navigationLocked = workView.disabled || inboxSaving || notesBusy;
   showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
+  openEvents.disabled = navigationLocked;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
+  events.disableCreate(newTask.disabled || workspaceSelectionBusy);
+  more.inert = retryWork.inert = eventLocked;
   for (const button of items.querySelectorAll("button")) {
-    button.disabled = Boolean(taskUpdate) || editorOpen;
+    button.disabled = newTask.disabled || Boolean(button.closest(".event-actions") && events.paused());
   }
 }
 
@@ -295,12 +323,19 @@ function renderItem(item, today) {
     if (today) metadata.push(item.data.due_date < today ? "Overdue" : "Due today");
     metadata.push("Due " + item.data.due_date);
   }
+  if (item.data.kind === "event") {
+    metadata.push(item.visibility === "private" ? "Private" : "Shared with workspace");
+  }
   detail.textContent = metadata.join(" · ");
   row.append(title, detail);
-  if (item.data.kind === "task" && item.data.description) {
+  if (item.data.kind === "event") renderEventTimes(row, item.data);
+  if ((item.data.kind === "task" || item.data.kind === "event") && item.data.description) {
     const description = document.createElement("p");
     description.textContent = item.data.description;
     row.append(description);
+  }
+  if (item.data.kind === "event" && canWriteWork()) {
+    events.renderActions(row, item, item.creator_id === ownId);
   }
   if (item.data.kind === "task" && canWriteWork()) {
     const actions = document.createElement("div");
@@ -340,18 +375,21 @@ function localDate() {
   return parts.map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0")).join("-");
 }
 
-async function loadWork(append = false, savedMessage = "") {
+async function loadWork(append = false, savedMessage = "", eventMessage = "") {
   if (!append) {
     clearWork();
     taskFeedback.textContent = savedMessage;
+    events.showFeedback(eventMessage);
   }
   if (!session || !select.value) return;
   const today = workspaceView === "today" ? localDate() : undefined;
   const dueOnly = isDueView();
+  const eventsOnly = !dueOnly && workView.value === "events";
   const version = ++workVersion;
   const active = sessionVersion;
   const path = "workspaces/" + encodeURIComponent(select.value) + (dueOnly ? "/work-due" : "/work-page");
   const query = new URLSearchParams({ limit: today ? "21" : "20" });
+  if (eventsOnly) query.set("kind", "event");
   if (append && nextCursor) query.set("after", nextCursor);
   workStatus.textContent = "Loading work items…";
   more.disabled = true;
@@ -361,7 +399,8 @@ async function loadWork(append = false, savedMessage = "") {
     // The due endpoint sorts by date, so later rows cannot qualify after a future date.
     const visible = today ? page.items.filter(item => item.data.due_date <= today) : page.items;
     items.append(...visible.slice(0, 20).map(item => renderItem(item, today)));
-    newTask.hidden = !canWriteWork();
+    newTask.hidden = !canWriteWork() || eventsOnly;
+    events.showCreate(!dueOnly && canWriteWork());
     syncWorkControls();
     nextCursor = page.next_after;
     more.hidden = !nextCursor;
@@ -375,7 +414,8 @@ async function loadWork(append = false, savedMessage = "") {
         ? "Showing the 20 earliest deadlines. Switch to All work for the full list."
         : items.childElementCount ? "" : "No unfinished tasks with due dates.";
     } else {
-      workStatus.textContent = items.childElementCount ? "" : "No work items yet.";
+      workStatus.textContent = items.childElementCount ? ""
+        : eventsOnly ? "No events yet." : "No work items yet.";
     }
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
@@ -390,6 +430,7 @@ async function loadWork(append = false, savedMessage = "") {
     }
     clearWork();
     taskFeedback.textContent = savedMessage;
+    events.showFeedback(eventMessage);
     workStatus.textContent = status === 403 || status === 404
       ? "This work list is unavailable. Refresh your workspaces or retry."
       : "Could not load work items.";
@@ -449,30 +490,11 @@ async function loadTodayReviews() {
 }
 
 function renderTodayEvent({ data: event }) {
-  const options = {
-    year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    timeZoneName: "short", timeZone: event.time_zone,
-  };
-  let formatter;
-  try {
-    formatter = new Intl.DateTimeFormat(undefined, options);
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    // The API may know a time zone identifier that this browser does not.
-    formatter = new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" });
-  }
   const row = document.createElement("li");
   const title = document.createElement("strong");
   title.textContent = event.title;
   row.append(title);
-  for (const [label, value] of [["Starts ", event.starts_at], ["Ends ", event.ends_at]]) {
-    const line = document.createElement("span");
-    const timestamp = document.createElement("time");
-    timestamp.dateTime = value;
-    timestamp.textContent = formatter.format(new Date(value));
-    line.append(label, timestamp);
-    row.append(line);
-  }
+  renderEventTimes(row, event);
   return row;
 }
 
@@ -695,6 +717,11 @@ reviewInInbox.addEventListener("click", () => {
 });
 retryReviews.addEventListener("click", loadTodayReviews);
 retryEvents.addEventListener("click", loadTodayEvents);
+openEvents.addEventListener("click", () => {
+  workView.value = "events";
+  switchWorkspaceView("work");
+  showWork.focus();
+});
 workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());

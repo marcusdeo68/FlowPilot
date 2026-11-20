@@ -1,10 +1,17 @@
 # Session handoff
 
-## Latest increment — private sticky notes
+## Latest increment — manual workspace events
+
+Increment 0025 adds the signed-in event editor, event list and cancellation.
+Today links to Events under Work items. See [0025](implementation/0025-manual-workspace-events.md)
+and [STATUS](STATUS.md). The next product increment is an in-app reminders
+slice for authorized deadlines and events using synthetic data.
+
+## Previous increment — private sticky notes
 
 Increment 0024 provides native private Notes. Apply `alembic upgrade head` to
 the configured workspace database before starting the updated API. See STATUS
-for verification. Manual event entry remains the next roadmap item.
+for verification.
 
 ## Previous increment — upcoming events in Today
 

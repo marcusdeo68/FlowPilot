@@ -57,6 +57,7 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 - [x] Surface recent pending private reviews in the signed-in Today view (0022).
 - [x] Surface authorized upcoming and ongoing manual events in signed-in Today (0023).
 - [x] Create, edit, archive, and restore native private sticky notes (0024).
+- [x] Browse, create, reschedule, and cancel manual workspace events (0025).
 - Unified Inbox with source evidence and review/edit/confirm/dispute actions.
 - Tasks & Projects and a schedule view.
 - Action review UI that makes sender account, recipients, target, and content visible before approval.
