@@ -145,6 +145,8 @@ def test_edit_rolls_back_if_append_only_history_cannot_be_written(setup):
 
 
 def test_task_edit_history_prevents_lossy_downgrade(setup, pg):
+    from flowpilot_api.storage import SCHEMA_REVISION
+
     service, workspace, _, _ = setup
     engine, config = pg
     principal = Principal("test", "member")
@@ -162,7 +164,7 @@ def test_task_edit_history_prevents_lossy_downgrade(setup, pg):
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0007_task_details_audit"
+            == SCHEMA_REVISION
         )
     assert service.get_work(principal, workspace, initial.id) == updated
     assert [event["operation"] for event in service.history(principal, workspace, initial.id)] == [

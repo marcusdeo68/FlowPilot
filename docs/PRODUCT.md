@@ -11,10 +11,10 @@ turning every incoming update into an interruption.
 
 ## Intended integrations and capabilities
 
-The intended integrations are **Gmail, Google Calendar, Slack, and Google Keep**.
-These are product targets; none is connected in the current implementation.
+The intended integrations are **Gmail, Google Calendar, and Slack**. FlowPilot
+provides native private Notes for quick capture.
 
-- Bring permitted email, messages, calendar events, and notes into a centralized
+- Bring permitted email, messages, and calendar events into a centralized
   workspace with their source context and privacy intact.
 - Organize tasks and commitments by priority, deadline, and project, with a focused
   Today view so users can decide what needs attention next.
@@ -22,15 +22,12 @@ These are product targets; none is connected in the current implementation.
   items. Include control over timing, snoozing and dismissal; group related
   updates and avoid repeated alerts for the same item. Browser/OS delivery and
   closed-app behavior require a later design and implementation.
-- Compose and send Gmail email and Slack messages, and create new Google Keep
-  text or list notes from the hub, where supported. Each provider write requires review
-  and explicit approval of the exact account, destination and content.
+- Write quick private notes in the workspace and archive them when finished.
+- Compose and send Gmail email and Slack messages from the hub. Each provider
+  write requires review and explicit approval of the exact account, destination,
+  and content.
 
-Google Keep remains an intended integration with an account-access feasibility
-gate: its documented API targets enterprise administration. Validate the intended
-account model before promising personal-account access; see the
-[security notes](SECURITY.md#provider-specific-review-notes). Additional providers
-may follow, but these four define the current product direction.
+Future imports from other note apps require their own access and privacy review.
 
 The unifying idea is not to mirror every source application or automate a user's desktop windows. FlowPilot creates a trustworthy, cross-app view of work while keeping each provider's permissions and source context visible.
 

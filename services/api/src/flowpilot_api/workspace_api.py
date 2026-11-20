@@ -41,6 +41,8 @@ from flowpilot_api.membership_service import (
     WorkspaceCreate,
     WorkspaceInfo,
 )
+from flowpilot_api.notes import NoteNotFound, NotesService
+from flowpilot_api.notes_routes import notes_routes
 from flowpilot_api.proposal_routes import proposal_routes
 from flowpilot_api.proposals import ProposalNotFound, ProposalService, ReviewConflict
 from flowpilot_api.repository import InvalidTransition, VersionConflict
@@ -196,6 +198,7 @@ def create_workspace_app(
         (AccessDenied, 403, "Workspace capability denied"),
         (WorkNotFound, 404, "Work item not found"),
         (SourceNotFound, 404, "Source item not found"),
+        (NoteNotFound, 404, "Note not found"),
         (VersionConflict, 409, "Work changed; reload its current version"),
         (InvalidTransition, 409, "Invalid work transition"),
         (IntegrityError, 409, "Conflicting or invalid record"),
@@ -442,6 +445,7 @@ def create_workspace_app(
         return service.history(user.principal, workspace_id, work_id)
 
     app.include_router(proposal_routes(ProposalService(engine), read_identity, write_identity))
+    app.include_router(notes_routes(NotesService(engine), read_identity, write_identity))
     if browser is not None:
         app.include_router(browser.routes(bearer_identity))
         app.include_router(workspace_ui(browser, login_enabled=login_config is not None))

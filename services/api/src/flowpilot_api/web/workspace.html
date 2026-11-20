@@ -6,6 +6,7 @@
   <title>Workspaces · FlowPilot</title>
   <link rel="stylesheet" href="/api/v2/workspace.css">
   <script src="/api/v2/workspace-inbox.js" defer></script>
+  <script src="/api/v2/workspace-notes.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -42,6 +43,7 @@
         <button id="show-today" type="button" aria-pressed="false" disabled>Today</button>
         <button id="show-work" type="button" aria-pressed="true" disabled>Work items</button>
         <button id="show-inbox" type="button" aria-pressed="false" disabled>Private inbox</button>
+        <button id="show-notes" type="button" aria-pressed="false" disabled>Notes</button>
       </nav>
       <section id="work-panel" aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
@@ -86,6 +88,33 @@
             <button id="review-in-inbox" type="button" disabled>Open private inbox</button>
           </div>
         </section>
+      </section>
+      <section id="notes-panel" aria-labelledby="notes-heading" hidden>
+        <h2 id="notes-heading">Notes</h2>
+        <p>Only you can see your notes in this workspace.</p>
+        <label for="notes-view">Note view</label>
+        <div class="actions">
+          <select id="notes-view">
+            <option value="active">Active notes</option>
+            <option value="archived">Archived notes</option>
+          </select>
+          <button id="new-note" type="button" hidden>New note</button>
+          <button id="refresh-notes" type="button">Refresh notes</button>
+        </div>
+        <form id="note-editor" aria-labelledby="note-editor-heading" hidden>
+          <h3 id="note-editor-heading">New note</h3>
+          <label for="note-body">Note text</label>
+          <textarea id="note-body" rows="5" required aria-describedby="note-limit"></textarea>
+          <p id="note-limit">Up to 2,000 characters.</p>
+          <div class="actions">
+            <button id="save-note" type="submit">Save note</button>
+            <button id="close-note-editor" type="button">Close note editor</button>
+          </div>
+        </form>
+        <p id="notes-feedback" role="status"></p>
+        <p id="notes-status" role="status"></p>
+        <ul id="notes-items" aria-label="Private notes"></ul>
+        <button id="more-notes" type="button" hidden>Load more notes</button>
       </section>
       <section id="inbox-panel" aria-labelledby="inbox-heading" hidden>
         <h2 id="inbox-heading">Private inbox</h2>

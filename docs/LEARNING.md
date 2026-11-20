@@ -194,3 +194,10 @@ Read [0023](implementation/0023-today-upcoming-events.md). Compare 9 a.m. Easter
 and 8 a.m. Central on the same day. Explain why the database orders event
 instants using offset-bearing timestamps, and why it uses the record ID to break
 a tie before limiting the results.
+
+## Private notes exercise
+
+Read [0024](implementation/0024-private-sticky-notes.md). Open a synthetic note
+in two tabs, then save two different edits. Explain why the second save needs
+the current version and why the audit event and successful edit belong in the
+same transaction.

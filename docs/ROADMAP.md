@@ -2,7 +2,8 @@
 
 The product direction is a unified cross-app work coordination hub. The first proof remains narrow: reliably turn source changes into reviewed tasks/commitments/events, then prepare a useful follow-up. Stages are dependencies, not delivery promises.
 
-Gmail, Google Calendar, Slack, and Google Keep are the intended integration set.
+Gmail, Google Calendar, and Slack are the intended integration set. FlowPilot
+provides native private Notes for quick capture.
 The product must centralize communication and task organization while reducing
 overwhelm. Each integration still needs its own API, scope, privacy and account
 support review; naming the targets does not select the first pilot or connect them.
@@ -55,6 +56,7 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 - [x] Signed-in Today view for due-today and overdue tasks (0021).
 - [x] Surface recent pending private reviews in the signed-in Today view (0022).
 - [x] Surface authorized upcoming and ongoing manual events in signed-in Today (0023).
+- [x] Create, edit, archive, and restore native private sticky notes (0024).
 - Unified Inbox with source evidence and review/edit/confirm/dispute actions.
 - Tasks & Projects and a schedule view.
 - Action review UI that makes sender account, recipients, target, and content visible before approval.
@@ -88,9 +90,8 @@ Gmail is a product-relevant candidate, but the official Gmail API classifies ful
 ## Stage 5 — Human-approved actions
 
 - Create editable professional email drafts with exact sender, recipient, subject, body, and attachment preview.
-- Prepare Slack messages with the exact sending account, channel/conversation and
-  content, and Google Keep note/list creation where the account/API supports it.
-  Both follow the same explicit version-bound approval and execution safeguards.
+- Prepare Slack messages with the exact sending account, channel or conversation,
+  and content. Apply explicit version-bound approval and execution safeguards.
 - Start with saving drafts where supported; sending is a separate capability and permission grant.
 - Approval binds an authorized user to the exact action payload, account, target, version, and expiry.
 - Editing after approval invalidates it; execution re-checks authorization and uses an idempotency key.
@@ -105,7 +106,6 @@ Gmail `gmail.send` is sensitive, while `gmail.compose` is a restricted scope; th
   before implementation. Calendar writes require the Stage 5 approval workflow.
 - Slack: scope only the channels/conversations a user or app is permitted to access; keep per-provider app permissions explicit ([Slack permission scopes](https://api.slack.com/scopes)).
 - Microsoft Teams: review delegated vs application permissions and admin consent requirements for the target chat/channel features ([Microsoft Graph permissions](https://learn.microsoft.com/graph/permissions-reference?view=graph-rest-1.0)).
-- Google Keep: do not assume personal-account note sync is available. Google's published Keep API is oriented toward enterprise administration and domain authorization; validate the intended account model before committing this connector ([Google Keep API overview](https://developers.google.com/workspace/keep/api/guides)).
 - Consider Drive, Google Docs, Notion, or other additional sources only when a pilot demonstrates a clear workflow and their access model passes the same review.
 
 ## Stage 7 — Pilot and reliability

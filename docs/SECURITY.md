@@ -95,11 +95,17 @@ Sending email or messages, changing events, and editing provider data are extern
 
 For email, show sender account, recipients, subject, body, and attachments in a clear review step. A convenient send button is appropriate after the user sees and approves those details; do not silently send generated text.
 
-The intended Slack messaging flow must likewise show the sending account, exact
-channel/conversation and content. Creating a new Google Keep text or list note is
-also a provider write: show the target account, note title and exact text/list contents.
-These use the same version, expiry, permission recheck, idempotency and result
-verification rules above; a reminder or model suggestion cannot authorize them.
+The intended Slack messaging flow must show the sending account, exact channel
+or conversation, and content. It uses the same version, expiry, permission
+recheck, idempotency, and result verification rules.
+
+## Private native notes
+
+Notes use server-enforced author and workspace scoping. A workspace owner has
+access to their own notes. Archiving retains the text. Each mutation records its
+actor, operation, time, and version without copying the note body into audit.
+Use synthetic content on loopback while deletion, retention, and production
+database access controls are pending. See [0024](implementation/0024-private-sticky-notes.md).
 
 ## Planned reminder privacy
 
@@ -115,4 +121,4 @@ overload. No reminder scheduler or popup delivery is implemented yet.
 - Gmail read scopes for message bodies are restricted. Google states that storing or transmitting restricted-scope data on servers requires a security assessment; verify current OAuth verification and policy obligations before a live integration ([scope reference](https://developers.google.com/workspace/gmail/api/auth/scopes), [Workspace user data policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy)).
 - Slack permissions are scope-based and can grant access to conversation content or message posting. Request only the scopes required for an explicitly selected workflow ([Slack scopes](https://api.slack.com/scopes)).
 - Microsoft Graph has delegated and application Teams message permissions with materially different reach; broad application permissions may require administrator consent ([permissions reference](https://learn.microsoft.com/graph/permissions-reference?view=graph-rest-1.0)).
-- Google's Keep API is described for enterprise administration and supports domain authorization paths. Validate that it supports the intended personal-account workflow before promising a Keep connector ([Keep API overview](https://developers.google.com/workspace/keep/api/guides)).
+- Future note imports require their own review of account support, authorization scopes, and retention before a connector is added.

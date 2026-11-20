@@ -882,6 +882,162 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     expect(page.get_by_role("listitem")).to_have_count(21)
 
 
+def test_workspace_browser_creates_edits_and_archives_private_notes(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Private notes workspace")
+    path = f"/api/v2/workspaces/{workspace}/notes"
+    notes = page.get_by_role("button", name="Notes", exact=True)
+    notes.click()
+    page.get_by_role("button", name="New note", exact=True).click()
+    body = page.get_by_label("Note text", exact=True)
+    save = page.get_by_role("button", name="Save note", exact=True)
+    value = "<strong>Workshop ideas</strong>\nBring the agenda 🙂"
+    body.fill(value)
+    expect(page.get_by_role("button", name="Work items", exact=True)).to_be_disabled()
+    selector = page.get_by_label("Workspace", exact=True)
+    refresh_workspaces = page.get_by_role("button", name="Refresh workspaces", exact=True)
+    create_workspace = page.get_by_role("button", name="Create workspace", exact=True)
+    for control in (selector, refresh_workspaces, create_workspace):
+        expect(control).to_be_disabled()
+    with page.expect_response(origin + path) as created:
+        save.click()
+    assert created.value.status == 201 and created.value.json()["body"] == value
+    note_id = created.value.json()["id"]
+    cards = page.get_by_role("list", name="Private notes", exact=True)
+    expect(cards.get_by_text("<strong>Workshop ideas</strong>", exact=False)).to_be_visible()
+    expect(cards.locator("strong")).to_have_count(0)
+    for control in (selector, refresh_workspaces, create_workspace):
+        expect(control).to_be_enabled()
+
+    ordinary = {"Content-Type": "application/json"}
+    edit_url = path + "/" + note_id
+    denied = fetch(
+        page,
+        edit_url,
+        method="PATCH",
+        headers=ordinary,
+        body=json.dumps({"expected_version": 1, "body": "Invalid CSRF"}),
+    )
+    assert denied["status"] == 403
+    page.get_by_role("button", name="Edit note", exact=True).click()
+    expect(body).to_have_value(value)
+    body.fill("Keep this draft visible")
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    saved_elsewhere = fetch(
+        page,
+        edit_url,
+        method="PATCH",
+        headers={**ordinary, "X-CSRF-Token": csrf},
+        body=json.dumps({"expected_version": 1, "body": "Saved in another tab"}),
+    )
+    assert saved_elsewhere["status"] == 200
+    with page.expect_response(origin + edit_url) as stale:
+        save.click()
+    assert stale.value.status == 409
+    expect(page.get_by_text("This note changed.", exact=False)).to_be_visible()
+    expect(body).to_have_value("Keep this draft visible")
+    expect(save).to_be_disabled()
+    page.get_by_role("button", name="Close note editor", exact=True).click()
+    page.get_by_role("button", name="Refresh notes", exact=True).click()
+    expect(cards.get_by_text("Saved in another tab", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Edit note", exact=True).click()
+    body.fill("Final workshop note")
+    save.click()
+    expect(cards.get_by_text("Final workshop note", exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Archive note", exact=True).click()
+    expect(page.get_by_text("No notes yet.", exact=True)).to_be_visible()
+    view = page.get_by_label("Note view", exact=True)
+    view.select_option("archived")
+    expect(cards.get_by_text("Final workshop note", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Edit note", exact=True)).to_have_count(0)
+    page.get_by_role("button", name="Restore note", exact=True).click()
+    expect(page.get_by_text("No archived notes.", exact=True)).to_be_visible()
+
+    view.select_option("active")
+    page.get_by_role("button", name="New note", exact=True).click()
+    uncertain = "Saved despite a dropped response"
+    body.fill(uncertain)
+
+    def lose_create_response(route: Route) -> None:
+        persisted = route.fetch()
+        assert persisted.status == 201
+        route.fulfill(status=503)
+
+    page.route(origin + path, lose_create_response, times=1)
+    save.click()
+    expect(page.get_by_text("Could not confirm the save.", exact=False)).to_be_visible()
+    expect(body).to_have_value(uncertain)
+    expect(save).to_be_disabled()
+    page.get_by_role("button", name="Close note editor", exact=True).click()
+    page.get_by_role("button", name="Refresh notes", exact=True).click()
+    expect(cards.get_by_text(uncertain, exact=True)).to_have_count(1)
+
+    context.clear_cookies()
+    page.goto(origin + "/api/v2/test-login-browser")
+    bearer = sign("new-browser-user", scope="flowpilot:read")
+    auth = fetch(
+        page, "/api/v2/session", method="POST", headers={"Authorization": f"Bearer {bearer}"}
+    )
+    assert auth["status"] == 201
+    page.goto(origin + "/api/v2/workspace")
+    notes.click()
+    expect(cards.get_by_text("Final workshop note", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="New note", exact=True)).to_be_hidden()
+    expect(cards.get_by_role("button")).to_have_count(0)
+
+
+def test_workspace_browser_discards_a_late_private_note_page(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First notes workspace")
+    path = f"/api/v2/workspaces/{first}/notes"
+    note = "Private note from the first workspace"
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    saved = fetch(
+        page,
+        path,
+        method="POST",
+        headers={"Content-Type": "application/json", "X-CSRF-Token": csrf},
+        body=json.dumps({"body": note}),
+    )
+    assert saved["status"] == 201
+
+    page.evaluate(
+        """path => {
+            const actualFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await actualFetch(url, options);
+                if (!url.startsWith(path + '?')) return response;
+                await new Promise(resolve => { window.releaseOldNotes = resolve; });
+                const json = response.json.bind(response);
+                response.json = async () => {
+                    const value = await json();
+                    setTimeout(() => { window.oldNotesParsed = true; }, 0);
+                    return value;
+                };
+                return response;
+            };
+        }""",
+        path,
+    )
+    page.get_by_role("button", name="Notes", exact=True).click()
+    page.wait_for_function("() => typeof window.releaseOldNotes === 'function'")
+    second = create_workspace_in_browser(page, origin, "Second notes workspace")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    empty = page.get_by_text("No notes yet.", exact=True)
+    expect(empty).to_be_visible()
+    page.evaluate("() => window.releaseOldNotes()")
+    page.wait_for_function("() => window.oldNotesParsed === true")
+    expect(empty).to_be_visible()
+    expect(page.get_by_text(note, exact=True)).to_have_count(0)
+
+
 def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_change(login_browser):
     from playwright.sync_api import expect
 

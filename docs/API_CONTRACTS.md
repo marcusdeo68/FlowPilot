@@ -193,6 +193,27 @@ the query starts and start before its 168-hour cutoff, including ongoing events.
 The limit accepts 1–100. Sort is start time, then ID, ascending. See
 [increment 0023](implementation/0023-today-upcoming-events.md).
 
+### Private notes
+
+Paths below are relative to `/api/v2/workspaces/{workspace_id}/notes`.
+Notes belong to the verified caller inside the selected workspace. Cookie
+writes require the usual CSRF token and all writes require write scope plus
+an active owner or member role. Reads require read scope and active membership.
+
+| Method and path | Contract |
+| --- | --- |
+| `GET /` | `archived=false`, `limit=25` (1–100), and optional UUID `after`. Returns `{items, next_after}` in descending creation time and ID. |
+| `POST /` | `{"body":"Plain text"}`. Returns 201 with note version 1. |
+| `PATCH /{id}` | `{"body":"New text","expected_version":1}`. Edits an active note. |
+| `POST /{id}/state` | `{"archived":true,"expected_version":2}`. Use false to restore. |
+
+Notes return `id`, `body`, `archived`, `version`, `created_at`, and `updated_at`.
+The body supports 1–2,000 characters with meaningful text. A foreign or missing
+ID or cursor returns 404. A stale version or an edit to an archived note returns
+409. Repeating a current value leaves the version and audit history intact.
+Validation errors use `{"detail":"Invalid note request"}` and omit the submitted
+body. See [increment 0024](implementation/0024-private-sticky-notes.md).
+
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
 for source-to-proposal creation, listing, correction, and review contracts.
 

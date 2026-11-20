@@ -136,3 +136,7 @@ Task status controls and the Due tasks view are described in
 Open **Private inbox** in the signed-in workspace to capture a synthetic source
 and review it into a private task. See
 [increment 0020](docs/implementation/0020-signed-in-private-inbox.md).
+
+Open **Notes** in the signed-in workspace to create private sticky notes. Apply
+`alembic upgrade head` before starting this version of the workspace API. See
+[increment 0024](docs/implementation/0024-private-sticky-notes.md).
