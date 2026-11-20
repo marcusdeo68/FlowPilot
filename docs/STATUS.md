@@ -6,8 +6,14 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0027 adds [reminder settings](implementation/0027-reminder-settings.md)
+  for category, event lead time and future snooze duration in the signed-in tab.
+  Independent verification passed 294 tests with no skips, including 103
+  PostgreSQL-only and 43 Chromium tests. All local quality checks passed.
 - Increment 0026 adds [opt-in in-app reminders](implementation/0026-in-app-reminders.md)
-  for due-today tasks and imminent events. Preferences, snooze and dismissals
+  for due-today tasks and imminent events. It merged in [PR #33](https://github.com/marcusdeo68/FlowPilot/pull/33)
+  as `65526b4` after all six [candidate checks](https://github.com/marcusdeo68/FlowPilot/actions/runs/44786936394) passed.
+  Preferences, snooze and dismissals
   are scoped to the workspace and signed-in tab. Independent verification passed
   292 tests with no skips, including 103 PostgreSQL-only and 41 Chromium tests.
   Lint, formatting, build, pinned Pyright, JavaScript syntax and documentation links passed.

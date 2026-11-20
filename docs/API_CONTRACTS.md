@@ -223,13 +223,17 @@ for a different work kind returns 404. See
 `GET /api/v2/workspaces/{workspace_id}/reminders?local_date=2030-09-30` returns
 `{tasks, events, has_more}`. `local_date` is the viewer's local calendar date in
 YYYY-MM-DD format. Unfinished tasks must match that date. Scheduled events must
-start after the database statement time and within the following 15 minutes.
+start after the database statement time and within the selected event window.
+The optional `category` is `tasks`, `events`, or `both` (default).
+The optional integer `event_lead_minutes` ranges from 5 to 60 and defaults to 15.
+An excluded category returns an empty list and does not contribute to `has_more`.
 Each list returns up to five authorized items with their ID, title, and relevant
 date or start instant. The server filters by active membership and visibility
 before applying each limit. Cookie clients send the current session's
 `X-CSRF-Token` as a tab-to-session binding. A missing or stale binding returns
 401. Bearer clients use the usual read scope. See
-[increment 0026](implementation/0026-in-app-reminders.md).
+[increment 0026](implementation/0026-in-app-reminders.md) and
+[increment 0027](implementation/0027-reminder-settings.md).
 
 ### Private notes
 

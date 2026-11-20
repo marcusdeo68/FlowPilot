@@ -4,11 +4,16 @@ function createWorkspaceReminders({ request, expired, localDate }) {
   const toggle = document.querySelector("#toggle-reminders");
   const status = document.querySelector("#reminders-status");
   const popup = document.querySelector("#reminder-popup");
+  const settings = document.querySelector("#reminder-settings");
+  const category = document.querySelector("#reminder-category");
+  const lead = document.querySelector("#reminder-lead");
+  const duration = document.querySelector("#reminder-snooze");
   const list = document.querySelector("#reminder-items");
   const overflow = document.querySelector("#reminder-overflow");
   const snooze = document.querySelector("#snooze-reminders");
   const dismiss = document.querySelector("#dismiss-reminders");
   const workspaces = new Map();
+  const defaults = { category: "both", lead: "15", duration: "5" };
   let workspace;
   let session;
   let state;
@@ -96,9 +101,15 @@ function createWorkspaceReminders({ request, expired, localDate }) {
     }, Math.max(1, Math.min(...cutoffs) - now.getTime()));
   }
 
-  function syncToggle() {
-    toggle.hidden = !workspace;
+  function syncSettings() {
+    const preferences = state?.preferences ?? defaults;
+    toggle.hidden = settings.hidden = !workspace;
     toggle.setAttribute("aria-pressed", String(Boolean(state?.enabled)));
+    category.value = preferences.category;
+    lead.value = preferences.lead;
+    lead.disabled = preferences.category === "tasks";
+    duration.value = preferences.duration;
+    snooze.textContent = `Snooze ${preferences.duration} minutes`;
   }
 
   async function poll() {
@@ -112,10 +123,16 @@ function createWorkspaceReminders({ request, expired, localDate }) {
     pending = controller;
     const timeout = setTimeout(() => controller.abort(), 20_000);
     const day = localDate();
+    const preferences = state.preferences;
+    const query = new URLSearchParams({ local_date: day });
+    if (preferences.category !== defaults.category) query.set("category", preferences.category);
+    if (preferences.category !== "tasks" && preferences.lead !== defaults.lead) {
+      query.set("event_lead_minutes", preferences.lead);
+    }
     let delay = 30_000;
     try {
       const page = await request("workspaces/" + encodeURIComponent(workspace)
-        + "/reminders?local_date=" + encodeURIComponent(day), {
+        + "/reminders?" + query, {
         headers: { "X-CSRF-Token": session.csrf_token }, signal: controller.signal,
       });
       if (version !== generation || document.hidden) return;
@@ -135,7 +152,7 @@ function createWorkspaceReminders({ request, expired, localDate }) {
       clearPopup();
       if (failure === 403 || failure === 404) {
         state.enabled = false;
-        syncToggle();
+        syncSettings();
         status.textContent = "Reminders are unavailable for this workspace.";
       } else {
         status.textContent = "Reminders could not refresh. Retrying shortly.";
@@ -155,29 +172,47 @@ function createWorkspaceReminders({ request, expired, localDate }) {
     workspace = id;
     session = currentSession;
     state = workspaces.get(id);
-    syncToggle();
+    settings.open = false;
+    syncSettings();
     status.textContent = "";
     void poll();
   }
 
-  toggle.addEventListener("click", () => {
-    if (!workspace) return;
+  function ensureState() {
     if (!state) {
-      state = { enabled: false, dismissed: new Set(), snoozed: new Map() };
+      state = { enabled: false, preferences: { ...defaults }, dismissed: new Set(), snoozed: new Map() };
       workspaces.set(workspace, state);
     }
+  }
+
+  toggle.addEventListener("click", () => {
+    if (!workspace) return;
+    ensureState();
     state.enabled = !state.enabled;
-    syncToggle();
+    syncSettings();
     status.textContent = state.enabled ? "Checking for reminders…" : "Reminders off.";
     if (state.enabled) void poll();
     else stop();
   });
 
+  settings.addEventListener("change", () => {
+    if (!workspace) return;
+    ensureState();
+    const previous = state.preferences;
+    state.preferences = { category: category.value, lead: lead.value, duration: duration.value };
+    syncSettings();
+    if (previous.category === category.value && previous.lead === lead.value) return;
+    stop();
+    status.textContent = state.enabled ? "Checking for reminders…" : "";
+    void poll();
+  });
+
   snooze.addEventListener("click", () => {
-    const until = Date.now() + 5 * 60_000;
+    const minutes = state.preferences.duration;
+    const until = Date.now() + Number(minutes) * 60_000;
     for (const { key } of shown) state.snoozed.set(key, until);
     clearPopup();
-    status.textContent = "Reminders snoozed for 5 minutes.";
+    status.textContent = `Reminders snoozed for ${minutes} minutes.`;
     toggle.focus();
   });
 
