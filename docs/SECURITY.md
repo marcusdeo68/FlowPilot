@@ -116,14 +116,18 @@ active writers to cancel events visible to them, including shared events.
 Cookie writes require CSRF. Changes and metadata-only audit events commit together.
 See [0025](implementation/0025-manual-workspace-events.md).
 
-## Planned reminder privacy
+## Reminder privacy
 
 Popup reminders must respect the viewer's source/work visibility. Permission to
 see a deadline in FlowPilot does not justify exposing private email or note text
 in a lock-screen notification. Review notification permissions and preview content,
 plus browser/OS delivery and closed-app behavior, before implementation. Timing,
 snoozing, dismissal and duplicate-alert suppression should reduce interruption
-overload. No reminder scheduler or popup delivery is implemented yet.
+overload. Increment 0026 displays reminders only on a visible signed-in
+workspace page after opt-in. It requests visible item IDs, titles, and timing,
+and keeps snooze and dismissal keys in tab memory. Cookie reminder reads require
+the tab's existing session token to prevent a replacement cookie in another tab
+from authorizing the old page. See [0026](implementation/0026-in-app-reminders.md).
 
 ## Provider-specific review notes
 

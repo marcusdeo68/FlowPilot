@@ -218,6 +218,19 @@ This filter uses the same creation order and pagination contract. An `after` ID
 for a different work kind returns 404. See
 [increment 0025](implementation/0025-manual-workspace-events.md).
 
+### In-app reminder candidates
+
+`GET /api/v2/workspaces/{workspace_id}/reminders?local_date=2030-09-30` returns
+`{tasks, events, has_more}`. `local_date` is the viewer's local calendar date in
+YYYY-MM-DD format. Unfinished tasks must match that date. Scheduled events must
+start after the database statement time and within the following 15 minutes.
+Each list returns up to five authorized items with their ID, title, and relevant
+date or start instant. The server filters by active membership and visibility
+before applying each limit. Cookie clients send the current session's
+`X-CSRF-Token` as a tab-to-session binding. A missing or stale binding returns
+401. Bearer clients use the usual read scope. See
+[increment 0026](implementation/0026-in-app-reminders.md).
+
 ### Private notes
 
 Paths below are relative to `/api/v2/workspaces/{workspace_id}/notes`.

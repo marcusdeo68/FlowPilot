@@ -5,7 +5,7 @@ No request is permitted to assert its own issuer/subject or role.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -94,6 +94,27 @@ class DueTasks:
 @dataclass(frozen=True)
 class UpcomingEvents:
     items: list[StoredWork]
+    has_more: bool
+
+
+@dataclass(frozen=True)
+class TaskReminder:
+    id: UUID
+    title: str
+    due_date: date
+
+
+@dataclass(frozen=True)
+class EventReminder:
+    id: UUID
+    title: str
+    starts_at: datetime
+
+
+@dataclass(frozen=True)
+class ReminderCandidates:
+    tasks: list[TaskReminder]
+    events: list[EventReminder]
     has_more: bool
 
 
@@ -350,6 +371,40 @@ class WorkService:
                 .all()
             )
             return UpcomingEvents([_stored(row) for row in rows[:limit]], len(rows) > limit)
+
+    def reminder_candidates(
+        self, principal: Principal, workspace_id: UUID, *, local_date: date
+    ) -> ReminderCandidates:
+        limit = 5
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
+            tasks = connection.execute(
+                text("""SELECT id, title, due_date FROM work_items
+                    WHERE workspace_id = :workspace AND (visibility = 'workspace' OR creator_id = :user)
+                    AND kind = 'task' AND status IN :unfinished AND due_date = :local_date
+                    ORDER BY created_at, id LIMIT :limit""").bindparams(
+                    bindparam("unfinished", expanding=True)
+                ),
+                {**params, "local_date": local_date, "unfinished": tuple(TASK_TRANSITIONS)},
+            ).all()
+            events = connection.execute(
+                text("""SELECT id, title, starts_at FROM work_items
+                    WHERE workspace_id = :workspace AND (visibility = 'workspace' OR creator_id = :user)
+                    AND kind = 'event' AND status = 'scheduled'
+                    AND starts_at > statement_timestamp()
+                    AND starts_at <= statement_timestamp() + INTERVAL '15 minutes'
+                    ORDER BY starts_at, id LIMIT :limit"""),
+                params,
+            ).all()
+            return ReminderCandidates(
+                [TaskReminder(row.id, row.title, row.due_date) for row in tasks[:limit]],
+                [
+                    EventReminder(row.id, row.title, row.starts_at.astimezone(UTC))
+                    for row in events[:limit]
+                ],
+                len(tasks) > limit or len(events) > limit,
+            )
 
     def edit_task(
         self,

@@ -2,7 +2,7 @@
 
 import os
 from contextlib import asynccontextmanager
-from datetime import UTC
+from datetime import UTC, date
 from typing import Annotated, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -63,6 +63,7 @@ from flowpilot_api.work import (
 from flowpilot_api.work_service import (
     DueTasks,
     ManualSource,
+    ReminderCandidates,
     SourceNotFound,
     StoredWork,
     UpcomingEvents,
@@ -358,6 +359,26 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 5,
     ):
         return service.list_upcoming_events(user.principal, workspace_id, limit=limit)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/reminders", response_model=ReminderCandidates)
+    def reminders(
+        workspace_id: UUID,
+        request: Request,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        local_date: Annotated[str, Query(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")],
+    ):
+        credential = session_cookie(request)
+        if credential is not None and browser is not None:
+            try:
+                # Another tab may have replaced this tab's HttpOnly session cookie.
+                browser.check_csrf(request, credential)
+            except HTTPException as exc:
+                raise InvalidSession from exc
+        try:
+            day = date.fromisoformat(local_date)
+        except ValueError as exc:
+            raise HTTPException(422, "Use a valid local calendar date") from exc
+        return service.reminder_candidates(user.principal, workspace_id, local_date=day)
 
     @app.post(
         "/api/v2/workspaces/{workspace_id}/work-events", response_model=StoredWork, status_code=201
