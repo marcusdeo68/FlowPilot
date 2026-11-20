@@ -38,3 +38,5 @@ nav [aria-pressed="false"] { background: #fff; color: #275745; }
 #notes-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
 #notes-items li { margin: 0; padding: .9rem; border: 1px solid #d8c886; border-radius: .45rem; background: #fff8d8; }
 #notes-items p { margin: 0 0 .75rem; }
+#reminder-popup { margin: 1rem 0; padding: 1rem; border: 1px solid #60796d; border-radius: .55rem; background: #eaf4ef; }
+#reminder-popup h2, #reminder-items { margin-top: 0; }

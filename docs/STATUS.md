@@ -6,9 +6,15 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0026 adds [opt-in in-app reminders](implementation/0026-in-app-reminders.md)
+  for due-today tasks and imminent events. Preferences, snooze and dismissals
+  are scoped to the workspace and signed-in tab. Independent verification passed
+  292 tests with no skips, including 103 PostgreSQL-only and 41 Chromium tests.
+  Lint, formatting, build, pinned Pyright, JavaScript syntax and documentation links passed.
 - Increment 0025 adds [manual workspace events](implementation/0025-manual-workspace-events.md).
-  Events can be created, browsed, rescheduled and canceled in the signed-in workspace.
-  The existing work schema supports the increment. In-app reminders are next.
+  It merged in [PR #32](https://github.com/marcusdeo68/FlowPilot/pull/32) as `c7c0dcc`.
+  Independent verification passed 287 tests, including 101 PostgreSQL-only and
+  38 Chromium tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44725777822) passed.
 - Increment 0024 adds [private sticky notes](implementation/0024-private-sticky-notes.md).
   Apply migration `0008_private_notes` before using the updated workspace API.
   Merged in [PR #31](https://github.com/marcusdeo68/FlowPilot/pull/31) as `f37cc67`.
@@ -184,6 +190,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-035 | Clear expired reminders while a poll is pending. | Audit found that a network delay could leave an already-started event or previous-day task visible. Chromium holds a request across both cutoffs and checks that the popup clears each expired title. |
 | FP-034 | Compare retained event instants in UTC. | With PostgreSQL set to America/New_York, an event crossing the fall clock change appeared to end before it started. The integration regression uses a non-UTC session, preserves the valid interval and checks that a repeated edit stays a no-op. |
 | FP-033 | Preserve untouched event instants when rescheduling. | Audit reproduced a one-hour change to the start when the browser and server disagreed about Havana's offset and the user moved only the end. The Chromium regression simulates offset disagreement and checks the original start survives. |
 | FP-032 | Publish the actual local timestamp format in OpenAPI. | The first event candidate advertised RFC 3339 date-time fields that commonly include an offset. The PostgreSQL-backed HTTP test checks the generated pattern accepts the local payload and rejects an offset. |

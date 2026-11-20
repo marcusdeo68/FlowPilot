@@ -54,6 +54,10 @@ def workspace_ui(browser: BrowserAuth, *, login_enabled: bool) -> APIRouter:
     def events_script():
         return FileResponse(ASSETS / "workspace-events.js", media_type="text/javascript")
 
+    @router.get(WORKSPACE_URL + "-reminders.js", include_in_schema=False)
+    def reminders_script():
+        return FileResponse(ASSETS / "workspace-reminders.js", media_type="text/javascript")
+
     @router.get(WORKSPACE_URL + ".css", include_in_schema=False)
     def styles():
         return FileResponse(ASSETS / "workspace.css", media_type="text/css")

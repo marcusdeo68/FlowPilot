@@ -8,6 +8,7 @@
   <script src="/api/v2/workspace-inbox.js" defer></script>
   <script src="/api/v2/workspace-notes.js" defer></script>
   <script src="/api/v2/workspace-events.js" defer></script>
+  <script src="/api/v2/workspace-reminders.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -46,6 +47,19 @@
         <button id="show-inbox" type="button" aria-pressed="false" disabled>Private inbox</button>
         <button id="show-notes" type="button" aria-pressed="false" disabled>Notes</button>
       </nav>
+      <div class="actions">
+        <button id="toggle-reminders" type="button" aria-pressed="false" hidden>In-app reminders</button>
+        <p id="reminders-status" role="status"></p>
+      </div>
+      <aside id="reminder-popup" aria-labelledby="reminder-heading" hidden>
+        <h2 id="reminder-heading">Reminders</h2>
+        <ul id="reminder-items" aria-live="polite"></ul>
+        <p id="reminder-overflow" hidden>More matching items are available in Work items.</p>
+        <div class="actions">
+          <button id="snooze-reminders" type="button">Snooze 5 minutes</button>
+          <button id="dismiss-reminders" type="button">Dismiss reminders</button>
+        </div>
+      </aside>
       <section id="work-panel" aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
         <label id="work-view-label" for="work-view">Work view</label>

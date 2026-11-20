@@ -1195,6 +1195,219 @@ def test_workspace_browser_preserves_an_event_draft_after_stale_save(login_brows
     expect(page.get_by_text("My stale draft", exact=True)).to_have_count(0)
 
 
+def test_in_app_reminders_retry_group_snooze_and_dismiss(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    page.clock.install(time=datetime.now(UTC) - timedelta(minutes=2))
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Reminder workshop")
+    day = page.evaluate("() => localDate()")
+    seed_browser_work(page, workspace, ["<b>Due agenda</b>"], due_date=day)
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    headers = {"Content-Type": "application/json", "X-CSRF-Token": csrf}
+    base = f"/api/v2/workspaces/{workspace}"
+    starts_at = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=10)
+    event = fetch(
+        page,
+        base + "/work",
+        method="POST",
+        headers=headers,
+        body=json.dumps(
+            {
+                "item": {
+                    "kind": "event",
+                    "title": "Team rehearsal",
+                    "time_zone": "UTC",
+                    "starts_at": starts_at.isoformat(),
+                    "ends_at": (starts_at + timedelta(hours=1)).isoformat(),
+                }
+            }
+        ),
+    )
+    assert event["status"] == 201
+    work_path = base + "/work/" + json.loads(event["text"])["id"]
+    popup = page.get_by_role("complementary", name="Reminders")
+    toggle = page.get_by_role("button", name="In-app reminders")
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+    expect(popup).to_be_hidden()
+    page.route(
+        origin + base + "/reminders?local_date=" + day,
+        lambda route: route.fulfill(status=503),
+        times=1,
+    )
+    toggle.click()
+    expect(page.get_by_text("Reminders could not refresh.", exact=False)).to_be_visible()
+    page.clock.fast_forward(31_000)
+    expect(popup.get_by_text("<b>Due agenda</b>", exact=True)).to_be_visible()
+    expect(popup.get_by_text("Team rehearsal", exact=True)).to_be_visible()
+    expect(popup.get_by_role("listitem")).to_have_count(2)
+
+    popup.get_by_role("button", name="Snooze 5 minutes").click()
+    expect(popup).to_be_hidden()
+    page.clock.fast_forward(250_000)
+    # Show the polling cycle actually completed while the group was snoozed.
+    expect(page.get_by_text("Reminders snoozed for 5 minutes.", exact=True)).to_be_hidden()
+    expect(popup).to_be_hidden()
+    page.clock.fast_forward(60_000)
+    expect(popup.get_by_text("Team rehearsal", exact=True)).to_be_visible()
+    popup.get_by_role("button", name="Dismiss reminders").click()
+    expect(popup).to_be_hidden()
+    edited = fetch(
+        page,
+        work_path + "/event-details",
+        method="PATCH",
+        headers=headers,
+        body=json.dumps(
+            {
+                "expected_version": 1,
+                "details": {"title": "Renamed rehearsal", "description": None},
+            }
+        ),
+    )
+    assert edited["status"] == 200
+    page.clock.fast_forward(31_000)
+    expect(page.get_by_text("Reminders dismissed.", exact=True)).to_be_hidden()
+    expect(popup).to_be_hidden()
+
+    revised = starts_at + timedelta(minutes=1)
+    rescheduled = fetch(
+        page,
+        work_path + "/event-details",
+        method="PATCH",
+        headers=headers,
+        body=json.dumps(
+            {
+                "expected_version": 2,
+                "details": {"title": "Renamed rehearsal", "description": None},
+                "schedule": {
+                    "time_zone": "UTC",
+                    "starts_at": revised.replace(tzinfo=None).isoformat(),
+                },
+            }
+        ),
+    )
+    assert rescheduled["status"] == 200
+    page.clock.fast_forward(31_000)
+    expect(popup.get_by_text("Renamed rehearsal", exact=True)).to_be_visible()
+    expect(popup.get_by_role("listitem")).to_have_count(1)
+    toggle.click()
+    expect(popup).to_be_hidden()
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+
+
+def test_in_app_reminders_expire_while_refresh_is_pending(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, _, _ = login_browser
+    context.new_cdp_session(page).send("Emulation.setTimezoneOverride", {"timezoneId": "UTC"})
+    midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    page.clock.install(time=midnight - timedelta(minutes=2))
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Reminder time boundaries")
+    page.clock.pause_at(midnight - timedelta(seconds=20))
+    day = page.evaluate("() => localDate()")
+    url = origin + f"/api/v2/workspaces/{workspace}/reminders?local_date={day}"
+    response = {
+        "tasks": [{"title": "Previous-day task", "id": str(uuid4()), "due_date": day}],
+        "events": [
+            {
+                "title": "About to start",
+                "id": str(uuid4()),
+                "starts_at": (midnight - timedelta(seconds=5)).isoformat(),
+            }
+        ],
+        "has_more": False,
+    }
+    page.route(url, lambda route: route.fulfill(json=response), times=1)
+    page.get_by_role("button", name="In-app reminders").click()
+    popup = page.get_by_role("complementary", name="Reminders")
+    expect(popup.get_by_role("listitem")).to_have_count(2)
+
+    held = []
+    page.route(url, lambda route: held.append(route), times=1)
+    with page.expect_request(url):
+        page.clock.run_for(15_000)
+    expect(popup.get_by_text("About to start", exact=True)).to_have_count(0)
+    expect(popup.get_by_text("Previous-day task", exact=True)).to_be_visible()
+    page.clock.run_for(5_000)
+    expect(popup).to_be_hidden()
+    expect(popup.get_by_role("listitem")).to_have_count(0)
+    assert len(held) == 1
+    held[0].fulfill(json=response)
+    page.clock.run_for(5)
+    expect(popup).to_be_hidden()
+
+
+def test_in_app_reminders_ignore_old_workspace_and_replaced_session(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First reminder workspace")
+    day = page.evaluate("() => localDate()")
+    seed_browser_work(page, first, ["Private first reminder"], due_date=day)
+    second = create_workspace_in_browser(page, origin, "Second reminder workspace")
+    seed_browser_work(page, second, ["Private second reminder"], due_date=day)
+    pick = page.get_by_label("Workspace", exact=True)
+    pick.select_option(first)
+    popup = page.get_by_role("complementary", name="Reminders")
+    toggle = page.get_by_role("button", name="In-app reminders")
+    first_url = f"/api/v2/workspaces/{first}/reminders?local_date={day}"
+    page.evaluate(
+        """url => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (path, options) => {
+            const response = await original(path, options);
+            if (path !== url) return response;
+            const originalBody = await response.text();
+            await new Promise(resolve => { window.releaseReminder = resolve; });
+            const replacement = new Response(originalBody, { status: response.status });
+            const parse = replacement.json.bind(replacement);
+            replacement.json = async () => {
+                const value = await parse();
+                setTimeout(() => { window.reminderParsed = true; }, 0);
+                return value;
+            };
+            return replacement;
+        };
+    }""",
+        first_url,
+    )
+    toggle.click()
+    page.wait_for_function("() => typeof window.releaseReminder === 'function'")
+    pick.select_option(second)
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+    page.evaluate("() => window.releaseReminder()")
+    page.wait_for_function("() => window.reminderParsed === true")
+    expect(popup).to_be_hidden()
+    toggle.click()
+    expect(popup.get_by_text("Private second reminder", exact=True)).to_be_visible()
+    expect(popup.get_by_text("Private first reminder", exact=True)).to_have_count(0)
+
+    old_token = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    context.clear_cookies()
+    renewed = fetch(
+        page,
+        "/api/v2/session",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {sign('new-browser-user')}",
+        },
+    )
+    assert renewed["status"] == 201
+    second_url = f"/api/v2/workspaces/{second}/reminders?local_date={day}"
+    assert fetch(page, second_url, headers={"X-CSRF-Token": old_token})["status"] == 401
+    assert fetch(page, second_url)["status"] == 401
+    new_token = json.loads(renewed["text"])["csrf_token"]
+    assert fetch(page, second_url, headers={"X-CSRF-Token": new_token})["status"] == 200
+    toggle.click()
+    toggle.click()
+    expect(page.get_by_text("Your session is unavailable.", exact=False)).to_be_visible()
+    expect(popup).to_be_hidden()
+    expect(popup.get_by_role("listitem")).to_have_count(0)
+
+
 def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_change(login_browser):
     from playwright.sync_api import expect
 

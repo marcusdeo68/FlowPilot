@@ -1,11 +1,18 @@
 # Session handoff
 
-## Latest increment — manual workspace events
+## Latest increment — in-app reminders
+
+Increment 0026 adds an opt-in popup for tasks due today and events starting
+within 15 minutes in the signed-in workspace. See
+[0026](implementation/0026-in-app-reminders.md) and [STATUS](STATUS.md).
+The next increment can add per-workspace reminder timing and categories while
+the signed-in tab is open.
+
+## Previous increment — manual workspace events
 
 Increment 0025 adds the signed-in event editor, event list and cancellation.
 Today links to Events under Work items. See [0025](implementation/0025-manual-workspace-events.md)
-and [STATUS](STATUS.md). The next product increment is an in-app reminders
-slice for authorized deadlines and events using synthetic data.
+and [STATUS](STATUS.md).
 
 ## Previous increment — private sticky notes
 

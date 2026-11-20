@@ -208,3 +208,10 @@ Read [0025](implementation/0025-manual-workspace-events.md). Try scheduling a
 synthetic event at 1:30 a.m. in New York on November 3, 2030. Enter that time
 again in UTC using the instant you intend. Explain why the date, wall time,
 and zone can identify two instants during the fall clock change.
+
+## In-app reminder exercise
+
+Read [0026](implementation/0026-in-app-reminders.md). Dismiss a synthetic
+event's reminder. Change the event's title and then its start time. Explain why
+the reminder stays dismissed after the title edit and reappears after the
+reschedule. Compare this with using the record version as the dismissal key.

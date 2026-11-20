@@ -110,6 +110,8 @@ const events = createWorkspaceEvents({
   syncControls: syncWorkControls,
 });
 
+const reminders = createWorkspaceReminders({ request, expired, localDate });
+
 function clearWorkspaceWriteHint() {
   const option = select.selectedOptions[0];
   if (option) delete option.dataset.role;
@@ -157,6 +159,7 @@ function clearWork() {
 
 function clearSession() {
   sessionVersion += 1;
+  reminders.clear();
   session = undefined;
   ownId = undefined;
   workspaceSelectionBusy = false;
@@ -211,6 +214,7 @@ function syncWorkspaceNavigation() {
 }
 
 function loadSelectedWorkspaceView() {
+  reminders.select(session ? select.value || undefined : undefined, session);
   inbox.clear();
   notes.clear();
   clearTodayLists();
@@ -525,6 +529,7 @@ async function loadWorkspaces(created) {
   const version = sessionVersion;
   const preferred = created?.id ?? select.value;
   workspaceSelectionBusy = true;
+  reminders.select(undefined, session);
   inbox.clear();
   notes.clear();
   clearTodayLists();
