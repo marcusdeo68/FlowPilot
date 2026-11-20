@@ -34,6 +34,11 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0024 adds `notes.py` for private sticky notes and their metadata-only
+audit history. Each read and write resolves stored membership and binds the
+record to its author and workspace. The signed-in Notes view keeps draft state
+in the selected browser context. See [0024](implementation/0024-private-sticky-notes.md).
+
 Increment 0016 adds opt-in `login.py`: explicit trusted endpoint configuration,
 PKCE redirect, callback presentation, same-origin completion, bounded HTTPS code
 exchange and strict token/client verification before opaque session issuance.

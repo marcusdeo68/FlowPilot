@@ -1,6 +1,12 @@
 # Session handoff
 
-## Latest increment — upcoming events in Today
+## Latest increment — private sticky notes
+
+Increment 0024 provides native private Notes. Apply `alembic upgrade head` to
+the configured workspace database before starting the updated API. See STATUS
+for verification. Manual event entry remains the next roadmap item.
+
+## Previous increment — upcoming events in Today
 
 Increment 0023 shows up to five scheduled events in the next seven days,
 including events already in progress. Existing signed API clients can create
@@ -109,9 +115,9 @@ integration or live sign-in was added. The increment is prepared for its own PR;
 verify current PR state and exact-revision CI before any merge.
 Preserve pending resource docs and unrelated `.playwright-mcp/` local artifact.
 Next: reconcile/merge the reviewed test-environment increment with
-exact-revision CI, then plan the next access-model/UI roadmap slice. Core targets
-remain Gmail, Calendar, Slack, Keep, calm task organization and reminders, and
-explicitly approved communication. No real accounts are connected to FlowPilot.
+exact-revision CI, then plan the next access-model/UI roadmap slice. At this
+checkpoint the planned integrations included Keep. See the current roadmap
+for the native Notes decision and remaining integration targets.
 
 The earlier restart checkpoint below is historical; Docker and Playwright status
 have since advanced. Playwright MCP navigation was successfully exercised after

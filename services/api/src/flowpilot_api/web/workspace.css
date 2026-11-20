@@ -33,3 +33,7 @@ nav [aria-pressed="false"] { background: #fff; color: #275745; }
 #source-detail dd { margin: .15rem 0 .7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 #source-detail .actions { margin-top: .55rem; }
 #source-items button { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+#note-body { width: min(100%, 35rem); }
+#notes-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
+#notes-items li { margin: 0; padding: .9rem; border: 1px solid #d8c886; border-radius: .45rem; background: #fff8d8; }
+#notes-items p { margin: 0 0 .75rem; }

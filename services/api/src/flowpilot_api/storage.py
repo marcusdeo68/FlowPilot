@@ -5,7 +5,7 @@ import os
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import make_url
 
-SCHEMA_REVISION = "0007_task_details_audit"
+SCHEMA_REVISION = "0008_private_notes"
 
 
 def create_database_engine(url: str | None = None) -> Engine:

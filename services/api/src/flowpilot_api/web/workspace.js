@@ -16,7 +16,9 @@ const createStatus = document.querySelector("#create-status");
 const showToday = document.querySelector("#show-today");
 const showWork = document.querySelector("#show-work");
 const showInbox = document.querySelector("#show-inbox");
+const showNotes = document.querySelector("#show-notes");
 const inboxPanel = document.querySelector("#inbox-panel");
+const notesPanel = document.querySelector("#notes-panel");
 const workPanel = document.querySelector("#work-panel");
 const workHeading = document.querySelector("#work-heading");
 const todayReviews = document.querySelector("#today-reviews");
@@ -61,6 +63,8 @@ let editorVersion = 0;
 let taskUpdate;
 let workspaceView = "work";
 let inboxSaving = false;
+let notesBusy = false;
+let workspaceSelectionBusy = false;
 
 const inbox = createWorkspaceInbox({
   request,
@@ -69,16 +73,28 @@ const inbox = createWorkspaceInbox({
     inboxSaving = locked;
     syncWorkControls();
   },
-  denyWrites() {
-    const option = select.selectedOptions[0];
-    if (option) delete option.dataset.role;
-  },
+  denyWrites: clearWorkspaceWriteHint,
   openWork() {
     workView.value = "all";
     switchWorkspaceView("work");
     showWork.focus();
   },
 });
+
+const notes = createWorkspaceNotes({
+  request,
+  expired,
+  lockNavigation(locked) {
+    notesBusy = locked;
+    syncWorkControls();
+  },
+  denyWrites: clearWorkspaceWriteHint,
+});
+
+function clearWorkspaceWriteHint() {
+  const option = select.selectedOptions[0];
+  if (option) delete option.dataset.role;
+}
 
 async function request(path, options) {
   const response = await fetch("/api/v2/" + path, {
@@ -119,14 +135,15 @@ function clearSession() {
   sessionVersion += 1;
   session = undefined;
   ownId = undefined;
+  workspaceSelectionBusy = false;
   clearTimeout(expiresTimer);
   inbox.clear();
+  notes.clear();
   clearTodayLists();
   workspaceView = "work";
   syncWorkspaceNavigation();
   clearWork();
   select.replaceChildren();
-  select.disabled = true;
   syncWorkControls();
   workView.value = "all";
   workView.disabled = true;
@@ -156,8 +173,9 @@ function canWriteWork() {
 
 function syncWorkspaceNavigation() {
   const today = workspaceView === "today";
-  workPanel.hidden = workspaceView === "inbox";
+  workPanel.hidden = workspaceView === "inbox" || workspaceView === "notes";
   inboxPanel.hidden = workspaceView !== "inbox";
+  notesPanel.hidden = workspaceView !== "notes";
   workHeading.textContent = today ? "Today" : "Work items";
   todayReviews.hidden = !today;
   todayEvents.hidden = !today;
@@ -165,14 +183,19 @@ function syncWorkspaceNavigation() {
   showToday.setAttribute("aria-pressed", String(today));
   showWork.setAttribute("aria-pressed", String(workspaceView === "work"));
   showInbox.setAttribute("aria-pressed", String(workspaceView === "inbox"));
+  showNotes.setAttribute("aria-pressed", String(workspaceView === "notes"));
 }
 
 function loadSelectedWorkspaceView() {
   inbox.clear();
+  notes.clear();
   clearTodayLists();
   if (workspaceView === "inbox") {
     clearWork();
     if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
+  } else if (workspaceView === "notes") {
+    clearWork();
+    if (session && select.value) notes.show(select.value, session.csrf_token, canWriteWork());
   } else {
     void loadWork();
     if (workspaceView === "today") {
@@ -191,8 +214,13 @@ function switchWorkspaceView(view) {
 
 function syncWorkControls() {
   const editorOpen = !taskEditor.hidden;
+  select.disabled = workspaceSelectionBusy || notesBusy || !select.options.length;
+  createButton.disabled = refreshWorkspaces.disabled = workspaceSelectionBusy || notesBusy;
+  nameInput.disabled = notesBusy;
+  notesPanel.inert = workspaceSelectionBusy;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
-  showToday.disabled = showWork.disabled = showInbox.disabled = workView.disabled || inboxSaving;
+  const navigationLocked = workView.disabled || inboxSaving || notesBusy;
+  showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
   for (const button of items.querySelectorAll("button")) {
@@ -474,12 +502,13 @@ async function loadWorkspaces(created) {
   if (!session) return;
   const version = sessionVersion;
   const preferred = created?.id ?? select.value;
+  workspaceSelectionBusy = true;
   inbox.clear();
+  notes.clear();
   clearTodayLists();
   clearWork();
   select.replaceChildren();
   syncWorkControls();
-  select.disabled = createButton.disabled = refreshWorkspaces.disabled = true;
   workspaceStatus.textContent = "Loading workspaces…";
   try {
     const workspaces = await request("workspaces?limit=100");
@@ -501,7 +530,6 @@ async function loadWorkspaces(created) {
       return option;
     }));
     if (listed || created) select.value = preferred;
-    select.disabled = workspaces.length === 0;
     if (workspaces.length === 100) {
       workspaceStatus.textContent = "Showing the first 100 workspaces.";
     } else {
@@ -516,7 +544,8 @@ async function loadWorkspaces(created) {
     workspaceStatus.textContent = "Could not load workspaces.";
   } finally {
     if (version === sessionVersion) {
-      createButton.disabled = refreshWorkspaces.disabled = false;
+      workspaceSelectionBusy = false;
+      syncWorkControls();
       refreshWorkspaces.hidden = false;
     }
   }
@@ -575,7 +604,8 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   const version = sessionVersion;
-  createButton.disabled = refreshWorkspaces.disabled = true;
+  workspaceSelectionBusy = true;
+  syncWorkControls();
   createStatus.textContent = "Creating workspace…";
   try {
     const created = await request("workspaces", {
@@ -592,7 +622,8 @@ form.addEventListener("submit", async (event) => {
     createStatus.textContent = status === 403
       ? "You do not have permission to create a workspace."
       : "Could not confirm creation. Refresh workspaces before trying again.";
-    createButton.disabled = refreshWorkspaces.disabled = false;
+    workspaceSelectionBusy = false;
+    syncWorkControls();
   }
 });
 
@@ -657,6 +688,7 @@ select.addEventListener("change", loadSelectedWorkspaceView);
 showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));
 showInbox.addEventListener("click", () => switchWorkspaceView("inbox"));
+showNotes.addEventListener("click", () => switchWorkspaceView("notes"));
 reviewInInbox.addEventListener("click", () => {
   switchWorkspaceView("inbox");
   showInbox.focus();

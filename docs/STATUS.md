@@ -1,13 +1,16 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-19. This file records implementation evidence, known issues, and
+Updated: 2026-11-20. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
-- Increment 0023 adds [upcoming events in Today](implementation/0023-today-upcoming-events.md).
-  The window covers the next 168 hours and includes ongoing events.
+- Increment 0024 adds [private sticky notes](implementation/0024-private-sticky-notes.md).
+  Apply migration `0008_private_notes` before using the updated workspace API.
+- Increment 0023 adds [upcoming events in Today](implementation/0023-today-upcoming-events.md)
+  and merged in [PR #30](https://github.com/marcusdeo68/FlowPilot/pull/30) as `ede9df1`.
+  Independent verification passed 275 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44696407800) passed.
 - Increment 0022 adds [recent pending reviews in Today](implementation/0022-today-pending-reviews.md)
   and merged in [PR #29](https://github.com/marcusdeo68/FlowPilot/pull/29) as `1a8f5f5`.
   Independent verification passed 273 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44687589352) passed.
@@ -95,13 +98,12 @@ verification for each revision. Update this file when an item's state changes.
   [run 43500166899](https://github.com/marcusdeo68/FlowPilot/actions/runs/43500166899)
   before merge. No sign-in UI, real provider or live account is connected.
 
-- Product direction clarified: Gmail, Google Calendar, Slack and Google Keep are
-  the intended integrations. Configurable popup reminders, task organization and
-  approved email/Slack/Keep composition belong in a calm centralized workspace.
-  These are planned capabilities, not newly implemented features or defects.
+- Earlier product planning named Gmail, Google Calendar, Slack, and Google Keep.
+  Increment 0024 established native Notes. Configurable popup reminders, task
+  organization, and approved email and Slack composition remain product goals.
   [Product intent](PRODUCT.md#intended-integrations-and-capabilities),
   [roadmap](ROADMAP.md) and [security boundaries](SECURITY.md) capture the scope;
-  Google Keep account/API feasibility and notification delivery remain open.
+  notification delivery remains open.
 
 - Engineering workflow: [PR #11](https://github.com/marcusdeo68/FlowPilot/pull/11)
   makes `AGENTS.md` load the [engineering guardrails](ENGINEERING_GUARDRAILS.md)
@@ -177,6 +179,7 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-031 | Protect an open note draft during workspace operations. | Review found that changing or refreshing the workspace could clear an editor or a pending save. Chromium verifies the workspace controls unlock only after the Notes editor closes. |
 | FP-030 | Clear both Today lists after a current workspace access denial. | The two reads can finish in either order during a permission change. Chromium returns a successful pending-review response after a 403 and verifies the private title stays hidden. |
 | FP-029 | Pause suggestion review when the date field contains a partial entry. | Chromium can show part of a date while reporting an empty value. The browser regression verifies it blocks acceptance until the entry is completed or cleared. |
 | FP-028 | Require a fresh workspace role before showing inbox write controls after a 403. | Review traced a member-to-observer downgrade followed by a successful inbox refresh using a stale role. Chromium verifies the user can reread their source while writes stay hidden. |
