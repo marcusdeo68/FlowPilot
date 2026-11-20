@@ -936,7 +936,7 @@ def test_workspace_browser_today_shows_pending_reviews_separately_from_due_work(
     expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
     assert len(held) == 1
     held[0].fulfill(status=401)
-    page.wait_for_function("window.oldReviewsHandled === true")
+    page.wait_for_function("() => window.oldReviewsHandled === true")
     expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
 
@@ -982,10 +982,10 @@ def test_workspace_browser_today_discards_pending_reviews_after_access_denial(lo
     page.get_by_role("button", name="Today", exact=True).click()
     unavailable = page.get_by_text("Today is unavailable. Refresh your workspaces to try again.")
     expect(unavailable).to_be_visible()
-    page.wait_for_function("typeof window.releaseLateReview === 'function'")
+    page.wait_for_function("() => typeof window.releaseLateReview === 'function'")
     assert page.evaluate("window.lateReviewTitle") == title
-    page.evaluate("window.releaseLateReview()")
-    page.wait_for_function("window.lateReviewParsed === true")
+    page.evaluate("() => window.releaseLateReview()")
+    page.wait_for_function("() => window.lateReviewParsed === true")
     expect(page.get_by_text(title, exact=True)).to_have_count(0)
 
 
