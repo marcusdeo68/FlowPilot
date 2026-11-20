@@ -173,3 +173,10 @@ task an earlier deadline than the newest 20 items and find it in Due tasks.
 Complete it and watch the next eligible task appear. Explain why the database has
 to apply visibility and status filters before taking the first 20 rows, even
 though the application already checks who is signed in.
+
+## Private inbox exercise
+
+Read [0020](implementation/0020-signed-in-private-inbox.md). Open one synthetic
+source in two tabs. Edit and save the suggestion in the first tab, then try to
+accept the previous version in the second. Reload the second tab's source
+details and explain which saved fields acceptance will copy into the task.

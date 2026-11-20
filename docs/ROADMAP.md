@@ -61,6 +61,7 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
   suppression. Define browser/OS permission, privacy and closed-app delivery
   behavior before claiming notifications work outside an open FlowPilot view.
 - [x] First local dashboard shell with a today view and API-backed manual commitment capture.
+- [x] Capture and browse private manual sources and review task suggestions in the signed-in workspace (0020).
 - [ ] Replace sample-only inbox and schedule cards with typed synthetic source/evidence fixtures.
 - [ ] Connect inbox review and task/project screens to the unified work model after Stage 1 access boundaries exist.
 

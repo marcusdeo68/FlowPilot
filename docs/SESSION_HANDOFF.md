@@ -1,5 +1,12 @@
 # Session handoff
 
+## Latest increment — signed-in private inbox
+
+Increment 0020 connects private manual sources and task suggestion review to
+the signed-in workspace. It uses the existing PostgreSQL schema and synthetic
+login setup. See STATUS for verification. Next, bring due work and review items
+into a signed-in Today view.
+
 ## Latest increment — task lifecycle and due view
 
 Increment 0019 completes the signed-in manual task lifecycle and adds a bounded

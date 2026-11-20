@@ -13,6 +13,10 @@ const form = document.querySelector("#create-workspace");
 const nameInput = document.querySelector("#workspace-name");
 const createButton = form.querySelector("button");
 const createStatus = document.querySelector("#create-status");
+const showWork = document.querySelector("#show-work");
+const showInbox = document.querySelector("#show-inbox");
+const inboxPanel = document.querySelector("#inbox-panel");
+const workPanel = document.querySelector("#work-panel");
 const workView = document.querySelector("#work-view");
 const workStatus = document.querySelector("#work-status");
 const items = document.querySelector("#work-items");
@@ -41,6 +45,24 @@ let loadedTitle;
 let loadedDescription;
 let editorVersion = 0;
 let taskUpdate;
+let showingInbox = false;
+
+const inbox = createWorkspaceInbox({
+  request,
+  expired,
+  lockWorkNavigation(locked) {
+    showWork.disabled = locked || !select.value;
+  },
+  denyWrites() {
+    const option = select.selectedOptions[0];
+    if (option) delete option.dataset.role;
+  },
+  openWork() {
+    workView.value = "all";
+    switchWorkspaceView(false);
+    showWork.focus();
+  },
+});
 
 async function request(path, options) {
   const response = await fetch("/api/v2/" + path, {
@@ -82,9 +104,13 @@ function clearSession() {
   session = undefined;
   ownId = undefined;
   clearTimeout(expiresTimer);
+  inbox.clear();
+  showingInbox = false;
+  syncWorkspaceNavigation();
   clearWork();
   select.replaceChildren();
   select.disabled = true;
+  syncWorkControls();
   workView.value = "all";
   workView.disabled = true;
   workspaceStatus.textContent = createStatus.textContent = "";
@@ -111,9 +137,35 @@ function canWriteWork() {
   return Boolean(session?.can_write && ownId && (role === "owner" || role === "member"));
 }
 
+function syncWorkspaceNavigation() {
+  workPanel.hidden = showingInbox;
+  inboxPanel.hidden = !showingInbox;
+  showWork.setAttribute("aria-pressed", String(!showingInbox));
+  showInbox.setAttribute("aria-pressed", String(showingInbox));
+}
+
+function loadSelectedWorkspaceView() {
+  inbox.clear();
+  if (showingInbox) {
+    clearWork();
+    if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
+  } else {
+    void loadWork();
+  }
+}
+
+function switchWorkspaceView(useInbox) {
+  if (showingInbox === useInbox) return;
+  showingInbox = useInbox;
+  syncWorkspaceNavigation();
+  loadSelectedWorkspaceView();
+}
+
 function syncWorkControls() {
   const editorOpen = !taskEditor.hidden;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
+  showWork.disabled = !select.value;
+  showInbox.disabled = workView.disabled;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
   for (const button of items.querySelectorAll("button")) {
     button.disabled = Boolean(taskUpdate) || editorOpen;
@@ -271,9 +323,10 @@ async function loadWorkspaces(created) {
   if (!session) return;
   const version = sessionVersion;
   const preferred = created?.id ?? select.value;
+  inbox.clear();
   clearWork();
   select.replaceChildren();
-  workView.disabled = true;
+  syncWorkControls();
   select.disabled = createButton.disabled = refreshWorkspaces.disabled = true;
   workspaceStatus.textContent = "Loading workspaces…";
   try {
@@ -305,7 +358,7 @@ async function loadWorkspaces(created) {
     if (workspaces.length && !ownId) {
       workspaceStatus.textContent += " Could not load your profile. Refresh workspaces to edit tasks.";
     }
-    void loadWork();
+    loadSelectedWorkspaceView();
   } catch (status) {
     if (version !== sessionVersion || expired(status)) return;
     workspaceStatus.textContent = "Could not load workspaces.";
@@ -448,7 +501,9 @@ taskEditor.addEventListener("submit", async (event) => {
 
 newTask.addEventListener("click", () => openTaskEditor());
 cancelTask.addEventListener("click", closeTaskEditor);
-select.addEventListener("change", () => loadWork());
+select.addEventListener("change", loadSelectedWorkspaceView);
+showWork.addEventListener("click", () => switchWorkspaceView(false));
+showInbox.addEventListener("click", () => switchWorkspaceView(true));
 workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());
