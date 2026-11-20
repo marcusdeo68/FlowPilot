@@ -6,6 +6,12 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0021 adds [due work in Today](implementation/0021-today-due-work.md).
+  It uses the same workspace permissions and due-task query as Work items.
+- Increment 0020 merged as `14c3826` in [PR #27](https://github.com/marcusdeo68/FlowPilot/pull/27).
+  Both local runs passed 270 tests. All six post-merge checks passed in
+  [run 44662271014](https://github.com/marcusdeo68/FlowPilot/actions/runs/44662271014).
+
 - Increment 0020 adds the [signed-in private inbox](implementation/0020-signed-in-private-inbox.md).
   It connects manual source intake, paginated browsing, evidence display, and
   versioned suggestion review to the existing workspace API.

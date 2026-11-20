@@ -180,3 +180,10 @@ Read [0020](implementation/0020-signed-in-private-inbox.md). Open one synthetic
 source in two tabs. Edit and save the suggestion in the first tab, then try to
 accept the previous version in the second. Reload the second tab's source
 details and explain which saved fields acceptance will copy into the task.
+
+## Today exercise
+
+Read [0021](implementation/0021-today-due-work.md). At 10:30 p.m. in Los Angeles
+on January 2, imagine 20 unfinished tasks due January 2 and one due January 3.
+Explain which tasks appear and why a 21st row with a later date cannot trigger
+the overflow notice.

@@ -39,12 +39,13 @@
         </form>
       </section>
       <nav class="actions" aria-label="Workspace views">
+        <button id="show-today" type="button" aria-pressed="false" disabled>Today</button>
         <button id="show-work" type="button" aria-pressed="true" disabled>Work items</button>
         <button id="show-inbox" type="button" aria-pressed="false" disabled>Private inbox</button>
       </nav>
       <section id="work-panel" aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
-        <label for="work-view">Work view</label>
+        <label id="work-view-label" for="work-view">Work view</label>
         <div class="actions">
           <select id="work-view" disabled>
             <option value="all">All work</option>

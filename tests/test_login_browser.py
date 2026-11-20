@@ -882,6 +882,53 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     expect(page.get_by_role("listitem")).to_have_count(21)
 
 
+def test_workspace_browser_today_uses_local_date_and_bounds_due_work(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Workspace for Today")
+    path = f"/api/v2/workspaces/{workspace_id}/work-due?limit=21"
+    seed_browser_work(page, workspace_id, ["Due tomorrow"], due_date="2030-01-03")
+    seed_browser_work(page, workspace_id, ["Undated task"])
+    titles = [f"Due today {index:02d}" for index in range(20)]
+    seed_browser_work(page, workspace_id, titles, due_date="2030-01-02")
+    cdp = context.new_cdp_session(page)
+    cdp.send("Emulation.setTimezoneOverride", {"timezoneId": "America/Los_Angeles"})
+    # The signed-in screen uses the local January 2 date even though UTC is January 3.
+    page.clock.set_fixed_time(datetime(2030, 1, 3, 6, 30, tzinfo=UTC))
+
+    today = page.get_by_role("button", name="Today", exact=True)
+    all_work = page.get_by_role("button", name="Work items", exact=True)
+    page.route(origin + path, lambda route: route.fulfill(status=503), times=1)
+    today.click()
+    expect(page.get_by_text("Could not load work items.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(today).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("heading", name="Today", exact=True)).to_be_visible()
+    rows = page.get_by_role("listitem")
+    expect(rows).to_have_count(20)
+    expect(rows.filter(has_text=titles[0])).to_contain_text("Due today")
+    expect(page.get_by_text("Due tomorrow", exact=True)).to_have_count(0)
+    expect(page.get_by_text("Undated task", exact=True)).to_have_count(0)
+    limit_message = page.get_by_text("Showing the 20 earliest tasks due by today.", exact=False)
+    expect(limit_message).to_have_count(0)
+
+    seed_browser_work(page, workspace_id, ["Oldest urgent task"], due_date="2030-01-01")
+    all_work.click()
+    today.click()
+    urgent = rows.filter(has_text="Oldest urgent task")
+    expect(rows.first).to_contain_text("Oldest urgent task")
+    expect(urgent).to_contain_text("Overdue")
+    expect(limit_message).to_be_visible()
+    urgent.get_by_role("button", name="Start task", exact=True).click()
+    urgent.get_by_role("button", name="Complete task", exact=True).click()
+    expect(urgent).to_have_count(0)
+    expect(rows).to_have_count(20)
+    expect(limit_message).to_have_count(0)
+    expect(page.get_by_text(titles[0], exact=True)).to_be_visible()
+
+
 def test_workspace_browser_transition_refreshes_stale_task_and_hides_read_only_controls(
     login_browser,
 ):
