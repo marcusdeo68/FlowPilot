@@ -13,10 +13,13 @@ const form = document.querySelector("#create-workspace");
 const nameInput = document.querySelector("#workspace-name");
 const createButton = form.querySelector("button");
 const createStatus = document.querySelector("#create-status");
+const showToday = document.querySelector("#show-today");
 const showWork = document.querySelector("#show-work");
 const showInbox = document.querySelector("#show-inbox");
 const inboxPanel = document.querySelector("#inbox-panel");
 const workPanel = document.querySelector("#work-panel");
+const workHeading = document.querySelector("#work-heading");
+const workViewLabel = document.querySelector("#work-view-label");
 const workView = document.querySelector("#work-view");
 const workStatus = document.querySelector("#work-status");
 const items = document.querySelector("#work-items");
@@ -45,13 +48,15 @@ let loadedTitle;
 let loadedDescription;
 let editorVersion = 0;
 let taskUpdate;
-let showingInbox = false;
+let workspaceView = "work";
+let inboxSaving = false;
 
 const inbox = createWorkspaceInbox({
   request,
   expired,
   lockWorkNavigation(locked) {
-    showWork.disabled = locked || !select.value;
+    inboxSaving = locked;
+    syncWorkControls();
   },
   denyWrites() {
     const option = select.selectedOptions[0];
@@ -59,7 +64,7 @@ const inbox = createWorkspaceInbox({
   },
   openWork() {
     workView.value = "all";
-    switchWorkspaceView(false);
+    switchWorkspaceView("work");
     showWork.focus();
   },
 });
@@ -105,7 +110,7 @@ function clearSession() {
   ownId = undefined;
   clearTimeout(expiresTimer);
   inbox.clear();
-  showingInbox = false;
+  workspaceView = "work";
   syncWorkspaceNavigation();
   clearWork();
   select.replaceChildren();
@@ -138,15 +143,19 @@ function canWriteWork() {
 }
 
 function syncWorkspaceNavigation() {
-  workPanel.hidden = showingInbox;
-  inboxPanel.hidden = !showingInbox;
-  showWork.setAttribute("aria-pressed", String(!showingInbox));
-  showInbox.setAttribute("aria-pressed", String(showingInbox));
+  const today = workspaceView === "today";
+  workPanel.hidden = workspaceView === "inbox";
+  inboxPanel.hidden = workspaceView !== "inbox";
+  workHeading.textContent = today ? "Today" : "Work items";
+  workViewLabel.hidden = workView.hidden = today;
+  showToday.setAttribute("aria-pressed", String(today));
+  showWork.setAttribute("aria-pressed", String(workspaceView === "work"));
+  showInbox.setAttribute("aria-pressed", String(workspaceView === "inbox"));
 }
 
 function loadSelectedWorkspaceView() {
   inbox.clear();
-  if (showingInbox) {
+  if (workspaceView === "inbox") {
     clearWork();
     if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
   } else {
@@ -154,9 +163,9 @@ function loadSelectedWorkspaceView() {
   }
 }
 
-function switchWorkspaceView(useInbox) {
-  if (showingInbox === useInbox) return;
-  showingInbox = useInbox;
+function switchWorkspaceView(view) {
+  if (workspaceView === view) return;
+  workspaceView = view;
   syncWorkspaceNavigation();
   loadSelectedWorkspaceView();
 }
@@ -164,8 +173,7 @@ function switchWorkspaceView(useInbox) {
 function syncWorkControls() {
   const editorOpen = !taskEditor.hidden;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
-  showWork.disabled = !select.value;
-  showInbox.disabled = workView.disabled;
+  showToday.disabled = showWork.disabled = showInbox.disabled = workView.disabled || inboxSaving;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
   for (const button of items.querySelectorAll("button")) {
     button.disabled = Boolean(taskUpdate) || editorOpen;
@@ -205,7 +213,7 @@ async function changeTaskStatus(item, target, row) {
     });
     if (!row.isConnected) return;
     const message = "Task status updated.";
-    if (workView.value === "due") {
+    if (isDueView()) {
       void loadWork(false, message);
     } else {
       row.replaceWith(renderItem(updated));
@@ -229,13 +237,14 @@ async function changeTaskStatus(item, target, row) {
   }
 }
 
-function renderItem(item) {
+function renderItem(item, today) {
   const row = document.createElement("li");
   const title = document.createElement("strong");
   const detail = document.createElement("span");
   title.textContent = item.data.title;
   const metadata = [item.data.kind, item.data.status];
   if (item.data.kind === "task" && item.data.due_date) {
+    if (today) metadata.push(item.data.due_date < today ? "Overdue" : "Due today");
     metadata.push("Due " + item.data.due_date);
   }
   detail.textContent = metadata.join(" · ");
@@ -273,30 +282,47 @@ function renderItem(item) {
   return row;
 }
 
+function isDueView() {
+  return workspaceView === "today" || workView.value === "due";
+}
+
+function localDate() {
+  const now = new Date();
+  const parts = [now.getFullYear(), now.getMonth() + 1, now.getDate()];
+  return parts.map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0")).join("-");
+}
+
 async function loadWork(append = false, savedMessage = "") {
   if (!append) {
     clearWork();
     taskFeedback.textContent = savedMessage;
   }
   if (!session || !select.value) return;
-  const dueOnly = workView.value === "due";
+  const today = workspaceView === "today" ? localDate() : undefined;
+  const dueOnly = isDueView();
   const version = ++workVersion;
   const active = sessionVersion;
   const path = "workspaces/" + encodeURIComponent(select.value) + (dueOnly ? "/work-due" : "/work-page");
-  const query = new URLSearchParams({ limit: "20" });
+  const query = new URLSearchParams({ limit: today ? "21" : "20" });
   if (append && nextCursor) query.set("after", nextCursor);
   workStatus.textContent = "Loading work items…";
   more.disabled = true;
   try {
     const page = await request(path + "?" + query);
     if (version !== workVersion || !session) return;
-    items.append(...page.items.map(renderItem));
+    // The due endpoint sorts by date, so later rows cannot qualify after a future date.
+    const visible = today ? page.items.filter(item => item.data.due_date <= today) : page.items;
+    items.append(...visible.slice(0, 20).map(item => renderItem(item, today)));
     newTask.hidden = !canWriteWork();
     syncWorkControls();
     nextCursor = page.next_after;
     more.hidden = !nextCursor;
     more.disabled = false;
-    if (dueOnly) {
+    if (today) {
+      workStatus.textContent = visible.length > 20
+        ? "Showing the 20 earliest tasks due by today. Open Work items to see more."
+        : visible.length ? "" : "No tasks due today or overdue.";
+    } else if (dueOnly) {
       workStatus.textContent = page.has_more
         ? "Showing the 20 earliest deadlines. Switch to All work for the full list."
         : items.childElementCount ? "" : "No unfinished tasks with due dates.";
@@ -502,8 +528,9 @@ taskEditor.addEventListener("submit", async (event) => {
 newTask.addEventListener("click", () => openTaskEditor());
 cancelTask.addEventListener("click", closeTaskEditor);
 select.addEventListener("change", loadSelectedWorkspaceView);
-showWork.addEventListener("click", () => switchWorkspaceView(false));
-showInbox.addEventListener("click", () => switchWorkspaceView(true));
+showToday.addEventListener("click", () => switchWorkspaceView("today"));
+showWork.addEventListener("click", () => switchWorkspaceView("work"));
+showInbox.addEventListener("click", () => switchWorkspaceView("inbox"));
 workView.addEventListener("change", () => loadWork());
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());

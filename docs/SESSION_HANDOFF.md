@@ -1,5 +1,10 @@
 # Session handoff
 
+## Latest increment — due work in Today
+
+Increment 0021 adds overdue and due-today tasks to signed-in Today. See STATUS
+for verification. The next increment is pending private reviews in Today.
+
 ## Latest increment — signed-in private inbox
 
 Increment 0020 connects private manual sources and task suggestion review to

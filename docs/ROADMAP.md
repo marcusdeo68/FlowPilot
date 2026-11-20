@@ -52,6 +52,8 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 ## Stage 2 — Unified manual workflow UI (shell started)
 
 - Today / Command Center for changes, due work, events, blockers, and approvals.
+- [x] Signed-in Today view for due-today and overdue tasks (0021).
+- [ ] Surface pending private reviews in the signed-in Today view.
 - Unified Inbox with source evidence and review/edit/confirm/dispute actions.
 - Tasks & Projects and a schedule view.
 - Action review UI that makes sender account, recipients, target, and content visible before approval.
