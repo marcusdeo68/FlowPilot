@@ -64,6 +64,7 @@ from flowpilot_api.work_service import (
     DueTasks,
     ManualSource,
     ReminderCandidates,
+    ReminderCategory,
     SourceNotFound,
     StoredWork,
     UpcomingEvents,
@@ -366,6 +367,8 @@ def create_workspace_app(
         request: Request,
         user: Annotated[AccessIdentity, Depends(read_identity)],
         local_date: Annotated[str, Query(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")],
+        category: ReminderCategory = "both",
+        event_lead_minutes: Annotated[int, Query(ge=5, le=60)] = 15,
     ):
         credential = session_cookie(request)
         if credential is not None and browser is not None:
@@ -378,7 +381,13 @@ def create_workspace_app(
             day = date.fromisoformat(local_date)
         except ValueError as exc:
             raise HTTPException(422, "Use a valid local calendar date") from exc
-        return service.reminder_candidates(user.principal, workspace_id, local_date=day)
+        return service.reminder_candidates(
+            user.principal,
+            workspace_id,
+            local_date=day,
+            category=category,
+            event_lead_minutes=event_lead_minutes,
+        )
 
     @app.post(
         "/api/v2/workspaces/{workspace_id}/work-events", response_model=StoredWork, status_code=201

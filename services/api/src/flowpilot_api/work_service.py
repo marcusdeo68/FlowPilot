@@ -118,6 +118,9 @@ class ReminderCandidates:
     has_more: bool
 
 
+ReminderCategory = Literal["tasks", "events", "both"]
+
+
 class _StoredWorkPayload(RootModel[WorkItem]):
     """Validate a database projection against the same tagged union used by the API."""
 
@@ -373,30 +376,46 @@ class WorkService:
             return UpcomingEvents([_stored(row) for row in rows[:limit]], len(rows) > limit)
 
     def reminder_candidates(
-        self, principal: Principal, workspace_id: UUID, *, local_date: date
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        *,
+        local_date: date,
+        category: ReminderCategory = "both",
+        event_lead_minutes: int = 15,
     ) -> ReminderCandidates:
+        if not 5 <= event_lead_minutes <= 60:
+            raise ValueError("Event lead time must be between 5 and 60 minutes")
         limit = 5
         with self.engine.begin() as connection:
             member = self._member(connection, principal, workspace_id)
             params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
-            tasks = connection.execute(
-                text("""SELECT id, title, due_date FROM work_items
+            tasks = (
+                []
+                if category == "events"
+                else connection.execute(
+                    text("""SELECT id, title, due_date FROM work_items
                     WHERE workspace_id = :workspace AND (visibility = 'workspace' OR creator_id = :user)
                     AND kind = 'task' AND status IN :unfinished AND due_date = :local_date
                     ORDER BY created_at, id LIMIT :limit""").bindparams(
-                    bindparam("unfinished", expanding=True)
-                ),
-                {**params, "local_date": local_date, "unfinished": tuple(TASK_TRANSITIONS)},
-            ).all()
-            events = connection.execute(
-                text("""SELECT id, title, starts_at FROM work_items
+                        bindparam("unfinished", expanding=True)
+                    ),
+                    {**params, "local_date": local_date, "unfinished": tuple(TASK_TRANSITIONS)},
+                ).all()
+            )
+            events = (
+                []
+                if category == "tasks"
+                else connection.execute(
+                    text("""SELECT id, title, starts_at FROM work_items
                     WHERE workspace_id = :workspace AND (visibility = 'workspace' OR creator_id = :user)
                     AND kind = 'event' AND status = 'scheduled'
                     AND starts_at > statement_timestamp()
-                    AND starts_at <= statement_timestamp() + INTERVAL '15 minutes'
+                    AND starts_at <= statement_timestamp() + make_interval(mins => :event_lead_minutes)
                     ORDER BY starts_at, id LIMIT :limit"""),
-                params,
-            ).all()
+                    {**params, "event_lead_minutes": event_lead_minutes},
+                ).all()
+            )
             return ReminderCandidates(
                 [TaskReminder(row.id, row.title, row.due_date) for row in tasks[:limit]],
                 [

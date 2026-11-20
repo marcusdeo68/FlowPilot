@@ -150,3 +150,5 @@ events. See [increment 0025](docs/implementation/0025-manual-workspace-events.md
 Turn on **In-app reminders** in a signed-in workspace to see tasks due today
 and events starting within 15 minutes. Use **Snooze 5 minutes** or **Dismiss
 reminders** to clear the group. See [increment 0026](docs/implementation/0026-in-app-reminders.md).
+Use **Reminder settings** to choose tasks, events, or both, plus your event
+lead time and future snooze length. See [increment 0027](docs/implementation/0027-reminder-settings.md).

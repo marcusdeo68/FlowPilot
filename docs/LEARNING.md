@@ -215,3 +215,10 @@ Read [0026](implementation/0026-in-app-reminders.md). Dismiss a synthetic
 event's reminder. Change the event's title and then its start time. Explain why
 the reminder stays dismissed after the title edit and reappears after the
 reschedule. Compare this with using the record version as the dismissal key.
+
+## Reminder settings exercise
+
+Read [0027](implementation/0027-reminder-settings.md). Snooze a group for 15
+minutes, then change the preference to five. Explain why the first group's
+deadline stays fixed. Switch from events to tasks while a reminder request is
+running and explain how request generations protect the new selection.

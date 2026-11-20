@@ -1,12 +1,18 @@
 # Session handoff
 
-## Latest increment — in-app reminders
+## Latest increment — reminder settings
+
+Increment 0027 lets users control which reminders appear, how far ahead to show
+events, and how long to snooze the next group. See
+[0027](implementation/0027-reminder-settings.md) and [STATUS](STATUS.md).
+The next increment can address signed-in workspace access management before any
+live provider data is introduced.
+
+## Previous increment — in-app reminders
 
 Increment 0026 adds an opt-in popup for tasks due today and events starting
 within 15 minutes in the signed-in workspace. See
 [0026](implementation/0026-in-app-reminders.md) and [STATUS](STATUS.md).
-The next increment can add per-workspace reminder timing and categories while
-the signed-in tab is open.
 
 ## Previous increment — manual workspace events
 

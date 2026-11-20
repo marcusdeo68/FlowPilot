@@ -51,6 +51,36 @@
         <button id="toggle-reminders" type="button" aria-pressed="false" hidden>In-app reminders</button>
         <p id="reminders-status" role="status"></p>
       </div>
+      <details id="reminder-settings" hidden>
+        <summary>Reminder settings</summary>
+        <div class="actions">
+          <div>
+            <label for="reminder-category">Remind me about</label>
+            <select id="reminder-category">
+              <option value="both">Due tasks and events</option>
+              <option value="tasks">Due tasks</option>
+              <option value="events">Upcoming events</option>
+            </select>
+          </div>
+          <div>
+            <label for="reminder-lead">Before an event starts</label>
+            <select id="reminder-lead">
+              <option value="5">5 minutes</option>
+              <option value="15" selected>15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+          <div>
+            <label for="reminder-snooze">Snooze for</label>
+            <select id="reminder-snooze">
+              <option value="5">5 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+            </select>
+          </div>
+        </div>
+      </details>
       <aside id="reminder-popup" aria-labelledby="reminder-heading" hidden>
         <h2 id="reminder-heading">Reminders</h2>
         <ul id="reminder-items" aria-live="polite"></ul>

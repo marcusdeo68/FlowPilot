@@ -75,6 +75,15 @@ def test_reminder_candidates_filter_before_independent_limits(setup):
     assert [row.id for row in observer_page.tasks] == [shared_task.id]
     assert [row.id for row in observer_page.events] == [shared_event.id]
     assert not observer_page.has_more
+    only_tasks = service.reminder_candidates(member, workspace, local_date=today, category="tasks")
+    assert only_tasks.tasks == page.tasks
+    assert only_tasks.events == [] and only_tasks.has_more
+    only_early_events = service.reminder_candidates(
+        member, workspace, local_date=today, category="events", event_lead_minutes=5
+    )
+    assert only_early_events.tasks == []
+    assert [row.id for row in only_early_events.events] == [shared_event.id, personal_events[0].id]
+    assert not only_early_events.has_more
 
 
 def test_reminder_endpoint_enforces_read_scope_active_membership_and_minimal_payload(
@@ -113,6 +122,46 @@ def test_reminder_endpoint_enforces_read_scope_active_membership_and_minimal_pay
         "events": [],
         "has_more": False,
     }
+    for invalid in (
+        "category=notes",
+        "event_lead_minutes=4",
+        "event_lead_minutes=61",
+        "event_lead_minutes=7.5",
+    ):
+        assert client.get(url + "&" + invalid, headers=read).status_code == 422
+    starts = (datetime.now(UTC) + timedelta(minutes=20)).replace(microsecond=0)
+    event = client.post(
+        base + "/work",
+        headers=write,
+        json={
+            "item": {
+                "kind": "event",
+                "title": "Later rehearsal",
+                "time_zone": "UTC",
+                "starts_at": starts.isoformat(),
+                "ends_at": (starts + timedelta(hours=1)).isoformat(),
+            }
+        },
+    )
+    assert event.status_code == 201
+    assert client.get(url, headers=read).json()["events"] == []
+    longer = client.get(url + "&category=events&event_lead_minutes=30", headers=read).json()
+    assert longer == {
+        "tasks": [],
+        "has_more": False,
+        "events": [
+            {
+                "id": event.json()["id"],
+                "title": "Later rehearsal",
+                "starts_at": starts.isoformat().replace("+00:00", "Z"),
+            }
+        ],
+    }
+    owner = {"Authorization": "Bearer " + sign("owner")}
+    assert (
+        client.get(url + "&category=events&event_lead_minutes=30", headers=owner).json()["events"]
+        == []
+    )
     with service.engine.begin() as connection:
         connection.execute(
             text("UPDATE memberships SET active=false WHERE user_id=:user"),
