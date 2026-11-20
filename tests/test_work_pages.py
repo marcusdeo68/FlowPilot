@@ -119,3 +119,79 @@ def test_work_page_signed_http_contract(workspace_client):
         == 404
     )
     assert isinstance(client.get(base + "/work", headers=read).json(), list)
+
+
+def test_due_tasks_order_scope_and_limit(workspace_client):
+    client, ws, other, _, sign = workspace_client
+    base = f"/api/v2/workspaces/{ws}"
+    due_path = base + "/work-due"
+
+    def authorization(name, **overrides):
+        return {"Authorization": "Bearer " + sign(name, overrides=overrides)}
+
+    def create(title, *, due=None, visibility="workspace", actor="member", path=base):
+        response = client.post(
+            path + "/work",
+            headers=authorization(actor),
+            json={
+                "visibility": visibility,
+                "item": {"kind": "task", "title": title, "due_date": due},
+            },
+        )
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    def transition(item, target, version):
+        response = client.post(
+            base + f"/work/{item}/transitions",
+            headers=authorization("owner"),
+            json={"target": target, "expected_version": version},
+        )
+        assert response.status_code == 200
+        assert response.json()["version"] == version + 1
+
+    create("Private earlier", due="2025-01-01", visibility="private")
+    create(
+        "Foreign earlier", due="2025-01-02", actor="outsider", path=f"/api/v2/workspaces/{other}"
+    )
+    create("Undated")
+    canceled = create("Canceled earlier", due="2025-01-03")
+    transition(canceled, "canceled", 1)
+    completed = create("Completed earlier", due="2025-01-04")
+    transition(completed, "active", 1)
+    transition(completed, "completed", 2)
+    commitment = client.post(
+        base + "/work",
+        headers=authorization("member"),
+        json={
+            "visibility": "workspace",
+            "item": {"kind": "commitment", "title": "Promise", "due_date": "2025-01-05"},
+        },
+    )
+    assert commitment.status_code == 201
+    older = create("Older tied", due="2025-01-06")
+    newer = create("Newer tied", due="2025-01-06")
+    transition(newer, "active", 1)
+    transition(newer, "blocked", 2)
+    later = create("Later active", due="2025-01-07")
+    transition(later, "active", 1)
+
+    assert client.get(due_path).status_code == 401
+    assert client.get(due_path, headers=authorization("outsider")).status_code == 403
+    observer = authorization("observer", scope="flowpilot:read")
+    for limit in (0, 101, "invalid"):
+        assert client.get(due_path, params={"limit": limit}, headers=observer).status_code == 422
+    focus = client.get(due_path, params={"limit": 2}, headers=observer)
+    assert focus.status_code == 200
+    assert [item["id"] for item in focus.json()["items"]] == [newer, older]
+    assert focus.json()["has_more"] is True
+    entire = client.get(due_path, headers=observer).json()
+    assert [item["id"] for item in entire["items"]] == [newer, older, later]
+    assert entire["has_more"] is False
+    own_view = client.get(due_path, headers=authorization("member")).json()["items"]
+    assert [item["data"]["title"] for item in own_view] == [
+        "Private earlier",
+        "Newer tied",
+        "Older tied",
+        "Later active",
+    ]

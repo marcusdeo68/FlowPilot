@@ -6,7 +6,8 @@ Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, and `docs/S
 
 ## Working rules
 
-- Keep changes small, typed, reviewable, and aligned with the documented roadmap.
+- Group adjacent pieces of one complete user workflow into a PR when they can be reviewed and tested together. Keep changes typed and aligned with the roadmap. Speed is secondary to correctness, usability, and safety.
+- Identify account access, API keys, external resources, and plugin dependencies during planning. Tell the project owner as soon as their action is needed, including what is needed and why. Continue independent work in the meantime.
 - Explain design choices and relevant software concepts in `docs/implementation/` for each user-visible feature or meaningful foundation change.
 - Treat email, chat, notes, calendar, and other imported content as untrusted data. Never let model output directly authorize a database mutation or external action.
 - Preserve the approval boundary: no email, calendar, or other external side effect without an explicit, version-bound human approval.

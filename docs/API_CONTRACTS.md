@@ -137,8 +137,8 @@ origin must also be the API's origin. Existing bearer-only requests remain valid
 
 | Method and path | Contract |
 | --- | --- |
-| `POST /api/v2/session` | Verified read-scoped bearer, exact Origin, no session cookie; 201 with `expires_at` (Unix seconds), `csrf_token` and HttpOnly session cookie |
-| `GET /api/v2/session` | Active cookie, safe same-origin read; same expiry/CSRF fields, no renewal |
+| `POST /api/v2/session` | Verified read-scoped bearer, exact Origin, no session cookie; 201 with `expires_at` (Unix seconds), `csrf_token`, `can_write` and HttpOnly session cookie |
+| `GET /api/v2/session` | Active cookie, safe same-origin read; same fields, no renewal |
 | `DELETE /api/v2/session` | Exact Origin, active cookie's `X-CSRF-Token`; atomic revocation then cookie deletion, 204 |
 
 Unsafe cookie requests require exact Origin plus CSRF. Foreign supplied Origin
@@ -149,6 +149,8 @@ malformed cookies can be cleared by same-origin DELETE without CSRF or persisted
 state mutation. Retrying logout is safe. Session exchange is not idempotent: an
 ambiguous response may leave an unused row until expiry; no automatic retries.
 Scopes/expiry come from verified claims and permissions remain live service checks.
+The `can_write` field describes the session's API scope. A write also requires
+the appropriate active workspace membership and object access.
 See [0012](implementation/0012-browser-sessions.md) for limitations.
 
 ## Remaining cross-app contract (design only)
@@ -176,6 +178,13 @@ on the first request; null `next_after` ends traversal. Read scope and active st
 membership are required; private work remains creator-only. Inaccessible/unknown
 pivots return 404, invalid limit/UUID 422. The existing `/work` list is preserved.
 See [work pagination](implementation/0014-work-pagination.md) for live-traversal limits.
+
+Due tasks: `GET /api/v2/workspaces/{workspace_id}/work-due?limit=20` returns
+`{items, has_more}`. It includes visible tasks in open, active, or blocked state
+with a due date. Earliest dates come first, with descending creation time and UUID
+as tie breakers. The limit accepts 1–100 and `has_more` counts only eligible,
+authorized tasks. Use `work-page` to browse all work. See
+[increment 0019](implementation/0019-task-lifecycle-and-due-view.md).
 
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)
 for source-to-proposal creation, listing, correction, and review contracts.

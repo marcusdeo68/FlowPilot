@@ -90,6 +90,12 @@ class Event(WorkBase):
 
 WorkItem = Annotated[Commitment | Task | Event, Field(discriminator="kind")]
 
+TASK_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    "open": ("active", "canceled"),
+    "active": ("completed", "blocked", "canceled"),
+    "blocked": ("active", "canceled"),
+}
+
 
 def can_change_work_status(item: Commitment | Task | Event, target: str) -> bool:
     if isinstance(item, Commitment):
@@ -99,10 +105,6 @@ def can_change_work_status(item: Commitment | Task | Event, target: str) -> bool
             return can_transition(item.status, CommitmentStatus(target))
         except ValueError:
             return False
-    transitions = {
-        "open": {"active", "canceled"},
-        "active": {"blocked", "completed", "canceled"},
-        "blocked": {"active", "canceled"},
-        "scheduled": {"canceled"},
-    }
-    return target in transitions.get(item.status, set())
+    if isinstance(item, Task):
+        return target in TASK_TRANSITIONS.get(item.status, ())
+    return item.status == "scheduled" and target == "canceled"

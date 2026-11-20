@@ -6,6 +6,15 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0019 adds the [task lifecycle and due view](implementation/0019-task-lifecycle-and-due-view.md)
+  in the signed-in workspace, using the existing audit and authorization rules.
+  The builder and independent runs passed 265 tests without skips. The pull
+  request records the separate recheck of the refresh-feedback fix and CI.
+  The next increment is the authenticated private inbox review workflow.
+
+- Increment 0018 merged as `513b438` in [PR #25](https://github.com/marcusdeo68/FlowPilot/pull/25).
+  All six post-merge checks passed in [run 44652349255](https://github.com/marcusdeo68/FlowPilot/actions/runs/44652349255).
+
 - Increment 0018 adds [manual task creation and editing](implementation/0018-manual-task-editing.md)
   in the signed-in workspace. Apply audit migration `0007_task_details_audit`
   before starting the updated verified API. Independent local verification on
@@ -151,6 +160,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-026 | Preserve the confirmed save message when a work-list reload fails. | Audit traced the Due tasks refresh error clearing the confirmation after a successful status write. Chromium returns a 503 on the refresh and checks both the confirmation and the retry prompt. |
+| FP-025 | Pause work-view switching during a pending status save. | Audit traced an old status appearing when the new view read before the write committed. Chromium checks that the selector pauses on save and permits view changes after a conflict. |
 | FP-024 | Keep saved text when the corresponding editor field is unchanged. | Review found that loading a title or description into a browser field can normalize line endings. The Chromium test edits only the due date and checks that both original CRLF values are preserved. |
 | FP-023 | Make editor fields read-only while a save is pending. | Review found that typing after submission could lose later edits when a successful save closed the form. The Chromium test pauses the PATCH and checks all fields before releasing it. |
 | FP-022 | Compute elapsed time before subtracting it from the OAuth response budget. | Windows Python 3.11 post-merge run 44591896009 passed a timeout of `5.000000000000028` to the socket. A frozen-clock transport regression reproduced the same rounding error with the strict five-second assertion. |

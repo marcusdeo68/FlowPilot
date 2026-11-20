@@ -165,3 +165,11 @@ why the service still has to authorize every request.
 Read [0018](implementation/0018-manual-task-editing.md). Open the same task in two
 tabs, save different titles, and explain how the second request's version check
 protects the first change and keeps the audit history consistent.
+
+## Due task exercise
+
+Read [0019](implementation/0019-task-lifecycle-and-due-view.md). Give an older
+task an earlier deadline than the newest 20 items and find it in Due tasks.
+Complete it and watch the next eligible task appear. Explain why the database has
+to apply visibility and status filters before taking the first 20 rows, even
+though the application already checks who is signed in.

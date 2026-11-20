@@ -16,6 +16,14 @@ from flowpilot_api.browser_sessions import (
 from flowpilot_api.identity import AccessIdentity
 
 
+def _session_info(user: AccessIdentity, credential: str) -> dict[str, int | str | bool]:
+    return {
+        "expires_at": user.expires_at,
+        "csrf_token": csrf_token(credential),
+        "can_write": "flowpilot:write" in user.scopes,
+    }
+
+
 def session_cookie(request: Request) -> str | None:
     # Reject duplicate credentials rather than depend on cookie/header parsing order.
     count = sum(
@@ -83,7 +91,7 @@ class BrowserAuth:
                 samesite="strict",
                 path=COOKIE_PATH,
             )
-            return {"expires_at": user.expires_at, "csrf_token": csrf_token(credential)}
+            return _session_info(user, credential)
 
         @router.get("/api/v2/session")
         def current(request: Request):
@@ -91,7 +99,7 @@ class BrowserAuth:
             if credential is None:
                 raise InvalidSession
             user = self.authenticate(request, credential)
-            return {"expires_at": user.expires_at, "csrf_token": csrf_token(credential)}
+            return _session_info(user, credential)
 
         @router.delete("/api/v2/session", status_code=204)
         def logout(request: Request):

@@ -1,5 +1,12 @@
 # Session handoff
 
+## Latest increment — task lifecycle and due view
+
+Increment 0019 completes the signed-in manual task lifecycle and adds a bounded
+view of unfinished tasks ordered by due date. It uses the existing 0007 schema.
+See STATUS and the PR for verification. Next, connect the authenticated private
+inbox review workflow. Check external prerequisites while planning that work.
+
 ## Latest increment — manual task editing
 
 Increment 0018 adds private task capture and creator-only task detail edits in

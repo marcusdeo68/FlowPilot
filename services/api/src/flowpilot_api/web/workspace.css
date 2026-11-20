@@ -23,5 +23,5 @@ ul { padding: 0; list-style: none; }
 li { border-top: 1px solid #d8e2dd; padding: .75rem 0; overflow-wrap: anywhere; }
 li span { display: block; margin-top: .25rem; color: #456359; }
 li p { white-space: pre-wrap; }
-li button, #task-editor .actions { margin-top: .65rem; }
+.task-actions, #task-editor .actions { margin-top: .65rem; }
 #task-title, #task-description { width: min(100%, 35rem); }

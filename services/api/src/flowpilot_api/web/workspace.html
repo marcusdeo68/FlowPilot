@@ -39,7 +39,14 @@
       </section>
       <section aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
-        <button id="new-task" type="button" hidden>New task</button>
+        <label for="work-view">Work view</label>
+        <div class="actions">
+          <select id="work-view" disabled>
+            <option value="all">All work</option>
+            <option value="due">Due tasks</option>
+          </select>
+          <button id="new-task" type="button" hidden>New task</button>
+        </div>
         <form id="task-editor" aria-labelledby="task-editor-heading" hidden>
           <h3 id="task-editor-heading">New task</h3>
           <label for="task-title">Task title</label>
