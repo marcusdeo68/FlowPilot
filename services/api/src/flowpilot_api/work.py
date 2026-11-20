@@ -9,10 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from flowpilot_api.domain import CommitmentStatus
 
 
-class WorkBase(BaseModel):
+class WorkDetails(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     title: str = Field(min_length=1, max_length=200)
-    description: str | None = Field(default=None, max_length=4000)
+    description: str | None = Field(max_length=4000)
 
     @field_validator("title", "description")
     @classmethod
@@ -26,6 +26,10 @@ class WorkBase(BaseModel):
         return value
 
 
+class WorkBase(WorkDetails):
+    description: str | None = Field(default=None, max_length=4000)
+
+
 class Commitment(WorkBase):
     kind: Literal["commitment"] = "commitment"
     status: CommitmentStatus = CommitmentStatus.DETECTED
@@ -36,6 +40,27 @@ class Task(WorkBase):
     kind: Literal["task"] = "task"
     status: Literal["open", "active", "blocked", "completed", "canceled"] = "open"
     due_date: date | None = None
+
+
+class TaskDetails(WorkDetails):
+    """Complete editable fields. Send null explicitly to clear a field."""
+
+    due_date: date | None
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def calendar_date(cls, value: object) -> date | None:
+        if value is None or type(value) is date:
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = date.fromisoformat(value)
+            except ValueError:
+                pass
+            else:
+                if parsed.isoformat() == value:
+                    return parsed
+        raise ValueError("Due date must be a YYYY-MM-DD calendar date or null")
 
 
 class Event(WorkBase):

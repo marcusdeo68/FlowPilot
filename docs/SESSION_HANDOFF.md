@@ -1,5 +1,13 @@
 # Session handoff
 
+## Latest increment — manual task editing
+
+Increment 0018 adds private task capture and creator-only task detail edits in
+the signed-in workspace. Apply migration 0007 before starting the API. The
+independent local run passed 261 tests with zero skips. See STATUS and the PR for
+verification. Next, add task status controls or the private inbox review surface.
+Live identity provider setup remains pending.
+
 ## Latest increment - signed-in workspace screen
 
 Increment 0017 builds on merged PR #22 and adds a same-origin workspace screen

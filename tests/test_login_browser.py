@@ -379,6 +379,114 @@ def test_workspace_browser_onboards_browses_and_signs_out(login_browser):
     expect(page.get_by_role("link", name="Sign in", exact=True)).to_be_visible()
 
 
+def test_workspace_browser_creates_edits_and_recovers_from_stale_task(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Synthetic task workspace")
+    work_path = f"/api/v2/workspaces/{workspace_id}/work"
+    title = page.get_by_label("Task title", exact=True)
+    description = page.get_by_label("Description", exact=True)
+    due_date = page.get_by_label("Due date", exact=True)
+    page.get_by_role("button", name="New task", exact=True).click()
+    title.fill("Prepare the synthetic agenda")
+    description.fill("<strong>Outline</strong>")
+    due_date.fill("2030-01-02")
+    with page.expect_response(
+        lambda response: response.url == origin + work_path and response.request.method == "POST"
+    ) as creation:
+        page.get_by_role("button", name="Create task", exact=True).click()
+    assert creation.value.status == 201
+    created = creation.value.json()
+    assert created["visibility"] == "private" and created["data"]["status"] == "open"
+    expect(page.get_by_text("Task created.", exact=True)).to_be_visible()
+    row = page.get_by_role("listitem").filter(has_text="Prepare the synthetic agenda")
+    expect(row.get_by_text("<strong>Outline</strong>", exact=True)).to_be_visible()
+    expect(row.get_by_text("Due 2030-01-02")).to_be_visible()
+    row.get_by_role("button", name="Edit task", exact=True).click()
+    expect(title).to_have_value("Prepare the synthetic agenda")
+    expect(description).to_have_value("<strong>Outline</strong>")
+    expect(due_date).to_have_value("2030-01-02")
+
+    updated_title = "Finalize the synthetic agenda"
+    title.fill(updated_title)
+    description.fill("")
+    due_date.fill("2030-02-03")
+    edit_path = work_path + f"/{created['id']}/task-details"
+    save = page.get_by_role("button", name="Save changes", exact=True)
+
+    def check_pending_editor(route: Route) -> None:
+        for field in (title, description, due_date):
+            assert field.evaluate("element => element.readOnly")
+        expect(save).to_be_disabled()
+        route.continue_()
+
+    page.route(origin + edit_path, check_pending_editor, times=1)
+    with page.expect_response(origin + edit_path) as update:
+        save.click()
+    assert update.value.status == 200
+    updated = update.value.json()
+    assert updated["version"] == created["version"] + 1
+    expect(page.get_by_text("Task updated.", exact=True)).to_be_visible()
+    page.reload()
+    updated_row = page.get_by_role("listitem").filter(has_text=updated_title)
+    expect(updated_row.get_by_text("Due 2030-02-03")).to_be_visible()
+    updated_row.get_by_role("button", name="Edit task", exact=True).click()
+    expect(title).to_have_value(updated_title)
+    expect(description).to_have_value("")
+    expect(due_date).to_have_value("2030-02-03")
+
+    title.fill("Draft in the older editor")
+    latest = "Agenda changed\r\nin another editor"
+    latest_description = "Agenda outline\r\nSecond item"
+    session = fetch(page, "/api/v2/session")
+    assert session["status"] == 200
+    changed = fetch(
+        page,
+        edit_path,
+        method="PATCH",
+        headers={
+            "Content-Type": "application/json",
+            "X-CSRF-Token": json.loads(session["text"])["csrf_token"],
+        },
+        body=json.dumps(
+            {
+                "expected_version": updated["version"],
+                "details": {
+                    "title": latest,
+                    "description": latest_description,
+                    "due_date": None,
+                },
+            }
+        ),
+    )
+    assert changed["status"] == 200
+    with page.expect_response(origin + edit_path) as conflict:
+        save.click()
+    assert conflict.value.status == 409
+    expect(page.get_by_text("This task changed.", exact=False)).to_be_visible()
+    expect(title).to_have_value("Draft in the older editor")
+    expect(save).to_be_disabled()
+    assert not title.evaluate("element => element.readOnly")
+    page.get_by_role("button", name="Cancel", exact=True).click()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    latest_row = page.get_by_role("listitem").filter(has_text="Agenda changed")
+    latest_row.get_by_role("button", name="Edit task", exact=True).click()
+    expect(title).to_have_value(latest.replace("\r\n", "\n"))
+    expect(description).to_have_value(latest_description.replace("\r\n", "\n"))
+    expect(due_date).to_have_value("")
+    expect(save).to_be_enabled()
+    due_date.fill("2030-03-04")
+    with page.expect_response(origin + edit_path) as due_date_update:
+        save.click()
+    assert due_date_update.value.status == 200
+    assert due_date_update.value.json()["data"] == {
+        **json.loads(changed["text"])["data"],
+        "due_date": "2030-03-04",
+    }
+
+
 def test_workspace_browser_clears_visible_work_when_session_expires(login_browser, pg):
     from playwright.sync_api import expect
 

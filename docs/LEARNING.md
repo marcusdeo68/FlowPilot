@@ -159,3 +159,9 @@ and why successful code exchange still requires signature/client verification.
 Read [0017](implementation/0017-workspace-screen.md). Simulate a work page returning
 after a workspace switch. Explain which state makes that response obsolete and
 why the service still has to authorize every request.
+
+## Task editing exercise
+
+Read [0018](implementation/0018-manual-task-editing.md). Open the same task in two
+tabs, save different titles, and explain how the second request's version check
+protects the first change and keeps the audit history consistent.

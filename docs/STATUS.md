@@ -6,6 +6,13 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0018 adds [manual task creation and editing](implementation/0018-manual-task-editing.md)
+  in the signed-in workspace. Apply audit migration `0007_task_details_audit`
+  before starting the updated verified API. Independent local verification on
+  the task editor changes based on `02d1c1a` passed 261 tests with zero skips
+  (148 ordinary, 91 PostgreSQL, 22 Chromium). Lint, format, typecheck, package
+  builds, JavaScript syntax, migration revision and documentation links passed.
+
 - Increment 0017 adds the [signed-in workspace screen](implementation/0017-workspace-screen.md)
   to the verified browser app. It supports selection, creation, paginated work,
   and sign-out with the existing session.
@@ -144,6 +151,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-024 | Keep saved text when the corresponding editor field is unchanged. | Review found that loading a title or description into a browser field can normalize line endings. The Chromium test edits only the due date and checks that both original CRLF values are preserved. |
+| FP-023 | Make editor fields read-only while a save is pending. | Review found that typing after submission could lose later edits when a successful save closed the form. The Chromium test pauses the PATCH and checks all fields before releasing it. |
 | FP-022 | Compute elapsed time before subtracting it from the OAuth response budget. | Windows Python 3.11 post-merge run 44591896009 passed a timeout of `5.000000000000028` to the socket. A frozen-clock transport regression reproduced the same rounding error with the strict five-second assertion. |
 | FP-020 | Ignore obsolete work responses before processing session errors. | Review found a delayed 401 from the previous selection could clear the current view. The new Chromium test holds an old 200 or 401 until the new list is visible. |
 | FP-021 | Include a newly created workspace in the current selection even when the capped list omits it. | Review traced creation of a name sorted past the first 100 through the alphabetical API list. The UI now includes and selects the authorized creation response, then loads work through the membership-checked API. |
