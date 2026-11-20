@@ -16,7 +16,10 @@ and falls back to UTC when the browser cannot format that zone.
 
 The creation route delegates to the existing canonical work service. An event
 starts private and scheduled. Its creator can edit its title, description, or
-schedule. A text-only edit keeps the original instants. Cancellation uses the
+schedule. The editor loads wall times from the server so its inputs use the same
+zone rules that validate a save. A reschedule keeps any untouched instant when
+the zone stays the same. Changing zones applies the displayed wall times to
+the newly selected zone. Cancellation uses the
 existing scheduled-to-canceled transition, with access for active writers who
 can see the event. An edited or canceled record and its metadata-only audit entry
 commit in the same transaction. A version conflict keeps the draft visible and

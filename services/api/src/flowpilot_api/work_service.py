@@ -26,7 +26,8 @@ from flowpilot_api.work import (
     TASK_TRANSITIONS,
     Commitment,
     Event,
-    EventSchedule,
+    EventScheduleChange,
+    InvalidEventSchedule,
     Task,
     TaskDetails,
     WorkDetails,
@@ -403,7 +404,7 @@ class WorkService:
         work_id: UUID,
         *,
         details: WorkDetails,
-        schedule: EventSchedule | None,
+        schedule: EventScheduleChange | None,
         expected_version: int,
     ) -> StoredWork:
         with self.engine.begin() as connection:
@@ -417,13 +418,27 @@ class WorkService:
                 raise VersionConflict
             if current.data.status != "scheduled":
                 raise InvalidTransition
-            timing = schedule or current.data
+            starts_at, ends_at, time_zone = (
+                current.data.starts_at,
+                current.data.ends_at,
+                current.data.time_zone,
+            )
+            if schedule is not None:
+                if schedule.time_zone != time_zone and (
+                    schedule.starts_at is None or schedule.ends_at is None
+                ):
+                    raise InvalidEventSchedule("Provide both times when changing time zone")
+                starts_at = schedule.starts_at or starts_at
+                ends_at = schedule.ends_at or ends_at
+                time_zone = schedule.time_zone
+                if ends_at <= starts_at:
+                    raise InvalidEventSchedule("Event end must follow start")
             changes = {
                 "title": details.title,
                 "description": details.description,
-                "starts_at": timing.starts_at,
-                "ends_at": timing.ends_at,
-                "time_zone": timing.time_zone,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+                "time_zone": time_zone,
             }
             if all(getattr(current.data, field) == value for field, value in changes.items()):
                 return current

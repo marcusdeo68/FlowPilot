@@ -1097,6 +1097,14 @@ def test_workspace_browser_event_lifecycle_in_work_and_today(login_browser):
     expect(upcoming.get_by_text(title, exact=True)).to_be_visible()
 
     page.get_by_role("button", name="Open events", exact=True).click()
+    # Simulate different zone rules in the browser while editing server-resolved times.
+    page.evaluate("""() => {
+        const original = Intl.DateTimeFormat.prototype.formatToParts;
+        Intl.DateTimeFormat.prototype.formatToParts = function(date) {
+            const shift = this.resolvedOptions().timeZone === 'America/New_York' ? 3600000 : 0;
+            return original.call(this, new Date(+date - shift));
+        };
+    }""")
     row.get_by_role("button", name="Edit event", exact=True).click()
     expect(start).to_have_value(starts_at.strftime(local_format))
     revised_end = ends_at + timedelta(hours=1)
@@ -1106,7 +1114,10 @@ def test_workspace_browser_event_lifecycle_in_work_and_today(login_browser):
     with page.expect_response("**/event-details") as edited:
         page.get_by_role("button", name="Save event changes", exact=True).click()
     assert edited.value.status == 200
-    assert datetime.fromisoformat(edited.value.json()["data"]["ends_at"]) == revised_end
+    edited_data = edited.value.json()["data"]
+    assert datetime.fromisoformat(edited_data["starts_at"]) == starts_at
+    assert datetime.fromisoformat(edited_data["ends_at"]) == revised_end
+    assert edited.value.request.post_data_json["schedule"]["starts_at"] is None
     expect(page.get_by_text("Event updated.", exact=True)).to_be_visible()
     revised = page.get_by_role("listitem").filter(has_text=changed_title)
     page.once("dialog", lambda dialog: dialog.accept())

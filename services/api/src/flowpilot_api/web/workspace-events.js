@@ -23,31 +23,6 @@ function renderEventTimes(row, event) {
   }
 }
 
-function eventScheduleForEditor(event) {
-  const options = {
-    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-    second: "2-digit", hourCycle: "h23", timeZone: event.time_zone,
-  };
-  const locale = "en-GB-u-ca-iso8601-nu-latn";
-  let zone = event.time_zone;
-  let formatter;
-  try {
-    formatter = new Intl.DateTimeFormat(locale, options);
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    zone = "UTC";
-    formatter = new Intl.DateTimeFormat(locale, { ...options, timeZone: zone });
-  }
-  const local = value => {
-    const parts = Object.fromEntries(formatter.formatToParts(new Date(value))
-      .map(({ type, value }) => [type, value]));
-    const fraction = value.match(/:\d{2}(\.\d+)(?:Z|[+-]\d{2}:\d{2})$/)?.[1] ?? "";
-    return `${parts.year.padStart(4, "0")}-${parts.month}-${parts.day}T`
-      + `${parts.hour}:${parts.minute}:${parts.second}${fraction}`;
-  };
-  return { time_zone: zone, starts_at: local(event.starts_at), ends_at: local(event.ends_at) };
-}
-
 function createWorkspaceEvents({ request, context, expired, reload, offerReload, deny, syncControls }) {
   const editor = document.querySelector("#event-editor");
   const heading = document.querySelector("#event-editor-heading");
@@ -87,15 +62,13 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     closeEditor();
   }
 
-  function open(record) {
-    if (create.hidden || create.disabled) return;
+  function open(record, schedule) {
     item = record;
     title.value = item?.data.title ?? "";
     description.value = item?.data.description ?? "";
-    const schedule = item ? eventScheduleForEditor(item.data) : undefined;
     if (schedule) {
       zone.value = schedule.time_zone;
-      // Native controls support milliseconds. Keep the full stored values for unchanged fields.
+      // Native controls support milliseconds. Omit unchanged times when saving.
       start.value = schedule.starts_at.replace(/(\.\d{3})\d+$/, "$1");
       end.value = schedule.ends_at.replace(/(\.\d{3})\d+$/, "$1");
     } else {
@@ -108,6 +81,36 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     editor.hidden = false;
     syncControls();
     title.focus();
+  }
+
+  async function openExisting(record) {
+    const current = context();
+    if (!current || create.hidden || create.disabled) return;
+    const version = generation;
+    pending = true;
+    syncControls();
+    feedback.textContent = "Loading event…";
+    try {
+      const schedule = await request(current.path + "/work/" + encodeURIComponent(record.id)
+        + "/event-details");
+      if (version !== generation) return;
+      if (schedule.version !== record.version) {
+        feedback.textContent = "This event changed. Refresh the work list before trying again.";
+        paused = true;
+        offerReload();
+        return;
+      }
+      open(record, schedule);
+    } catch (status) {
+      if (version !== generation || expired(status)) return;
+      if (status === 403 || status === 404) deny(status);
+      else feedback.textContent = "Could not open the event. Try again.";
+    } finally {
+      if (version === generation) {
+        pending = false;
+        syncControls();
+      }
+    }
   }
 
   async function mutate(path, method, body, success) {
@@ -125,11 +128,17 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
         headers: { "Content-Type": "application/json", "X-CSRF-Token": current.csrf },
         body: JSON.stringify(body),
       }, errors => {
-        const fields = { starts_at: "Start", ends_at: "End", time_zone: "Time zone" };
-        const known = errors?.find?.(error => Object.hasOwn(fields, error.loc?.at(-1)));
+        if (typeof errors === "string") {
+          validationError = errors;
+          return;
+        }
+        if (!Array.isArray(errors)) return;
+        const labels = { starts_at: "Start", ends_at: "End", time_zone: "Time zone" };
+        const known = errors.find(error => Array.isArray(error?.loc)
+          && Object.hasOwn(labels, error.loc.at(-1)));
         if (known && typeof known.msg === "string") {
-          validationError = fields[known.loc.at(-1)] + ": " + known.msg.replace(/^Value error, /, "");
-        } else if (errors?.some?.(error => error.msg === "Value error, Event end must follow start")) {
+          validationError = labels[known.loc.at(-1)] + ": " + known.msg.replace(/^Value error, /, "");
+        } else if (errors.some(error => error?.msg === "Value error, Event end must follow start")) {
           validationError = "Event end must follow start.";
         }
       });
@@ -172,9 +181,10 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     const schedule = readSchedule();
     if (item) {
       const changed = Object.entries(schedule).some(([key, value]) => value !== initial.shown[key]);
-      if (changed && schedule.time_zone === initial.shown.time_zone) {
+      if (changed) {
         for (const key of ["starts_at", "ends_at"]) {
-          if (schedule[key] === initial.shown[key]) schedule[key] = initial.schedule[key];
+          if (schedule[key] !== initial.shown[key]) continue;
+          schedule[key] = schedule.time_zone === item.data.time_zone ? null : initial.schedule[key];
         }
       }
       void mutate("/work/" + encodeURIComponent(item.id) + "/event-details", "PATCH", {
@@ -185,7 +195,9 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     }
   });
 
-  create.addEventListener("click", () => open());
+  create.addEventListener("click", () => {
+    if (!create.hidden && !create.disabled) open();
+  });
   close.addEventListener("click", () => {
     if (pending) return;
     closeEditor();
@@ -205,7 +217,7 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
       control.addEventListener("click", handler);
       actions.append(control);
     };
-    if (own) button("Edit event", () => open(record));
+    if (own) button("Edit event", () => void openExisting(record));
     button("Cancel event", () => {
       if (pending || paused || !editor.hidden || !row.isConnected) return;
       if (!window.confirm("Cancel this event? It cannot be reopened.")) return;

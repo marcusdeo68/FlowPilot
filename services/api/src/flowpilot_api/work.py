@@ -5,9 +5,21 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from flowpilot_api.domain import CommitmentStatus
+
+LOCAL_EVENT_TIME_PATTERN = (
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]{1,6})?)?$"
+)
 
 
 class WorkDetails(BaseModel):
@@ -64,11 +76,9 @@ class TaskDetails(WorkDetails):
         raise ValueError("Due date must be a YYYY-MM-DD calendar date or null")
 
 
-class EventSchedule(BaseModel):
+class EventZone(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     time_zone: str = Field(min_length=1, max_length=100)
-    starts_at: datetime
-    ends_at: datetime
 
     @field_validator("time_zone")
     @classmethod
@@ -78,6 +88,11 @@ class EventSchedule(BaseModel):
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise ValueError("Use a valid IANA time zone") from exc
         return value
+
+
+class EventSchedule(EventZone):
+    starts_at: datetime
+    ends_at: datetime
 
     @model_validator(mode="after")
     def valid_interval(self) -> "EventSchedule":
@@ -98,34 +113,50 @@ class Event(WorkBase, EventSchedule):
     status: Literal["scheduled", "canceled"] = "scheduled"
 
 
-class LocalEventSchedule(EventSchedule):
-    """Resolve wall times without guessing during daylight-saving transitions."""
+def resolve_local_event_time(value: object, info: ValidationInfo) -> datetime:
+    """Resolve a wall time without guessing during daylight-saving transitions."""
+    if not isinstance(value, str) or not re.fullmatch(LOCAL_EVENT_TIME_PATTERN, value):
+        raise ValueError("Use a local date and time without an offset")
+    local = datetime.fromisoformat(value)
+    if not info.data or "time_zone" not in info.data:
+        raise ValueError("Choose a valid IANA time zone")
+    zone = ZoneInfo(info.data["time_zone"])
+    candidates = set()
+    try:
+        for fold in (0, 1):
+            instant = local.replace(tzinfo=zone, fold=fold).astimezone(UTC)
+            if instant.astimezone(zone).replace(tzinfo=None) == local:
+                candidates.add(instant)
+    except OverflowError as exc:
+        raise ValueError("Time is outside the supported date range") from exc
+    if not candidates:
+        raise ValueError("This local time does not exist in the selected zone")
+    if len(candidates) > 1:
+        raise ValueError("This local time occurs twice. Choose another time or enter it in UTC")
+    return candidates.pop()
 
-    @field_validator("starts_at", "ends_at", mode="before")
-    @classmethod
-    def resolve_local_time(cls, value: object, info: ValidationInfo) -> datetime:
-        if not isinstance(value, str) or not re.fullmatch(
-            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]{1,6})?)?",
-            value,
-        ):
-            raise ValueError("Use a local date and time without an offset")
-        local = datetime.fromisoformat(value)
-        if "time_zone" not in info.data:
-            raise ValueError("Choose a valid IANA time zone")
-        zone = ZoneInfo(info.data["time_zone"])
-        candidates = set()
-        try:
-            for fold in (0, 1):
-                instant = local.replace(tzinfo=zone, fold=fold).astimezone(UTC)
-                if instant.astimezone(zone).replace(tzinfo=None) == local:
-                    candidates.add(instant)
-        except OverflowError as exc:
-            raise ValueError("Time is outside the supported date range") from exc
-        if not candidates:
-            raise ValueError("This local time does not exist in the selected zone")
-        if len(candidates) > 1:
-            raise ValueError("This local time occurs twice. Choose another time or enter it in UTC")
-        return candidates.pop()
+
+LocalEventTime = Annotated[
+    datetime,
+    BeforeValidator(
+        resolve_local_event_time,
+        json_schema_input_type=Annotated[str, Field(pattern=LOCAL_EVENT_TIME_PATTERN)],
+    ),
+]
+
+
+class LocalEventSchedule(EventSchedule):
+    starts_at: LocalEventTime
+    ends_at: LocalEventTime
+
+
+class EventScheduleChange(EventZone):
+    starts_at: LocalEventTime | None = None
+    ends_at: LocalEventTime | None = None
+
+
+class InvalidEventSchedule(ValueError):
+    """New times conflict with the event's retained schedule."""
 
 
 WorkItem = Annotated[Commitment | Task | Event, Field(discriminator="kind")]

@@ -2,8 +2,10 @@
 
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC
 from typing import Annotated, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -50,6 +52,8 @@ from flowpilot_api.session_routes import BrowserAuth, session_cookie
 from flowpilot_api.storage import SCHEMA_REVISION, create_database_engine
 from flowpilot_api.work import (
     Event,
+    EventScheduleChange,
+    InvalidEventSchedule,
     LocalEventSchedule,
     TaskDetails,
     WorkBase,
@@ -96,7 +100,14 @@ class CreateManualEvent(WorkBase):
 
 class EditManualEvent(ExpectedVersion):
     details: WorkDetails
-    schedule: LocalEventSchedule | None = None
+    schedule: EventScheduleChange | None = None
+
+
+class EventEditorSchedule(BaseModel):
+    version: int
+    time_zone: str
+    starts_at: str
+    ends_at: str
 
 
 class LinkEvidence(ExpectedVersion):
@@ -402,6 +413,31 @@ def create_workspace_app(
             expected_version=payload.expected_version,
         )
 
+    @app.get(
+        "/api/v2/workspaces/{workspace_id}/work/{work_id}/event-details",
+        response_model=EventEditorSchedule,
+    )
+    def event_editor_schedule(
+        workspace_id: UUID, work_id: UUID, user: Annotated[AccessIdentity, Depends(read_identity)]
+    ):
+        work = service.get_work(user.principal, workspace_id, work_id)
+        if not isinstance(work.data, Event):
+            raise WorkNotFound
+        zone = ZoneInfo(work.data.time_zone)
+        try:
+            start = work.data.starts_at.astimezone(zone)
+            end = work.data.ends_at.astimezone(zone)
+        except OverflowError:
+            zone = ZoneInfo("UTC")
+            start = work.data.starts_at.astimezone(UTC)
+            end = work.data.ends_at.astimezone(UTC)
+        return EventEditorSchedule(
+            version=work.version,
+            time_zone=zone.key,
+            starts_at=start.replace(tzinfo=None).isoformat(),
+            ends_at=end.replace(tzinfo=None).isoformat(),
+        )
+
     @app.patch(
         "/api/v2/workspaces/{workspace_id}/work/{work_id}/event-details",
         response_model=StoredWork,
@@ -412,14 +448,17 @@ def create_workspace_app(
         payload: EditManualEvent,
         user: Annotated[AccessIdentity, Depends(write_identity)],
     ):
-        return service.edit_event(
-            user.principal,
-            workspace_id,
-            work_id,
-            details=payload.details,
-            schedule=payload.schedule,
-            expected_version=payload.expected_version,
-        )
+        try:
+            return service.edit_event(
+                user.principal,
+                workspace_id,
+                work_id,
+                details=payload.details,
+                schedule=payload.schedule,
+                expected_version=payload.expected_version,
+            )
+        except InvalidEventSchedule as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     @app.post(
         "/api/v2/workspaces/{workspace_id}/work/{work_id}/transitions", response_model=StoredWork

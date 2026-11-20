@@ -184,6 +184,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-033 | Preserve untouched event instants when rescheduling. | Audit reproduced a one-hour change to the start when the browser and server disagreed about Havana's offset and the user moved only the end. The Chromium regression simulates offset disagreement and checks the original start survives. |
+| FP-032 | Publish the actual local timestamp format in OpenAPI. | The first event candidate advertised RFC 3339 date-time fields that commonly include an offset. The PostgreSQL-backed HTTP test checks the generated pattern accepts the local payload and rejects an offset. |
 | FP-031 | Protect an open note draft during workspace operations. | Review found that changing or refreshing the workspace could clear an editor or a pending save. Chromium verifies the workspace controls unlock only after the Notes editor closes. |
 | FP-030 | Clear both Today lists after a current workspace access denial. | The two reads can finish in either order during a permission change. Chromium returns a successful pending-review response after a 403 and verifies the private title stays hidden. |
 | FP-029 | Pause suggestion review when the date field contains a partial entry. | Chromium can show part of a date while reporting an empty value. The browser regression verifies it blocks acceptance until the entry is completed or cleared. |

@@ -202,9 +202,12 @@ and `2030-06-15T00:30` with `America/New_York`. Local timestamps use ISO date an
 time without an offset. Seconds and up to six fractional digits are optional.
 A skipped or repeated wall time, unknown zone, or reversed interval returns 422.
 
-`PATCH /api/v2/workspaces/{workspace_id}/work/{work_id}/event-details` replaces
-the scheduled event's `details` (`title` and nullable `description`) and accepts
-the same `schedule`. Omit it or send null to preserve the saved instants and zone.
+`GET /api/v2/workspaces/{workspace_id}/work/{work_id}/event-details` returns the
+event's version and its server-resolved local times for the editor. The same
+path accepts `PATCH` to replace `details` (`title` and nullable `description`)
+and accepts a `schedule`. Omit the schedule or send null to preserve all times.
+When the zone stays the same, omit or null an individual time to preserve its
+exact instant. When the zone changes, supply both local times.
 Send `expected_version`. This action is creator-only. A stale version or canceled
 event returns 409. The existing versioned `/transitions` endpoint accepts
 `target: "canceled"` for a scheduled event. Writes require the verified write

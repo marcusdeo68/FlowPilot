@@ -1,10 +1,11 @@
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from threading import Barrier
 
 import pytest
 from flowpilot_api.repository import VersionConflict
-from flowpilot_api.work import Event, LocalEventSchedule, WorkDetails
+from flowpilot_api.work import Event, EventScheduleChange, WorkDetails
 from flowpilot_api.work_service import Principal
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -65,6 +66,13 @@ def test_manual_event_versions_audit_and_event_only_browsing(workspace_client):
 
     work_path = base + "/work/" + item["id"]
     edit = work_path + "/event-details"
+    assert client.get(edit, headers=member).json() == {
+        "version": 1,
+        "starts_at": "2030-06-14T23:30:00.123456",
+        "ends_at": "2030-06-15T00:30:00",
+        "time_zone": "America/New_York",
+    }
+    assert client.get(edit, headers=owner).status_code == 404
     details = {"title": "Rehearsal", "description": "Bring the draft"}
     result = client.patch(edit, headers=member, json={"details": details, "expected_version": 1})
     assert result.status_code == 200
@@ -72,6 +80,13 @@ def test_manual_event_versions_audit_and_event_only_browsing(workspace_client):
     assert result.json()["data"] == expected_data
     command = {"details": details, "expected_version": 2}
     assert client.patch(edit, headers=member, json=command).json() == result.json()
+    for change, message in (
+        ({"time_zone": "UTC", "ends_at": "2030-06-15T05:00"}, "Provide both times"),
+        ({"time_zone": "America/New_York", "ends_at": "2030-06-14T23:00"}, "end must follow start"),
+    ):
+        rejected = client.patch(edit, headers=member, json={**command, "schedule": change})
+        assert rejected.status_code == 422 and message in rejected.text
+    assert client.get(work_path, headers=member).json() == result.json()
     moved = client.patch(
         edit,
         headers=member,
@@ -111,6 +126,12 @@ def test_manual_event_auth_and_wall_time_validation(workspace_client):
     outsider = {"Authorization": "Bearer " + sign("outsider")}
     read_only = {"Authorization": "Bearer " + sign("member", overrides={"scope": "flowpilot:read"})}
     body = {"title": "Draft", "schedule": schedule()}
+    schema = client.get("/openapi.json").json()["components"]["schemas"]["LocalEventSchedule"]
+    for name in ("starts_at", "ends_at"):
+        field = schema["properties"][name]
+        assert field["type"] == "string" and "format" not in field
+        assert re.fullmatch(field["pattern"], body["schedule"][name])
+        assert not re.fullmatch(field["pattern"], body["schedule"][name] + "Z")
     for actor, status in (({}, 401), (observer, 403), (outsider, 403), (read_only, 403)):
         assert client.post(path, headers=actor, json=body).status_code == status
     for invalid, error in (
@@ -164,7 +185,7 @@ def test_event_edit_serializes_with_cancellation_and_rolls_back_on_audit_failure
         time_zone="UTC",
     )
     item = service.create_work(actor, workspace, event)
-    timing = LocalEventSchedule(**schedule())
+    timing = EventScheduleChange(**schedule())
 
     def edit():
         return service.edit_event(
