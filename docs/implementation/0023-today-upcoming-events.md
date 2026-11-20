@@ -6,7 +6,7 @@ along with future meetings inside the window. A canceled or ended event drops
 out. Each start and end is shown in the event's saved time zone. If the browser
 cannot format that zone, it displays both times in UTC.
 
-Today reads `GET /work-events?limit=5` in the selected workspace. After checking
+Today reads `GET /api/v2/workspaces/{workspace_id}/work-events?limit=5`. After checking
 read scope and active stored membership, PostgreSQL filters by workspace,
 visibility, status, and time before applying the limit. It orders by the start
 instant, then the ID. The query uses one transaction timestamp for both window
@@ -22,7 +22,8 @@ route defaults to private. Open Today to see the event in your workspace.
 The panel retries its own transient failures and ignores obsolete responses
 after navigation. Like the other Today reads, an active access denial clears
 the view. PostgreSQL tests cover visibility, scope, filtering, tie order, and
-limits. Chromium tests cover time display, retry, denial, and late responses.
+limits. Chromium tests cover time display and UTC fallback, retry, denial,
+and late responses.
 See [STATUS](../STATUS.md) and the PR for verification.
 
 This is a snapshot of canonical manual or synthetic events in the existing

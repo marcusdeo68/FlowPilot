@@ -189,8 +189,8 @@ authorized tasks. Use `work-page` to browse all work. See
 Upcoming events: `GET /api/v2/workspaces/{workspace_id}/work-events?limit=5`
 returns `{items, has_more}`. It requires read scope and active workspace
 membership. The response contains authorized scheduled events that end after
-the query starts and begin within 168 hours of that instant, including ongoing
-events. The limit accepts 1–100. Sort is start time, then ID, ascending. See
+the query starts and start before its 168-hour cutoff, including ongoing events.
+The limit accepts 1–100. Sort is start time, then ID, ascending. See
 [increment 0023](implementation/0023-today-upcoming-events.md).
 
 See [the request sequence](implementation/0009-private-task-review.md#try-the-request-sequence)

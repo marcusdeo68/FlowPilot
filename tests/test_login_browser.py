@@ -914,12 +914,20 @@ def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_chan
         )
         assert saved["status"] == 201
 
+    page.get_by_role("button", name="Private inbox", exact=True).click()
+    pending_title = "Review the synthetic agenda"
+    capture_source_in_browser(page, "events-agenda", pending_title, "Synthetic agenda excerpt")
+    page.get_by_role("button", name=pending_title, exact=True).click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    expect(page.get_by_role("button", name="Accept and create task", exact=True)).to_be_enabled()
+
     today = page.get_by_role("button", name="Today", exact=True)
     work = page.get_by_role("button", name="Work items", exact=True)
     page.route(origin + path, lambda route: route.fulfill(status=503), times=1)
     today.click()
     expect(page.get_by_text("Could not load upcoming events.", exact=True)).to_be_visible()
     expect(page.get_by_text("Overdue next to events", exact=True)).to_be_visible()
+    expect(page.get_by_text(pending_title, exact=True)).to_be_visible()
     page.get_by_role("button", name="Retry upcoming events", exact=True).click()
     events = page.get_by_role("list", name="Upcoming events", exact=True)
     rows = events.get_by_role("listitem")
@@ -942,9 +950,27 @@ def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_chan
     today.click()
     expect(page.get_by_text("Today is unavailable.", exact=False)).to_be_visible()
     expect(page.get_by_text("Overdue next to events", exact=True)).to_have_count(0)
+    expect(page.get_by_text(pending_title, exact=True)).to_have_count(0)
     expect(rows).to_have_count(0)
+
+    utc_label = page.evaluate(
+        """({ value, zone }) => {
+            const OriginalFormatter = Intl.DateTimeFormat;
+            Intl.DateTimeFormat = function(locale, options) {
+                if (options?.timeZone === zone) throw new RangeError('Unsupported test time zone');
+                return new OriginalFormatter(locale, options);
+            };
+            window.restoreEventFormatter = () => { Intl.DateTimeFormat = OriginalFormatter; };
+            return new OriginalFormatter(undefined, {
+                hour: 'numeric', timeZone: 'UTC', timeZoneName: 'short'
+            }).formatToParts(new Date(value)).find(part => part.type === 'timeZoneName').value;
+        }""",
+        {"value": starts_at.isoformat(), "zone": zone},
+    )
     page.get_by_role("button", name="Refresh workspaces", exact=True).click()
     expect(rows.first.get_by_text(title, exact=True)).to_be_visible()
+    expect(timestamps.first).to_contain_text(utc_label)
+    page.evaluate("() => window.restoreEventFormatter()")
 
     work.click()
     page.evaluate(
