@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Workspaces · FlowPilot</title>
   <link rel="stylesheet" href="/api/v2/workspace.css">
+  <script src="/api/v2/workspace-inbox.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -37,7 +38,11 @@
           <p id="create-status" role="status"></p>
         </form>
       </section>
-      <section aria-labelledby="work-heading">
+      <nav class="actions" aria-label="Workspace views">
+        <button id="show-work" type="button" aria-pressed="true" disabled>Work items</button>
+        <button id="show-inbox" type="button" aria-pressed="false" disabled>Private inbox</button>
+      </nav>
+      <section id="work-panel" aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
         <label for="work-view">Work view</label>
         <div class="actions">
@@ -65,6 +70,59 @@
         <ul id="work-items"></ul>
         <button id="more-work" type="button" hidden>Load more</button>
         <button id="retry-work" type="button" hidden>Retry work list</button>
+      </section>
+      <section id="inbox-panel" aria-labelledby="inbox-heading" hidden>
+        <h2 id="inbox-heading">Private inbox</h2>
+        <div class="actions">
+          <button id="add-source" type="button" hidden>Add source</button>
+          <button id="refresh-inbox" type="button">Refresh inbox</button>
+        </div>
+        <form id="source-form" aria-labelledby="source-form-heading" hidden>
+          <h3 id="source-form-heading">Add a manual source</h3>
+          <fieldset id="source-fields">
+            <label for="source-reference">Source reference</label>
+            <input id="source-reference" required maxlength="300">
+            <label for="source-summary">Source summary</label>
+            <input id="source-summary" required maxlength="500">
+            <label for="source-excerpt">Source excerpt</label>
+            <textarea id="source-excerpt" required maxlength="2000" rows="4"></textarea>
+            <button type="submit">Save source</button>
+          </fieldset>
+          <button id="close-source-form" type="button">Close source form</button>
+        </form>
+        <p id="inbox-feedback" role="status"></p>
+        <p id="inbox-status" role="status"></p>
+        <ul id="source-items" aria-label="Sources"></ul>
+        <button id="more-sources" type="button" hidden>Load more sources</button>
+        <section id="source-detail" aria-labelledby="source-detail-heading" hidden>
+          <h3 id="source-detail-heading" tabindex="-1">Source details</h3>
+          <p id="source-loading" role="status"></p>
+          <dl id="source-preview" hidden>
+            <dt>Summary</dt><dd id="preview-summary"></dd>
+            <dt>Reference</dt><dd id="preview-reference"></dd>
+            <dt>Excerpt</dt><dd id="preview-excerpt"></dd>
+          </dl>
+          <p id="proposal-state" role="status"></p>
+          <form id="proposal-form" aria-label="Task suggestion" hidden>
+            <label for="proposal-title">Suggested task title</label>
+            <textarea id="proposal-title" required maxlength="200" rows="2"></textarea>
+            <label for="proposal-due-date">Suggested due date</label>
+            <input id="proposal-due-date" type="date">
+            <div id="proposal-actions" class="actions" hidden>
+              <button id="save-proposal" type="submit">Save suggestion changes</button>
+              <button id="accept-proposal" type="button">Accept and create task</button>
+              <button id="dismiss-proposal" type="button">Dismiss suggestion</button>
+            </div>
+            <p id="proposal-draft-hint" role="status"></p>
+          </form>
+          <div class="actions">
+            <button id="suggest-task" type="button" hidden>Suggest task</button>
+            <button id="reload-source" type="button" hidden>Reload source details</button>
+            <button id="return-to-work" type="button" hidden>Go to work list</button>
+            <button id="close-source-detail" type="button">Close source details</button>
+          </div>
+          <p id="proposal-feedback" role="status"></p>
+        </section>
       </section>
     </div>
   </main>

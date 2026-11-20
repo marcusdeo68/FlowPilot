@@ -334,6 +334,319 @@ def seed_browser_work(page, workspace_id, titles, *, due_date=None):
         assert created["status"] == 201
 
 
+def enter_source_draft(page, reference, summary, excerpt):
+    page.get_by_role("button", name="Add source", exact=True).click()
+    page.get_by_label("Source reference", exact=True).fill(reference)
+    page.get_by_label("Source summary", exact=True).fill(summary)
+    page.get_by_label("Source excerpt", exact=True).fill(excerpt)
+
+
+def capture_source_in_browser(page, reference, summary, excerpt):
+    from playwright.sync_api import expect
+
+    enter_source_draft(page, reference, summary, excerpt)
+    with page.expect_response(
+        lambda response: response.url.endswith("/sources") and response.request.method == "POST"
+    ) as saved:
+        page.get_by_role("button", name="Save source", exact=True).click()
+    assert saved.value.status == 201
+    expect(page.get_by_text("Source saved.", exact=True)).to_be_visible()
+    return saved.value.json()["id"]
+
+
+def test_workspace_browser_captures_and_reviews_private_sources(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Synthetic review workspace")
+    inbox = page.get_by_role("button", name="Private inbox", exact=True)
+    inbox.click()
+    expect(page.get_by_text("No sources yet.", exact=True)).to_be_visible()
+    first = "Prepare the workshop packet"
+    source_id = capture_source_in_browser(
+        page, "workshop-note", first, "<strong>A printed outline</strong>"
+    )
+    base = f"/api/v2/workspaces/{workspace_id}"
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    for index in range(20):
+        created = fetch(
+            page,
+            base + "/sources",
+            method="POST",
+            headers={"Content-Type": "application/json", "X-CSRF-Token": csrf},
+            body=json.dumps(
+                {
+                    "reference": f"extra-{index}",
+                    "summary": f"Note {index}",
+                    "excerpt": "Synthetic text",
+                }
+            ),
+        )
+        assert created["status"] == 201
+    page.reload()
+    inbox.click()
+    first_row = page.get_by_role("button", name=first, exact=True)
+    more = page.get_by_role("button", name="Load more sources", exact=True)
+    expect(more).to_be_visible()
+    expect(first_row).to_have_count(0)
+    more.click()
+    first_row.click()
+    expect(page.get_by_text("<strong>A printed outline</strong>", exact=True)).to_be_visible()
+    expect(page.get_by_text("workshop-note", exact=True)).to_be_visible()
+    with page.expect_response(origin + base + f"/sources/{source_id}/task-proposal") as suggested:
+        page.get_by_role("button", name="Suggest task", exact=True).click()
+    assert suggested.value.status == 200
+    proposal = suggested.value.json()
+    assert proposal["version"] == 1 and proposal["due_date"] is None
+    title = page.get_by_label("Suggested task title", exact=True)
+    expect(title).to_have_value(first)
+    due_date = page.get_by_label("Suggested due date", exact=True)
+    accept = page.get_by_role("button", name="Accept and create task", exact=True)
+    due_date.focus()
+    page.keyboard.press("2")
+    assert due_date.evaluate("element => element.validity.badInput")
+    expect(due_date).to_have_value("")
+    expect(accept).to_be_disabled()
+    expect(page.get_by_text("Enter a complete due date.", exact=True)).to_be_visible()
+    due_date.fill("2030-07-08")
+    assert not due_date.evaluate("element => element.validity.badInput")
+    expect(accept).to_be_disabled()
+    due_date.fill("")
+    expect(accept).to_be_enabled()
+    title.fill("Send the workshop packet")
+    due_date.fill("2030-07-08")
+    expect(accept).to_be_disabled()
+    with page.expect_response(origin + base + f"/proposals/{proposal['id']}") as corrected:
+        page.get_by_role("button", name="Save suggestion changes", exact=True).click()
+    assert corrected.value.status == 200 and corrected.value.json()["version"] == 2
+    with page.expect_response("**/review") as accepted:
+        accept.click()
+    assert accepted.value.status == 200 and accepted.value.json()["version"] == 3
+    task = accepted.value.json()
+    assert task["state"] == "accepted" and task["work_id"]
+    expect(page.get_by_text("Private task created.", exact=True)).to_be_visible()
+    expect(accept).to_be_hidden()
+    page.get_by_role("button", name="Go to work list", exact=True).click()
+    row = page.get_by_role("listitem").filter(has_text="Send the workshop packet")
+    expect(row.get_by_text("Due 2030-07-08")).to_be_visible()
+    stored = json.loads(fetch(page, base + f"/work/{task['work_id']}")["text"])
+    assert stored["visibility"] == "private" and stored["data"]["status"] == "open"
+
+    inbox.click()
+    second = "Optional venue walkthrough"
+    capture_source_in_browser(page, "venue-note", second, "Discuss at a later meeting")
+    page.get_by_role("button", name=second, exact=True).click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    page.once("dialog", lambda dialog: dialog.accept())
+    with page.expect_response("**/review") as dismissed:
+        page.get_by_role("button", name="Dismiss suggestion", exact=True).click()
+    assert dismissed.value.status == 200
+    assert (
+        dismissed.value.json()["state"] == "dismissed" and dismissed.value.json()["work_id"] is None
+    )
+    expect(page.get_by_text("Suggestion dismissed.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Refresh inbox", exact=True).click()
+    more.click()
+    rows = page.get_by_role("list", name="Sources").get_by_role("listitem")
+    expect(rows.filter(has_text=first)).to_contain_text("Accepted")
+    expect(rows.filter(has_text=second)).to_contain_text("Dismissed")
+
+
+def test_workspace_browser_recovers_stale_and_unconfirmed_review(login_browser):
+    from playwright.sync_api import Route, expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Synthetic review recovery")
+    inbox = page.get_by_role("button", name="Private inbox", exact=True)
+    inbox.click()
+    name = "A source awaiting review"
+    capture_source_in_browser(page, "recovery-note", name, "Review the current saved title")
+    page.get_by_role("button", name=name, exact=True).click()
+    with page.expect_response("**/task-proposal") as suggested:
+        page.get_by_role("button", name="Suggest task", exact=True).click()
+    base = f"/api/v2/workspaces/{workspace_id}"
+    proposal_path = base + f"/proposals/{suggested.value.json()['id']}"
+    accept = page.get_by_role("button", name="Accept and create task", exact=True)
+    expect(accept).to_be_enabled()
+    session = json.loads(fetch(page, "/api/v2/session")["text"])
+    corrected = fetch(
+        page,
+        proposal_path,
+        method="PATCH",
+        headers={"Content-Type": "application/json", "X-CSRF-Token": session["csrf_token"]},
+        body=json.dumps(
+            {"title": "Latest reviewed title", "due_date": None, "expected_version": 1}
+        ),
+    )
+    assert corrected["status"] == 200
+    with page.expect_response(origin + proposal_path + "/review") as stale:
+        accept.click()
+    assert stale.value.status == 409
+    expect(accept).to_be_disabled()
+    expect(page.get_by_text("The suggestion changed.", exact=False)).to_be_visible()
+    reload_details = page.get_by_role("button", name="Reload source details", exact=True)
+    reload_details.click()
+    expect(page.get_by_label("Suggested task title", exact=True)).to_have_value(
+        "Latest reviewed title"
+    )
+
+    def lose_confirmed_response(route: Route) -> None:
+        expect(page.get_by_role("button", name="Work items", exact=True)).to_be_disabled()
+        result = route.fetch()
+        assert result.status == 200 and result.json()["state"] == "accepted"
+        route.fulfill(status=503)
+
+    page.route(origin + proposal_path + "/review", lose_confirmed_response, times=1)
+    accept.click()
+    expect(page.get_by_text("Could not confirm the decision.", exact=False)).to_be_visible()
+    expect(accept).to_be_disabled()
+    expect(page.get_by_role("button", name="Work items", exact=True)).to_be_enabled()
+    reload_details.click()
+    expect(page.get_by_role("button", name="Go to work list", exact=True)).to_be_visible()
+    expect(accept).to_be_hidden()
+    work = json.loads(fetch(page, base + "/work-page")["text"])["items"]
+    assert [item["data"]["title"] for item in work] == ["Latest reviewed title"]
+
+    pending_name = "Another pending suggestion"
+    enter_source_draft(
+        page, "uncertain-source", pending_name, "Source saved before response failed"
+    )
+
+    def lose_capture_response(route: Route) -> None:
+        response = route.fetch()
+        assert response.status == 201
+        route.fulfill(status=503)
+
+    page.route(origin + base + "/sources", lose_capture_response, times=1)
+    save_source = page.get_by_role("button", name="Save source", exact=True)
+    save_source.click()
+    expect(page.get_by_text("Could not confirm the source was saved.", exact=False)).to_be_visible()
+    expect(save_source).to_be_disabled()
+    expect(page.get_by_label("Source reference", exact=True)).to_have_value("uncertain-source")
+    page.get_by_role("button", name="Refresh inbox", exact=True).click()
+    pending_row = page.get_by_role("button", name=pending_name, exact=True)
+    expect(pending_row).to_have_count(1)
+    expect(save_source).to_be_enabled()
+    page.get_by_role("button", name="Close source form", exact=True).click()
+    pending_row.click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    expect(accept).to_be_enabled()
+
+    context.clear_cookies()
+    page.goto(origin + "/api/v2/test-login-browser")
+    read_token = sign("new-browser-user", scope="flowpilot:read")
+    exchanged = fetch(
+        page, "/api/v2/session", method="POST", headers={"Authorization": f"Bearer {read_token}"}
+    )
+    assert exchanged["status"] == 201
+    page.goto(origin + "/api/v2/workspace")
+    inbox.click()
+    pending_row.click()
+    title = page.get_by_label("Suggested task title", exact=True)
+    expect(title).to_have_value(pending_name)
+    assert title.evaluate("element => element.readOnly")
+    expect(page.get_by_role("button", name="Add source", exact=True)).to_be_hidden()
+    expect(accept).to_be_hidden()
+
+
+def test_workspace_browser_keeps_inbox_read_only_after_role_downgrade(login_browser, pg):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Synthetic role downgrade")
+    inbox = page.get_by_role("button", name="Private inbox", exact=True)
+    work = page.get_by_role("button", name="Work items", exact=True)
+    inbox.click()
+    source = "Reread the prior evidence"
+    capture_source_in_browser(page, "downgrade-source", source, "Private retained evidence")
+    source_button = page.get_by_role("button", name=source, exact=True)
+    source_button.click()
+    page.get_by_role("button", name="Suggest task", exact=True).click()
+    accept = page.get_by_role("button", name="Accept and create task", exact=True)
+    expect(accept).to_be_enabled()
+
+    with pg[0].begin() as connection:
+        connection.execute(
+            text("UPDATE memberships SET role='observer' WHERE workspace_id=CAST(:ws AS uuid)"),
+            {"ws": workspace_id},
+        )
+    with page.expect_response("**/review") as denied:
+        accept.click()
+    assert denied.value.status == 403
+    expect(page.get_by_text("Inbox access changed.", exact=False)).to_be_visible()
+    expect(source_button).to_have_count(0)
+    expect(page.get_by_text("Private retained evidence", exact=True)).to_have_count(0)
+
+    page.get_by_role("button", name="Refresh inbox", exact=True).click()
+    source_button.click()
+    expect(page.get_by_text("Private retained evidence", exact=True)).to_be_visible()
+    expect(accept).to_be_hidden()
+    add_source = page.get_by_role("button", name="Add source", exact=True)
+    expect(add_source).to_be_hidden()
+    work.click()
+    inbox.click()
+    expect(source_button).to_be_visible()
+    expect(add_source).to_be_hidden()
+
+
+@pytest.mark.parametrize("delayed_status", [200, 401])
+def test_workspace_browser_ignores_late_inbox_details_after_switch(login_browser, delayed_status):
+    from playwright.sync_api import Route, expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First inbox workspace")
+    page.get_by_role("button", name="Private inbox", exact=True).click()
+    name = "First workspace source summary"
+    secret = "First workspace private excerpt"
+    source_id = capture_source_in_browser(page, "first-source", name, secret)
+    second = create_workspace_in_browser(page, origin, "Second inbox workspace")
+    selector = page.get_by_label("Workspace", exact=True)
+    selector.select_option(first)
+    path = f"/api/v2/workspaces/{first}/sources/{source_id}"
+    page.evaluate(
+        """path => {
+            const actualFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await actualFetch(url, options);
+                if (new URL(url, location.href).pathname !== path) return response;
+                const signal = () => setTimeout(() => { window.sourceHandled = true; }, 0);
+                if (!response.ok) signal();
+                else {
+                    const json = response.json.bind(response);
+                    response.json = async () => {
+                        const value = await json();
+                        signal();
+                        return value;
+                    };
+                }
+                return response;
+            };
+        }""",
+        path,
+    )
+    held: list[Route] = []
+    page.route(origin + path, lambda route: held.append(route), times=1)
+    with page.expect_request(origin + path):
+        page.get_by_role("button", name=name, exact=True).click()
+    selector.select_option(second)
+    expect(page.get_by_text("No sources yet.", exact=True)).to_be_visible()
+    assert len(held) == 1
+    if delayed_status == 200:
+        response = held[0].fetch()
+        assert response.ok and response.json()["excerpt"] == secret
+        held[0].fulfill(response=response)
+    else:
+        held[0].fulfill(status=401, json={"detail": "Unauthorized"})
+    page.wait_for_function("window.sourceHandled === true")
+    expect(page.get_by_text(secret, exact=True)).to_have_count(0)
+    expect(page.get_by_role("button", name=name, exact=True)).to_have_count(0)
+    expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+
+
 def test_workspace_browser_onboards_browses_and_signs_out(login_browser):
     from playwright.sync_api import expect
 

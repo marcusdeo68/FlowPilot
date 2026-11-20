@@ -25,3 +25,11 @@ li span { display: block; margin-top: .25rem; color: #456359; }
 li p { white-space: pre-wrap; }
 .task-actions, #task-editor .actions { margin-top: .65rem; }
 #task-title, #task-description { width: min(100%, 35rem); }
+nav [aria-pressed="false"] { background: #fff; color: #275745; }
+#source-fields { padding: 0; margin: 0 0 .55rem; border: 0; min-width: 0; }
+#source-fields input, #source-fields textarea, #proposal-title { width: min(100%, 35rem); }
+#source-fields button { display: block; margin-top: .55rem; }
+#source-detail dt { font-weight: 600; }
+#source-detail dd { margin: .15rem 0 .7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+#source-detail .actions { margin-top: .55rem; }
+#source-items button { max-width: 100%; text-align: left; overflow-wrap: anywhere; }

@@ -6,11 +6,16 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0020 adds the [signed-in private inbox](implementation/0020-signed-in-private-inbox.md).
+  It connects manual source intake, paginated browsing, evidence display, and
+  versioned suggestion review to the existing workspace API.
+- Increment 0019 merged as `a0900bf` in [PR #26](https://github.com/marcusdeo68/FlowPilot/pull/26).
+  All six post-merge checks passed in [run 44658310282](https://github.com/marcusdeo68/FlowPilot/actions/runs/44658310282).
+
 - Increment 0019 adds the [task lifecycle and due view](implementation/0019-task-lifecycle-and-due-view.md)
   in the signed-in workspace, using the existing audit and authorization rules.
   The builder and independent runs passed 265 tests without skips. The pull
   request records the separate recheck of the refresh-feedback fix and CI.
-  The next increment is the authenticated private inbox review workflow.
 
 - Increment 0018 merged as `513b438` in [PR #25](https://github.com/marcusdeo68/FlowPilot/pull/25).
   All six post-merge checks passed in [run 44652349255](https://github.com/marcusdeo68/FlowPilot/actions/runs/44652349255).
@@ -160,6 +165,9 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-029 | Pause suggestion review when the date field contains a partial entry. | Chromium can show part of a date while reporting an empty value. The browser regression verifies it blocks acceptance until the entry is completed or cleared. |
+| FP-028 | Require a fresh workspace role before showing inbox write controls after a 403. | Review traced a member-to-observer downgrade followed by a successful inbox refresh using a stale role. Chromium verifies the user can reread their source while writes stay hidden. |
+| FP-027 | Pause Work items navigation while an inbox write is pending. | Opening Work items before an acceptance committed could show a list without the new task. Chromium holds the review response and verifies the Work items button is paused until the request settles. |
 | FP-026 | Preserve the confirmed save message when a work-list reload fails. | Audit traced the Due tasks refresh error clearing the confirmation after a successful status write. Chromium returns a 503 on the refresh and checks both the confirmation and the retry prompt. |
 | FP-025 | Pause work-view switching during a pending status save. | Audit traced an old status appearing when the new view read before the write committed. Chromium checks that the selector pauses on save and permits view changes after a conflict. |
 | FP-024 | Keep saved text when the corresponding editor field is unchanged. | Review found that loading a title or description into a browser field can normalize line endings. The Chromium test edits only the due date and checks that both original CRLF values are preserved. |

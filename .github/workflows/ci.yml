@@ -33,6 +33,7 @@ jobs:
       - run: uv run --no-sync python -m build
       - run: node --check services/api/src/flowpilot_api/web/app.js
       - run: node --check services/api/src/flowpilot_api/web/workspace.js
+      - run: node --check services/api/src/flowpilot_api/web/workspace-inbox.js
   postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 10

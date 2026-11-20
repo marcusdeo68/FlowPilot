@@ -133,3 +133,6 @@ The signed-in workspace can create private tasks and edit their details. Apply
 verified API. See [increment 0018](docs/implementation/0018-manual-task-editing.md).
 Task status controls and the Due tasks view are described in
 [increment 0019](docs/implementation/0019-task-lifecycle-and-due-view.md).
+Open **Private inbox** in the signed-in workspace to capture a synthetic source
+and review it into a private task. See
+[increment 0020](docs/implementation/0020-signed-in-private-inbox.md).

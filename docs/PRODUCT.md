@@ -113,7 +113,8 @@ configuration remains pending. Increment 0017 adds workspace selection,
 creation, work browsing and sign-out in the verified browser app. Increment 0018
 adds private task capture and versioned task detail editing.
 Increment 0019 adds task status controls and a view of the earliest unfinished task deadlines.
-Source owners can review, correct, accept or dismiss one private task suggestion
-per manual source. Provider integrations, AI inference, outbound actions,
+Increment 0020 adds a signed-in Private inbox where source owners can capture
+synthetic notes, read the evidence, and review, correct, accept, or dismiss one
+task suggestion per source. Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational
 controls before introducing real connectors or personal data.
