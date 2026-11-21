@@ -222,3 +222,10 @@ Read [0027](implementation/0027-reminder-settings.md). Snooze a group for 15
 minutes, then change the preference to five. Explain why the first group's
 deadline stays fixed. Switch from events to tasks while a reminder request is
 running and explain how request generations protect the new selection.
+
+## Workspace access exercise
+
+Read [0028](implementation/0028-workspace-access.md). Try demoting the last
+active owner, then promote a synthetic teammate and repeat the change. Compare
+the authorized membership version with the workspace-wide owner count. Explain
+why removing the current user's access also requires reloading their workspace list.

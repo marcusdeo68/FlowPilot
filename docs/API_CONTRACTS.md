@@ -218,6 +218,13 @@ This filter uses the same creation order and pagination contract. An `after` ID
 for a different work kind returns 404. See
 [increment 0025](implementation/0025-manual-workspace-events.md).
 
+### Browser workspace access
+
+**Workspace access** uses the existing `me`, `workspaces`, `members`, and
+`membership-history` routes. On safe cookie requests a supplied `X-CSRF-Token`
+must match the cookie session. A mismatch returns 401. Bearer clients authenticate
+with verified access tokens. See [0028](implementation/0028-workspace-access.md).
+
 ### In-app reminder candidates
 
 `GET /api/v2/workspaces/{workspace_id}/reminders?local_date=2030-09-30` returns

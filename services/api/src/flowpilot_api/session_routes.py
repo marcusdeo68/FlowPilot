@@ -67,6 +67,12 @@ class BrowserAuth:
         user = self.sessions.resolve(credential)
         if unsafe:
             self.check_csrf(request, credential)
+        elif "x-csrf-token" in request.headers:
+            # Bind a read to the browser tab's session when it supplies its token.
+            try:
+                self.check_csrf(request, credential)
+            except HTTPException as exc:
+                raise InvalidSession from exc
         return user
 
     def routes(self, bearer_identity) -> APIRouter:

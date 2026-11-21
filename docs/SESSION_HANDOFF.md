@@ -1,12 +1,17 @@
 # Session handoff
 
-## Latest increment — reminder settings
+## Latest increment — signed-in workspace access
+
+Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
+Owners can manage roles, grants and existing memberships and review history.
+The next access increment is recipient-consented invitations for registered
+synthetic users. See [STATUS](STATUS.md) for verification.
+
+## Previous increment — reminder settings
 
 Increment 0027 lets users control which reminders appear, how far ahead to show
 events, and how long to snooze the next group. See
 [0027](implementation/0027-reminder-settings.md) and [STATUS](STATUS.md).
-The next increment can address signed-in workspace access management before any
-live provider data is introduced.
 
 ## Previous increment — in-app reminders
 

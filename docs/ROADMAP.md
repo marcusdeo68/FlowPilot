@@ -30,6 +30,7 @@ records, and authenticated dashboard wiring still need implementation and review
   for manual typed work, evidence privacy, and audit transactions (increment 0005).
 - [x] Separate signed-access-token workspace API factory with stored-member authorization (0007).
 - [x] API workspace creation/discovery, owner-only member administration, and last-owner protection (0008).
+- [x] Signed-in workspace access view for owners to manage memberships and review recent changes (0028).
 - [x] Private manual-source task suggestion, correction, dismissal, and version-bound acceptance (0009).
 - [x] Cursor-paginated owner-only source inbox with current review state (0010).
 - [x] Optional token-bounded browser sessions with CSRF, revocation and real-browser coverage (0012).

@@ -17,8 +17,10 @@ const showToday = document.querySelector("#show-today");
 const showWork = document.querySelector("#show-work");
 const showInbox = document.querySelector("#show-inbox");
 const showNotes = document.querySelector("#show-notes");
+const showAccess = document.querySelector("#show-access");
 const inboxPanel = document.querySelector("#inbox-panel");
 const notesPanel = document.querySelector("#notes-panel");
+const accessPanel = document.querySelector("#access-panel");
 const workPanel = document.querySelector("#work-panel");
 const workHeading = document.querySelector("#work-heading");
 const todayReviews = document.querySelector("#today-reviews");
@@ -65,6 +67,7 @@ let taskUpdate;
 let workspaceView = "work";
 let inboxSaving = false;
 let notesBusy = false;
+let accessSaving = false;
 let workspaceSelectionBusy = false;
 
 const inbox = createWorkspaceInbox({
@@ -112,20 +115,49 @@ const events = createWorkspaceEvents({
 
 const reminders = createWorkspaceReminders({ request, expired, localDate });
 
+const access = createWorkspaceAccess({
+  request,
+  expired,
+  lockNavigation(locked) {
+    accessSaving = locked;
+    syncWorkControls();
+  },
+  deny: clearWorkspaceWriteHint,
+  async refreshContext(message, member) {
+    const option = select.selectedOptions[0];
+    if (member?.active) {
+      option.dataset.role = member.role;
+      loadSelectedWorkspaceView();
+      access.showFeedback(message);
+      return;
+    }
+    if (member) option.remove();
+    else clearWorkspaceWriteHint();
+    const version = sessionVersion;
+    const loading = loadWorkspaces();
+    access.showFeedback(message);
+    await loading;
+    if (version === sessionVersion) access.showFeedback(message);
+  },
+});
+
 function clearWorkspaceWriteHint() {
   const option = select.selectedOptions[0];
   if (option) delete option.dataset.role;
 }
 
-async function request(path, options, onValidation) {
+async function request(path, options, onProblem) {
+  const headers = new Headers(options?.headers);
+  if (session && !headers.has("X-CSRF-Token")) headers.set("X-CSRF-Token", session.csrf_token);
   const response = await fetch("/api/v2/" + path, {
     credentials: "same-origin",
     cache: "no-store",
     ...options,
+    headers,
   });
-  if (response.status === 422 && onValidation) {
+  if ((response.status === 409 || response.status === 422) && onProblem) {
     const error = await response.json().catch(() => null);
-    onValidation(error?.detail);
+    onProblem(error?.detail);
   }
   if (!response.ok) throw response.status;
   if (response.status !== 204) return response.json();
@@ -166,6 +198,7 @@ function clearSession() {
   clearTimeout(expiresTimer);
   inbox.clear();
   notes.clear();
+  access.clear();
   clearTodayLists();
   workspaceView = "work";
   syncWorkspaceNavigation();
@@ -200,9 +233,10 @@ function canWriteWork() {
 
 function syncWorkspaceNavigation() {
   const today = workspaceView === "today";
-  workPanel.hidden = workspaceView === "inbox" || workspaceView === "notes";
+  workPanel.hidden = !today && workspaceView !== "work";
   inboxPanel.hidden = workspaceView !== "inbox";
   notesPanel.hidden = workspaceView !== "notes";
+  accessPanel.hidden = workspaceView !== "access";
   workHeading.textContent = today ? "Today" : "Work items";
   todayReviews.hidden = !today;
   todayEvents.hidden = !today;
@@ -211,12 +245,14 @@ function syncWorkspaceNavigation() {
   showWork.setAttribute("aria-pressed", String(workspaceView === "work"));
   showInbox.setAttribute("aria-pressed", String(workspaceView === "inbox"));
   showNotes.setAttribute("aria-pressed", String(workspaceView === "notes"));
+  showAccess.setAttribute("aria-pressed", String(workspaceView === "access"));
 }
 
 function loadSelectedWorkspaceView() {
   reminders.select(session ? select.value || undefined : undefined, session);
   inbox.clear();
   notes.clear();
+  access.clear();
   clearTodayLists();
   if (workspaceView === "inbox") {
     clearWork();
@@ -224,6 +260,16 @@ function loadSelectedWorkspaceView() {
   } else if (workspaceView === "notes") {
     clearWork();
     if (session && select.value) notes.show(select.value, session.csrf_token, canWriteWork());
+  } else if (workspaceView === "access") {
+    clearWork();
+    if (session && select.value) {
+      access.show({
+        id: ownId,
+        role: select.selectedOptions[0]?.dataset.role,
+        canWrite: session.can_write,
+        path: "workspaces/" + encodeURIComponent(select.value),
+      });
+    }
   } else {
     void loadWork();
     if (workspaceView === "today") {
@@ -243,13 +289,15 @@ function switchWorkspaceView(view) {
 function syncWorkControls() {
   const eventLocked = events.locked();
   const editorOpen = !taskEditor.hidden || eventLocked;
-  select.disabled = workspaceSelectionBusy || notesBusy || eventLocked || !select.options.length;
-  createButton.disabled = refreshWorkspaces.disabled = workspaceSelectionBusy || notesBusy || eventLocked;
-  nameInput.disabled = notesBusy || eventLocked;
-  notesPanel.inert = workspaceSelectionBusy;
+  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || accessSaving;
+  select.disabled = workspaceLocked || !select.options.length;
+  createButton.disabled = refreshWorkspaces.disabled = workspaceLocked;
+  nameInput.disabled = notesBusy || eventLocked || accessSaving;
+  notesPanel.inert = accessPanel.inert = workspaceSelectionBusy;
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
-  const navigationLocked = workView.disabled || inboxSaving || notesBusy;
+  const navigationLocked = workView.disabled || inboxSaving || notesBusy || accessSaving;
   showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
+  showAccess.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
   openEvents.disabled = navigationLocked;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
@@ -532,6 +580,7 @@ async function loadWorkspaces(created) {
   reminders.select(undefined, session);
   inbox.clear();
   notes.clear();
+  access.clear();
   clearTodayLists();
   clearWork();
   select.replaceChildren();
@@ -716,6 +765,7 @@ showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));
 showInbox.addEventListener("click", () => switchWorkspaceView("inbox"));
 showNotes.addEventListener("click", () => switchWorkspaceView("notes"));
+showAccess.addEventListener("click", () => switchWorkspaceView("access"));
 reviewInInbox.addEventListener("click", () => {
   switchWorkspaceView("inbox");
   showInbox.focus();

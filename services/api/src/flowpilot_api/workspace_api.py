@@ -370,13 +370,8 @@ def create_workspace_app(
         category: ReminderCategory = "both",
         event_lead_minutes: Annotated[int, Query(ge=5, le=60)] = 15,
     ):
-        credential = session_cookie(request)
-        if credential is not None and browser is not None:
-            try:
-                # Another tab may have replaced this tab's HttpOnly session cookie.
-                browser.check_csrf(request, credential)
-            except HTTPException as exc:
-                raise InvalidSession from exc
+        if session_cookie(request) is not None and "x-csrf-token" not in request.headers:
+            raise InvalidSession
         try:
             day = date.fromisoformat(local_date)
         except ValueError as exc:

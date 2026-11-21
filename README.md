@@ -69,6 +69,7 @@ node --check services/api/src/flowpilot_api/web/app.js
 node --check services/api/src/flowpilot_api/web/workspace.js
 node --check services/api/src/flowpilot_api/web/workspace-events.js
 node --check services/api/src/flowpilot_api/web/workspace-reminders.js
+node --check services/api/src/flowpilot_api/web/workspace-access.js
 ```
 
 GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
@@ -152,3 +153,7 @@ and events starting within 15 minutes. Use **Snooze 5 minutes** or **Dismiss
 reminders** to clear the group. See [increment 0026](docs/implementation/0026-in-app-reminders.md).
 Use **Reminder settings** to choose tasks, events, or both, plus your event
 lead time and future snooze length. See [increment 0027](docs/implementation/0027-reminder-settings.md).
+
+Open **Workspace access** to find your role and registered user ID. Workspace
+owners can review membership history, grant access to registered synthetic users,
+and change existing roles. See [increment 0028](docs/implementation/0028-workspace-access.md).
