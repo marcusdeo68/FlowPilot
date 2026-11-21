@@ -204,6 +204,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-037 | Recover an accepted workspace outside the bounded list. | Audit found that accepting a workspace beyond the first 100 could leave it out of the selector. Chromium omits the workspace from the list and verifies the dedicated active-membership read supplies its current role. |
+| FP-036 | Observe live waiting locks in the invitation expiry test. | The first local run missed the worker under a transaction-cached activity snapshot. The regression checks live PostgreSQL locks, holds the unchanged row past expiry and verifies acceptance fails. |
 | FP-035 | Clear expired reminders while a poll is pending. | Audit found that a network delay could leave an already-started event or previous-day task visible. Chromium holds a request across both cutoffs and checks that the popup clears each expired title. |
 | FP-034 | Compare retained event instants in UTC. | With PostgreSQL set to America/New_York, an event crossing the fall clock change appeared to end before it started. The integration regression uses a non-UTC session, preserves the valid interval and checks that a repeated edit stays a no-op. |
 | FP-033 | Preserve untouched event instants when rescheduling. | Audit reproduced a one-hour change to the start when the browser and server disagreed about Havana's offset and the user moved only the end. The Chromium regression simulates offset disagreement and checks the original start survives. |

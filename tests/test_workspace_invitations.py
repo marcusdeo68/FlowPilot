@@ -46,6 +46,7 @@ def test_invitation_api_requires_recipient_consent_and_exact_version(workspace_c
     invite = offered.json()
     assert (invite["status"], invite["version"], invite["role"]) == ("pending", 1, "observer")
     assert client.get("/api/v2/workspaces", headers=recipient).json() == []
+    assert client.get(base, headers=recipient).status_code == 403
     assert client.get(base + "/work", headers=recipient).status_code == 403
     assert client.get("/api/v2/invitations", headers=recipient).json() == [invite]
     assert client.get("/api/v2/invitations", headers=outsider).json() == []
@@ -75,6 +76,11 @@ def test_invitation_api_requires_recipient_consent_and_exact_version(workspace_c
     assert client.post(decision, headers=recipient, json=answer).status_code == 409
     assert client.get("/api/v2/invitations", headers=recipient).json() == []
     assert client.get(base + "/work", headers=recipient).status_code == 200
+    assert client.get(base, headers=recipient).json() == {
+        "id": str(workspace),
+        "name": "Synthetic A",
+        "role": "observer",
+    }
     member = [
         item
         for item in client.get(base + "/members", headers=owner).json()
@@ -237,8 +243,8 @@ def test_invitation_expiry_is_checked_after_waiting_on_an_unchanged_row(setup):
             deadline = time.monotonic() + 1.5
             with work.engine.connect() as observer:
                 while not observer.execute(
-                    text("""SELECT EXISTS (SELECT 1 FROM pg_stat_activity
-                    WHERE :pid = ANY(pg_blocking_pids(pid)) AND query LIKE '%workspace_invitations%')"""),
+                    text("""SELECT EXISTS (SELECT 1 FROM pg_locks
+                    WHERE NOT granted AND pid IS NOT NULL AND :pid = ANY(pg_blocking_pids(pid)))"""),
                     {"pid": pid},
                 ).scalar_one():
                     assert time.monotonic() < deadline, (

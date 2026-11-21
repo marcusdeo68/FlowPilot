@@ -1983,7 +1983,13 @@ def test_workspace_access_invitation_role_lifecycle_and_last_owner_conflict(logi
         expect(selection).to_be_disabled()
 
         offer()
-        incoming.get_by_role("button", name="Accept invitation", exact=True).click()
+        # A bounded list can omit the newly joined workspace. Recover through an authorized read.
+        recipient.route(
+            origin + "/api/v2/workspaces?limit=100", lambda route: route.fulfill(json=[]), times=1
+        )
+        with recipient.expect_response(origin + f"/api/v2/workspaces/{workspace_id}") as selected:
+            incoming.get_by_role("button", name="Accept invitation", exact=True).click()
+        assert selected.value.status == 200
         expect(recipient.get_by_text("Invitation accepted.", exact=True)).to_be_visible()
         expect(selection).to_have_value(workspace_id)
         recipient.get_by_role("button", name="Workspace access", exact=True).click()

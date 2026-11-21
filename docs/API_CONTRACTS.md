@@ -236,7 +236,9 @@ identity and requires write scope. Workspace owners use
 `GET /api/v2/invitations?limit=20` lists the current registered user's actionable
 invitations. `POST /api/v2/invitations/{invitation_id}/decision` takes `decision`
 (`accept` or `decline`) and `expected_version`. Acceptance creates the offered
-membership. Lists support limits 1 through 100. An unknown or out-of-scope
+membership. `GET /api/v2/workspaces/{workspace_id}` verifies active membership and
+returns current workspace details for an accepted workspace outside the bounded list.
+Lists support limits 1 through 100. An unknown or out-of-scope
 invitation returns 404. Expired, stale and conflicting writes return 409. Cookie
 writes also require the same-origin CSRF token. See
 [0029](implementation/0029-workspace-invitations.md).

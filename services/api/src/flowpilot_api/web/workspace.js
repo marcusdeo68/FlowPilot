@@ -629,19 +629,28 @@ async function loadWorkspaces(created, preferredId) {
       }
     }
     const listed = workspaces.some(({ id }) => id === preferred);
-    const options = created && !listed ? [...workspaces, created] : workspaces;
+    let extra = created;
+    if (!listed && preferredId) {
+      try {
+        extra = await request("workspaces/" + encodeURIComponent(preferredId));
+        if (version !== sessionVersion) return;
+      } catch (status) {
+        if (version !== sessionVersion || expired(status)) return;
+      }
+    }
+    const options = extra && !listed ? [...workspaces, extra] : workspaces;
     select.append(...options.map(({ id, name, role }) => {
       const option = new Option(name, id);
       option.dataset.role = role;
       return option;
     }));
-    if (listed || created) select.value = preferred;
+    if (listed || extra) select.value = preferred;
     if (workspaces.length === 100) {
       workspaceStatus.textContent = "Showing the first 100 workspaces.";
     } else {
-      workspaceStatus.textContent = workspaces.length ? "" : "Create your first workspace to get started.";
+      workspaceStatus.textContent = options.length ? "" : "Create your first workspace to get started.";
     }
-    if (workspaces.length && !ownId) {
+    if (options.length && !ownId) {
       workspaceStatus.textContent += " Could not load your profile. Refresh workspaces to edit tasks.";
     }
     invitations.show(ownId, session.can_write, unregistered);

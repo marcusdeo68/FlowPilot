@@ -294,6 +294,12 @@ def create_workspace_app(
     ):
         return memberships.create_workspace(user.principal, payload)
 
+    @app.get("/api/v2/workspaces/{workspace_id}", response_model=WorkspaceInfo)
+    def selected_workspace(
+        workspace_id: UUID, user: Annotated[AccessIdentity, Depends(read_identity)]
+    ):
+        return memberships.workspace(user.principal, workspace_id)
+
     @app.get("/api/v2/workspaces/{workspace_id}/members", response_model=list[MemberInfo])
     def members(
         workspace_id: UUID,

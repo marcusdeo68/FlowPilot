@@ -218,6 +218,19 @@ class MembershipService:
             ).mappings()
             return [WorkspaceInfo(row["id"], row["name"], Role(row["role"])) for row in rows]
 
+    def workspace(self, principal: Principal, workspace_id: UUID) -> WorkspaceInfo:
+        with self.engine.begin() as connection:
+            member = resolve_member(
+                connection,
+                issuer=principal.issuer,
+                subject=principal.subject,
+                workspace_id=workspace_id,
+            )
+            name = connection.execute(
+                text("SELECT name FROM workspaces WHERE id=:workspace"), {"workspace": workspace_id}
+            ).scalar_one()
+            return WorkspaceInfo(workspace_id, name, member.role)
+
     def list_members(
         self, principal: Principal, workspace_id: UUID, *, limit: int = 50
     ) -> list[MemberInfo]:
