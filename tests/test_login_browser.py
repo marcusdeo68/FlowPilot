@@ -1992,6 +1992,13 @@ def test_workspace_access_invitation_role_lifecycle_and_last_owner_conflict(logi
         assert selected.value.status == 200
         expect(recipient.get_by_text("Invitation accepted.", exact=True)).to_be_visible()
         expect(selection).to_have_value(workspace_id)
+        recipient.route(
+            origin + "/api/v2/workspaces?limit=100", lambda route: route.fulfill(json=[]), times=1
+        )
+        with recipient.expect_response(origin + f"/api/v2/workspaces/{workspace_id}") as refreshed:
+            recipient.get_by_role("button", name="Refresh workspaces", exact=True).click()
+        assert refreshed.value.status == 200
+        expect(selection).to_have_value(workspace_id)
         recipient.get_by_role("button", name="Workspace access", exact=True).click()
         expect(recipient.locator("#access-role")).to_have_text("Observer")
         expect(recipient.get_by_role("list", name="Members", exact=True)).to_be_hidden()

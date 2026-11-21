@@ -630,9 +630,9 @@ async function loadWorkspaces(created, preferredId) {
     }
     const listed = workspaces.some(({ id }) => id === preferred);
     let extra = created;
-    if (!listed && preferredId) {
+    if (!listed && !extra && preferred) {
       try {
-        extra = await request("workspaces/" + encodeURIComponent(preferredId));
+        extra = await request("workspaces/" + encodeURIComponent(preferred));
         if (version !== sessionVersion) return;
       } catch (status) {
         if (version !== sessionVersion || expired(status)) return;
