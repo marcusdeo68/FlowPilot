@@ -103,8 +103,8 @@ The default dashboard remains a local, unauthenticated SQLite scaffold for
 synthetic/manual commitments. A separate PostgreSQL workspace API now has typed
 work/source/evidence storage, stored-membership authorization, and configured
 signed-access-token verification, API onboarding, and owner-controlled membership.
-Optional token-bounded browser sessions are increment 0012. It has no real identity
-provider or invitation consent/delivery yet. Increment 0016 adds an opt-in generic
+Optional token-bounded browser sessions are increment 0012. Live identity
+and invitation delivery are unconfigured. Increment 0016 adds an opt-in generic
 browser sign-in/callback adapter verified with synthetic providers; live identity
 configuration remains pending. Increment 0017 adds workspace selection,
 creation, work browsing and sign-out in the verified browser app. Increment 0018
@@ -117,6 +117,7 @@ and upcoming or ongoing manual events. Increment 0024 adds private sticky notes.
 Increment 0025 lets users create, browse, reschedule, and cancel manual events.
 The workspace also offers in-app reminders and a signed-in access view for
 the current user's role and owner-managed membership changes.
+Registered synthetic users can accept or decline workspace invitations in the browser.
 Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational
 controls before introducing real connectors or personal data.

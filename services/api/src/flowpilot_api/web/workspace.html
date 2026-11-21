@@ -10,6 +10,7 @@
   <script src="/api/v2/workspace-events.js" defer></script>
   <script src="/api/v2/workspace-reminders.js" defer></script>
   <script src="/api/v2/workspace-access.js" defer></script>
+  <script src="/api/v2/workspace-invitations.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -27,6 +28,19 @@
       <button id="retry-session" type="button" hidden>Retry</button>
     </div>
     <div id="workspace" hidden>
+      <section id="invitations-panel" aria-labelledby="invitations-heading">
+        <h2 id="invitations-heading">Invitations</h2>
+        <div id="invitation-profile" hidden>
+          <span>Your registered user ID </span><code id="invitation-user-id"></code>
+        </div>
+        <div class="actions">
+          <button id="register-profile" type="button" hidden>Register profile</button>
+          <button id="refresh-invitations" type="button" hidden>Refresh invitations</button>
+        </div>
+        <p id="invitation-feedback" role="status"></p>
+        <p id="invitation-status" role="status"></p>
+        <ul id="incoming-invitations" aria-label="Incoming invitations" hidden></ul>
+      </section>
       <section aria-labelledby="choose-heading">
         <h2 id="choose-heading">Choose a workspace</h2>
         <label for="workspace-select">Workspace</label>
@@ -103,7 +117,7 @@
         <button id="refresh-access" type="button" hidden>Refresh access details</button>
         <div id="access-admin" hidden>
           <form id="grant-access" aria-labelledby="grant-access-heading" hidden>
-            <h3 id="grant-access-heading">Grant access</h3>
+            <h3 id="grant-access-heading">Invite user</h3>
             <p>Ask the registered user to share their FlowPilot user ID.</p>
             <label for="grant-user-id">Registered user ID</label>
             <input id="grant-user-id" required maxlength="36" spellcheck="false" autocomplete="off">
@@ -113,8 +127,11 @@
               <option value="member" selected>Member</option>
               <option value="owner">Owner</option>
             </select>
-            <button type="submit">Grant access</button>
+            <button type="submit">Send invitation</button>
           </form>
+          <h3>Pending invitations</h3>
+          <p id="offered-limit" hidden>Showing up to 20 pending invitations.</p>
+          <ul id="outgoing-invitations" aria-label="Pending invitations"></ul>
           <h3>Members</h3>
           <p id="member-limit" hidden>Showing up to 100 memberships.</p>
           <ul id="workspace-members" aria-label="Members"></ul>

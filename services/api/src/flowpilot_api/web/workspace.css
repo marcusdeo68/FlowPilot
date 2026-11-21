@@ -45,3 +45,5 @@ nav [aria-pressed="false"] { background: #fff; color: #275745; }
 #access-profile dd { margin: .2rem 0 .65rem; }
 #grant-user-id { width: min(100%, 28rem); }
 #workspace-members .actions { margin-top: .5rem; }
+#invitation-profile, #incoming-invitations .actions, #outgoing-invitations button { margin-top: .5rem; }
+#invitation-profile code { overflow-wrap: anywhere; }

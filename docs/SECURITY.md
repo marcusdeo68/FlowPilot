@@ -80,6 +80,14 @@ held by the tab. A supplied binding that mismatches the current cookie fails
 authentication. Owner roster and history clear when the view loses access or
 changes context. See [0028](implementation/0028-workspace-access.md).
 
+Increment 0029 adds local consent for workspace invitations. Only the registered
+recipient can accept the exact offer. Acceptance verifies the inviter's active
+owner role and membership version under the workspace lock. Offers expire after
+seven days. Invitation decisions and resulting membership changes commit with
+append-only audit. The original direct grant stays available through the signed
+synthetic API. Production delivery and abuse controls need review before that
+API can handle real accounts. See [0029](implementation/0029-workspace-invitations.md).
+
 - Authentication and server-side workspace/member/role authorization.
 - Tenant isolation tests and review of every query and background job for object-level access checks.
 - PostgreSQL migrations, backups, recovery, encryption at rest, retention, deletion, and export procedures.

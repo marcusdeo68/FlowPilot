@@ -229,3 +229,11 @@ Read [0028](implementation/0028-workspace-access.md). Try demoting the last
 active owner, then promote a synthetic teammate and repeat the change. Compare
 the authorized membership version with the workspace-wide owner count. Explain
 why removing the current user's access also requires reloading their workspace list.
+
+## Workspace invitation exercise
+
+Read [0029](implementation/0029-workspace-invitations.md). Have a synthetic
+owner offer Observer access and inspect the pending offer in the recipient's
+session. Revoke the invitation before the recipient accepts. Explain why the
+workspace lock, offer version and two append-only histories protect different
+parts of the workflow.

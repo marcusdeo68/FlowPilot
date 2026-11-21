@@ -62,6 +62,10 @@ def workspace_ui(browser: BrowserAuth, *, login_enabled: bool) -> APIRouter:
     def access_script():
         return FileResponse(ASSETS / "workspace-access.js", media_type="text/javascript")
 
+    @router.get(WORKSPACE_URL + "-invitations.js", include_in_schema=False)
+    def invitations_script():
+        return FileResponse(ASSETS / "workspace-invitations.js", media_type="text/javascript")
+
     @router.get(WORKSPACE_URL + ".css", include_in_schema=False)
     def styles():
         return FileResponse(ASSETS / "workspace.css", media_type="text/css")

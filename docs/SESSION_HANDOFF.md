@@ -1,11 +1,19 @@
 # Session handoff
 
-## Latest increment — signed-in workspace access
+## Latest increment — recipient-consented invitations
+
+Increment 0029 adds signed-in profile registration, owner-managed offers, and
+recipient decisions for synthetic workspace invitations. Apply migration
+`0009_workspace_invitations` to use the updated workspace API. See
+[0029](implementation/0029-workspace-invitations.md) and [STATUS](STATUS.md).
+The next increment can improve signed-in task organization while access and
+operational controls for a live pilot are reviewed.
+
+## Previous increment — signed-in workspace access
 
 Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
 Owners can manage roles, grants and existing memberships and review history.
-The next access increment is recipient-consented invitations for registered
-synthetic users. See [STATUS](STATUS.md) for verification.
+See [STATUS](STATUS.md) for verification.
 
 ## Previous increment — reminder settings
 

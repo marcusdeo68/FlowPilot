@@ -6,8 +6,11 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0029 adds [recipient-consented invitations](implementation/0029-workspace-invitations.md).
+  Upgrade the workspace database to `0009_workspace_invitations` before use.
 - Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
-  It connects the browser to the existing membership and audit routes.
+  Merged as `48e0d31` in [PR #35](https://github.com/marcusdeo68/FlowPilot/pull/35).
+  Independent verification passed 298 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44888015611) passed.
 - Increment 0027 adds [reminder settings](implementation/0027-reminder-settings.md)
   for category, event lead time and future snooze duration in the signed-in tab.
   Independent verification passed 294 tests with no skips, including 103

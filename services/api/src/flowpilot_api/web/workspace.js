@@ -21,6 +21,7 @@ const showAccess = document.querySelector("#show-access");
 const inboxPanel = document.querySelector("#inbox-panel");
 const notesPanel = document.querySelector("#notes-panel");
 const accessPanel = document.querySelector("#access-panel");
+const invitationsPanel = document.querySelector("#invitations-panel");
 const workPanel = document.querySelector("#work-panel");
 const workHeading = document.querySelector("#work-heading");
 const todayReviews = document.querySelector("#today-reviews");
@@ -68,6 +69,7 @@ let workspaceView = "work";
 let inboxSaving = false;
 let notesBusy = false;
 let accessSaving = false;
+let invitationSaving = false;
 let workspaceSelectionBusy = false;
 
 const inbox = createWorkspaceInbox({
@@ -141,6 +143,27 @@ const access = createWorkspaceAccess({
   },
 });
 
+const invitations = createWorkspaceInvitations({
+  request,
+  expired,
+  lockNavigation(locked) {
+    invitationSaving = locked;
+    syncWorkControls();
+  },
+  registered(id) {
+    ownId = id;
+    invitations.show(id, session.can_write);
+    loadSelectedWorkspaceView();
+  },
+  async refreshWorkspace(preferred, message) {
+    const version = sessionVersion;
+    const loading = loadWorkspaces(undefined, preferred);
+    invitations.showFeedback(message);
+    await loading;
+    if (version === sessionVersion) invitations.showFeedback(message);
+  },
+});
+
 function clearWorkspaceWriteHint() {
   const option = select.selectedOptions[0];
   if (option) delete option.dataset.role;
@@ -199,6 +222,7 @@ function clearSession() {
   inbox.clear();
   notes.clear();
   access.clear();
+  invitations.clear();
   clearTodayLists();
   workspaceView = "work";
   syncWorkspaceNavigation();
@@ -289,13 +313,16 @@ function switchWorkspaceView(view) {
 function syncWorkControls() {
   const eventLocked = events.locked();
   const editorOpen = !taskEditor.hidden || eventLocked;
-  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || accessSaving;
+  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || accessSaving || invitationSaving;
   select.disabled = workspaceLocked || !select.options.length;
   createButton.disabled = refreshWorkspaces.disabled = workspaceLocked;
-  nameInput.disabled = notesBusy || eventLocked || accessSaving;
-  notesPanel.inert = accessPanel.inert = workspaceSelectionBusy;
+  nameInput.disabled = notesBusy || eventLocked || accessSaving || invitationSaving;
+  notesPanel.inert = accessPanel.inert = workspaceSelectionBusy || invitationSaving;
+  inboxPanel.inert = workPanel.inert = invitationSaving;
+  invitationsPanel.inert = workspaceSelectionBusy || accessSaving || notesBusy || editorOpen
+    || inboxSaving || taskUpdate === "pending";
   workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
-  const navigationLocked = workView.disabled || inboxSaving || notesBusy || accessSaving;
+  const navigationLocked = workView.disabled || inboxSaving || notesBusy || accessSaving || invitationSaving;
   showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
   showAccess.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
@@ -572,15 +599,16 @@ async function loadTodayEvents() {
   }
 }
 
-async function loadWorkspaces(created) {
+async function loadWorkspaces(created, preferredId) {
   if (!session) return;
   const version = sessionVersion;
-  const preferred = created?.id ?? select.value;
+  const preferred = created?.id ?? preferredId ?? select.value;
   workspaceSelectionBusy = true;
   reminders.select(undefined, session);
   inbox.clear();
   notes.clear();
   access.clear();
+  invitations.clear();
   clearTodayLists();
   clearWork();
   select.replaceChildren();
@@ -589,13 +617,15 @@ async function loadWorkspaces(created) {
   try {
     const workspaces = await request("workspaces?limit=100");
     if (version !== sessionVersion) return;
-    if (workspaces.length && !ownId) {
+    let unregistered = false;
+    if (!ownId) {
       try {
         const profile = await request("me");
         if (version !== sessionVersion) return;
         ownId = profile.id;
       } catch (status) {
         if (version !== sessionVersion || expired(status)) return;
+        unregistered = status === 404;
       }
     }
     const listed = workspaces.some(({ id }) => id === preferred);
@@ -614,6 +644,7 @@ async function loadWorkspaces(created) {
     if (workspaces.length && !ownId) {
       workspaceStatus.textContent += " Could not load your profile. Refresh workspaces to edit tasks.";
     }
+    invitations.show(ownId, session.can_write, unregistered);
     loadSelectedWorkspaceView();
   } catch (status) {
     if (version !== sessionVersion || expired(status)) return;
