@@ -88,7 +88,16 @@ def visible_evidence(
         EvidenceVisibility.EXCERPT_SHARED,
     ):
         raise AccessDenied
-    if member.user_id == owner_id or visibility == EvidenceVisibility.EXCERPT_SHARED:
+    if member.user_id == owner_id:
+        return {"summary": summary, "excerpt": excerpt}
+    return shared_evidence(visibility, summary=summary, excerpt=excerpt)
+
+
+def shared_evidence(
+    visibility: EvidenceVisibility, *, summary: str, excerpt: str
+) -> dict[str, str]:
+    """Fields exposed through an explicitly workspace-visible evidence link."""
+    if visibility == EvidenceVisibility.EXCERPT_SHARED:
         return {"summary": summary, "excerpt": excerpt}
     if visibility == EvidenceVisibility.SUMMARY_SHARED:
         return {"summary": summary}

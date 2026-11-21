@@ -34,6 +34,11 @@ AWS is the planned later deployment target.
 
 ## Module boundaries
 
+Increment 0030 gets a consistent work and evidence preview under the same row
+lock used for evidence linking. The confirmation uses the preview's version.
+The existing workspace share operation commits visibility and history together.
+See [0030](implementation/0030-workspace-sharing.md).
+
 Increment 0025 resolves local event times with `zoneinfo` before writing canonical
 events through `WorkService`. The browser Events filter uses the existing authorized
 work pagination, and event edits follow its record-version and audit rules. See

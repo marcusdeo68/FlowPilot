@@ -6,8 +6,12 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0030 adds [workspace sharing](implementation/0030-workspace-sharing.md).
+  Authors can review and share tasks and events, and work now supports visibility filters.
 - Increment 0029 adds [recipient-consented invitations](implementation/0029-workspace-invitations.md).
   Upgrade the workspace database to `0009_workspace_invitations` before use.
+  Merged as `abb2f3f` in [PR #36](https://github.com/marcusdeo68/FlowPilot/pull/36).
+  Independent verification passed 303 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44890351123) passed.
 - Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
   Merged as `48e0d31` in [PR #35](https://github.com/marcusdeo68/FlowPilot/pull/35).
   Independent verification passed 298 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44888015611) passed.

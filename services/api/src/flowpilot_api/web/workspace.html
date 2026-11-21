@@ -11,6 +11,7 @@
   <script src="/api/v2/workspace-reminders.js" defer></script>
   <script src="/api/v2/workspace-access.js" defer></script>
   <script src="/api/v2/workspace-invitations.js" defer></script>
+  <script src="/api/v2/workspace-sharing.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -148,6 +149,8 @@
             <option value="all">All work</option>
             <option value="due">Due tasks</option>
             <option value="events">Events</option>
+            <option value="workspace">Shared work</option>
+            <option value="private">My private work</option>
           </select>
           <button id="new-task" type="button" hidden>New task</button>
           <button id="new-event" type="button" hidden>New event</button>
@@ -189,6 +192,24 @@
         </form>
         <p id="task-feedback" role="status"></p>
         <p id="event-feedback" role="status"></p>
+        <form id="share-preview" aria-labelledby="share-heading" hidden>
+          <h3 id="share-heading" tabindex="-1">Review workspace sharing</h3>
+          <div id="share-details" hidden>
+            <p>Current and future members of <strong id="share-workspace"></strong> will be able
+              to read this item, its history and later edits. Members with write access can change its status.</p>
+            <dl id="share-fields"></dl>
+            <div id="share-evidence-panel" hidden>
+              <h4>Evidence visible to the workspace</h4>
+              <ul id="share-evidence"></ul>
+            </div>
+            <p>This shares the item permanently. Review its text before confirming.</p>
+          </div>
+          <div class="actions">
+            <button id="confirm-share" type="submit" disabled>Confirm sharing</button>
+            <button id="close-share" type="button">Close sharing review</button>
+          </div>
+        </form>
+        <p id="share-feedback" role="status"></p>
         <p id="work-status" role="status"></p>
         <ul id="work-items"></ul>
         <button id="more-work" type="button" hidden>Load more</button>

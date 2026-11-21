@@ -2158,6 +2158,164 @@ def test_workspace_access_ignores_denial_from_previous_workspace(login_browser):
     expect(page.get_by_text("Access details are unavailable.", exact=False)).to_have_count(0)
 
 
+def test_workspace_browser_reviews_and_shares_tasks_and_events(login_browser, pg):
+    from uuid import UUID
+
+    from flowpilot_api.access import Role
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    service = MembershipService(pg[0])
+    viewer = Principal(provider, "sharing-observer")
+    viewer_id = service.register_profile(viewer).id
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Sharing workshop")
+    service.add_member(
+        Principal(provider, "new-browser-user"), UUID(workspace), viewer_id, role=Role.OBSERVER
+    )
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    headers = {"Content-Type": "application/json", "X-CSRF-Token": csrf}
+    base = f"/api/v2/workspaces/{workspace}"
+
+    def post(path, payload):
+        result = fetch(page, path, method="POST", headers=headers, body=json.dumps(payload))
+        assert result["status"] in (200, 201)
+        return json.loads(result["text"])
+
+    description = "<b>Workshop agenda</b>\nBring the handout."
+    task = post(
+        base + "/work",
+        {
+            "item": {
+                "kind": "task",
+                "title": "Private rehearsal task",
+                "description": description,
+            }
+        },
+    )
+    event = post(
+        base + "/work",
+        {
+            "item": {
+                "kind": "event",
+                "title": "Workshop time",
+                "time_zone": "America/New_York",
+                "starts_at": "2030-06-15T14:00:01.123456Z",
+                "ends_at": "2030-06-15T15:00:02.123456Z",
+            }
+        },
+    )
+    task_path = base + "/work/" + task["id"]
+    sources = []
+    for visibility, summary, excerpt in (
+        ("private", "Private evidence title", "Private evidence"),
+        ("summary_shared", "Published evidence summary", "Withheld excerpt"),
+    ):
+        source = post(
+            base + "/sources",
+            {
+                "reference": f"Synthetic reference {visibility}",
+                "summary": summary,
+                "excerpt": excerpt,
+            },
+        )
+        sources.append(source["id"])
+        task = post(
+            task_path + "/evidence",
+            {
+                "source_id": source["id"],
+                "expected_version": task["version"],
+                "visibility": visibility,
+            },
+        )
+    browser = context.browser
+    assert browser is not None
+    other_context = browser.new_context()
+    try:
+        other = other_context.new_page()
+        other.goto(origin + "/api/v2/test-login-browser")
+        issued = fetch(
+            other,
+            "/api/v2/session",
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {sign('sharing-observer')}",
+            },
+        )
+        assert issued["status"] == 201
+        other.goto(origin + "/api/v2/workspace")
+        other.get_by_label("Work view", exact=True).select_option("workspace")
+        expect(other.get_by_text("No shared work yet.", exact=True)).to_be_visible()
+
+        page.get_by_label("Work view", exact=True).select_option("private")
+        draft = page.get_by_role("listitem").filter(has_text="Private rehearsal task")
+        preview = page.get_by_role("form", name="Review workspace sharing")
+        confirm = preview.get_by_role("button", name="Confirm sharing", exact=True)
+        draft.get_by_role("button", name="Share with workspace", exact=True).click()
+        expect(confirm).to_be_enabled()
+        expect(preview.get_by_text("Sharing workshop", exact=True)).to_be_visible()
+        expect(preview.locator("dd").filter(has_text="Workshop agenda")).to_have_text(
+            description, use_inner_text=True
+        )
+        expect(preview.get_by_text("Published evidence summary", exact=True)).to_be_visible()
+        expect(preview.get_by_text("Private evidence title", exact=True)).to_have_count(0)
+        expect(preview.get_by_text("Withheld excerpt", exact=True)).to_have_count(0)
+        expect(page.get_by_label("Workspace", exact=True)).to_be_disabled()
+        preview.get_by_role("button", name="Close sharing review", exact=True).click()
+        assert json.loads(fetch(page, task_path)["text"])["visibility"] == "private"
+
+        draft.get_by_role("button", name="Share with workspace", exact=True).click()
+        expect(confirm).to_be_enabled()
+        revised = "Updated rehearsal task"
+        changed = fetch(
+            page,
+            task_path + "/task-details",
+            method="PATCH",
+            headers=headers,
+            body=json.dumps(
+                {
+                    "expected_version": task["version"],
+                    "details": {"title": revised, "description": description, "due_date": None},
+                }
+            ),
+        )
+        assert changed["status"] == 200
+        confirm.click()
+        expect(page.get_by_text("This item changed.", exact=False)).to_be_visible()
+        expect(confirm).to_be_disabled()
+        preview.get_by_role("button", name="Close sharing review", exact=True).click()
+        page.get_by_role("button", name="Retry work list", exact=True).click()
+        updated = page.get_by_role("listitem").filter(has_text=revised)
+        updated.get_by_role("button", name="Share with workspace", exact=True).click()
+        expect(preview.get_by_text(revised, exact=True)).to_be_visible()
+        confirm.click()
+        expect(page.get_by_text("Work shared with the workspace.", exact=True)).to_be_visible()
+        expect(updated).to_have_count(0)
+
+        event_row = page.get_by_role("listitem").filter(has_text="Workshop time")
+        event_row.get_by_role("button", name="Share with workspace", exact=True).click()
+        expect(preview.get_by_text(event["data"]["starts_at"], exact=True)).to_be_visible()
+        expect(preview.get_by_text(event["data"]["ends_at"], exact=True)).to_be_visible()
+        expect(preview.get_by_text(event["data"]["time_zone"], exact=True)).to_be_visible()
+        confirm.click()
+        expect(event_row).to_have_count(0)
+
+        other.reload()
+        other.get_by_label("Work view", exact=True).select_option("workspace")
+        task_row = other.get_by_role("listitem").filter(has_text=revised)
+        expect(task_row).to_be_visible()
+        expect(other.get_by_role("listitem").filter(has_text="Workshop time")).to_be_visible()
+        expect(task_row.get_by_role("button")).to_have_count(0)
+        expect(task_row).to_contain_text("Shared with workspace")
+        assert json.loads(fetch(other, task_path + "/evidence")["text"]) == [
+            {"summary": "Published evidence summary"}
+        ]
+        for source_id in sources:
+            assert fetch(other, base + "/sources/" + source_id)["status"] == 404
+    finally:
+        other_context.close()
+
+
 def test_workspace_browser_clears_visible_work_when_session_expires(login_browser, pg):
     from playwright.sync_api import expect
 

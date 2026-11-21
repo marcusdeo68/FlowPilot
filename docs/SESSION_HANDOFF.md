@@ -1,13 +1,18 @@
 # Session handoff
 
-## Latest increment — recipient-consented invitations
+## Latest increment — workspace sharing
+
+Increment 0030 adds [review and sharing](implementation/0030-workspace-sharing.md)
+for private tasks and events, with Shared work and My private work filters.
+See [STATUS](STATUS.md) for verification. Next, improve task organization or
+finish the operational controls for a live pilot.
+
+## Previous increment — recipient-consented invitations
 
 Increment 0029 adds signed-in profile registration, owner-managed offers, and
 recipient decisions for synthetic workspace invitations. Apply migration
 `0009_workspace_invitations` to use the updated workspace API. See
 [0029](implementation/0029-workspace-invitations.md) and [STATUS](STATUS.md).
-The next increment can improve signed-in task organization while access and
-operational controls for a live pilot are reviewed.
 
 ## Previous increment — signed-in workspace access
 

@@ -68,6 +68,7 @@ from flowpilot_api.work_service import (
     ManualSource,
     ReminderCandidates,
     ReminderCategory,
+    SharePreview,
     SourceNotFound,
     StoredWork,
     UpcomingEvents,
@@ -413,9 +414,10 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
         after: UUID | None = None,
         kind: Literal["event"] | None = None,
+        visibility: Visibility | None = None,
     ):
         return service.list_work_page(
-            user.principal, workspace_id, limit=limit, after=after, kind=kind
+            user.principal, workspace_id, limit=limit, after=after, kind=kind, visibility=visibility
         )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work-due", response_model=DueTasks)
@@ -574,6 +576,15 @@ def create_workspace_app(
             target=payload.target,
             expected_version=payload.expected_version,
         )
+
+    @app.get(
+        "/api/v2/workspaces/{workspace_id}/work/{work_id}/share-preview",
+        response_model=SharePreview,
+    )
+    def preview_share(
+        workspace_id: UUID, work_id: UUID, user: Annotated[AccessIdentity, Depends(write_identity)]
+    ):
+        return service.share_preview(user.principal, workspace_id, work_id)
 
     @app.post("/api/v2/workspaces/{workspace_id}/work/{work_id}/share", response_model=StoredWork)
     def share(

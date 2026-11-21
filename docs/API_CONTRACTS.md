@@ -179,6 +179,14 @@ membership are required; private work remains creator-only. Inaccessible/unknown
 pivots return 404, invalid limit/UUID 422. The existing `/work` list is preserved.
 See [work pagination](implementation/0014-work-pagination.md) for live-traversal limits.
 
+`work-page` accepts an optional `visibility=private|workspace`. It applies the
+filter before pagination and requires the cursor to match the filter as well as
+the current authorization boundary. `GET /api/v2/workspaces/{workspace_id}/work/{work_id}/share-preview`
+requires the originator of a private record with write capability. It returns
+`{item, evidence}` with the current work version and the evidence fields other
+members can read after sharing. Confirm with that `expected_version` on the
+existing `/share` POST. See [0030](implementation/0030-workspace-sharing.md).
+
 Due tasks: `GET /api/v2/workspaces/{workspace_id}/work-due?limit=20` returns
 `{items, has_more}`. It includes visible tasks in open, active, or blocked state
 with a due date. Earliest dates come first, with descending creation time and UUID

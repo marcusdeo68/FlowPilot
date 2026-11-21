@@ -130,6 +130,15 @@ active writers to cancel events visible to them, including shared events.
 Cookie writes require CSRF. Changes and metadata-only audit events commit together.
 See [0025](implementation/0025-manual-workspace-events.md).
 
+## Workspace sharing
+
+Authors with write capability can review a private work item and the exact
+evidence projection visible to other members. Confirmation binds to the
+reviewed work version. Linking evidence increments that version and requires
+a fresh review. Sharing publishes the canonical fields and history to the
+workspace and retains the separate source and evidence authorization rules.
+See [0030](implementation/0030-workspace-sharing.md).
+
 ## Reminder privacy
 
 Popup reminders must respect the viewer's source/work visibility. Permission to

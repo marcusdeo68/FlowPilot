@@ -47,3 +47,6 @@ nav [aria-pressed="false"] { background: #fff; color: #275745; }
 #workspace-members .actions { margin-top: .5rem; }
 #invitation-profile, #incoming-invitations .actions, #outgoing-invitations button { margin-top: .5rem; }
 #invitation-profile code { overflow-wrap: anywhere; }
+#share-fields dt { font-weight: 600; }
+#share-fields dd { margin: .2rem 0 .65rem; }
+#share-fields dd, #share-evidence li { white-space: pre-wrap; overflow-wrap: anywhere; }

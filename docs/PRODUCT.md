@@ -118,6 +118,8 @@ Increment 0025 lets users create, browse, reschedule, and cancel manual events.
 The workspace also offers in-app reminders and a signed-in access view for
 the current user's role and owner-managed membership changes.
 Registered synthetic users can accept or decline workspace invitations in the browser.
+Creators can review and share individual tasks and events with members of the
+workspace. Shared work and private work have their own filters.
 Provider integrations, AI inference, outbound actions,
 and deployment remain future work. Complete the access model and operational
 controls before introducing real connectors or personal data.
