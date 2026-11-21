@@ -1,7 +1,7 @@
 # Implementation 0030 — Workspace sharing
 
 Open **Work items** and choose **Share with workspace** on a private task or
-event you created. The review names the workspace and displays the complete
+scheduled event you created. The review names the workspace and displays the complete
 saved title and description, status, due date or exact event schedule, and any
 evidence visible to fellow members. For example, review a private workshop task
 and its previously approved evidence summary, then confirm. An observer can

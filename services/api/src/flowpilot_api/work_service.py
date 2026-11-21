@@ -614,6 +614,8 @@ class WorkService:
             member = self._member(connection, principal, workspace_id, write=True)
             # Evidence linking locks this same row before changing links and its version.
             item = self._shareable_work(connection, member, work_id)
+            if isinstance(item.data, Event) and item.data.status != "scheduled":
+                raise InvalidTransition("Only scheduled events can be previewed")
             evidence = []
             for row in self._evidence_rows(connection, workspace_id, work_id):
                 fields = shared_evidence(

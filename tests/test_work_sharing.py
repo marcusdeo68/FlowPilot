@@ -98,6 +98,34 @@ def test_preview_projects_workspace_evidence_and_binds_sharing_to_version(worksp
         )
         == 1
     )
+    event = client.post(
+        base + "/work",
+        headers=author,
+        json={
+            "item": {
+                "kind": "event",
+                "title": "Synthetic rehearsal",
+                "time_zone": "UTC",
+                "starts_at": "2030-06-15T14:00:00Z",
+                "ends_at": "2030-06-15T15:00:00Z",
+            }
+        },
+    )
+    assert event.status_code == 201
+    event_path = base + "/work/" + event.json()["id"]
+    assert client.get(event_path + "/share-preview", headers=author).status_code == 200
+    assert (
+        client.post(
+            event_path + "/transitions",
+            headers=author,
+            json={
+                "target": "canceled",
+                "expected_version": 1,
+            },
+        ).status_code
+        == 200
+    )
+    assert client.get(event_path + "/share-preview", headers=author).status_code == 409
 
 
 def test_visibility_filters_precede_pagination_and_validate_cursors(workspace_client):

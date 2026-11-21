@@ -184,7 +184,8 @@ filter before pagination and requires the cursor to match the filter as well as
 the current authorization boundary. `GET /api/v2/workspaces/{workspace_id}/work/{work_id}/share-preview`
 requires the originator of a private record with write capability. It returns
 `{item, evidence}` with the current work version and the evidence fields other
-members can read after sharing. Confirm with that `expected_version` on the
+members can read after sharing. Event previews require the scheduled status.
+Confirm with that `expected_version` on the
 existing `/share` POST. See [0030](implementation/0030-workspace-sharing.md).
 
 Due tasks: `GET /api/v2/workspaces/{workspace_id}/work-due?limit=20` returns

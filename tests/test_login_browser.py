@@ -2300,11 +2300,36 @@ def test_workspace_browser_reviews_and_shares_tasks_and_events(login_browser, pg
         confirm.click()
         expect(event_row).to_have_count(0)
 
+        page.get_by_label("Work view", exact=True).select_option("workspace")
+        expect(page.get_by_role("button", name="New task", exact=True)).to_be_hidden()
+        expect(page.get_by_role("button", name="New event", exact=True)).to_be_hidden()
+        edit_task = updated.get_by_role("button", name="Edit task", exact=True)
+        edit_task.click()
+        expect(page.get_by_label("Task title", exact=True)).to_have_value(revised)
+        page.locator("#cancel-task").click()
+        expect(edit_task).to_be_focused()
+        edit_task.click()
+        shared_task_title = "Shared rehearsal task updated"
+        page.get_by_label("Task title", exact=True).fill(shared_task_title)
+        page.locator("#save-task").click()
+        expect(page.get_by_text("Task updated.", exact=True)).to_be_visible()
+
+        edit_event = event_row.get_by_role("button", name="Edit event", exact=True)
+        edit_event.click()
+        expect(page.get_by_label("Event title", exact=True)).to_have_value("Workshop time")
+        page.get_by_role("button", name="Close event editor", exact=True).click()
+        expect(edit_event).to_be_focused()
+        edit_event.click()
+        shared_event_title = "Shared workshop time updated"
+        page.get_by_label("Event title", exact=True).fill(shared_event_title)
+        page.get_by_role("button", name="Save event changes", exact=True).click()
+        expect(page.get_by_text("Event updated.", exact=True)).to_be_visible()
+
         other.reload()
         other.get_by_label("Work view", exact=True).select_option("workspace")
-        task_row = other.get_by_role("listitem").filter(has_text=revised)
+        task_row = other.get_by_role("listitem").filter(has_text=shared_task_title)
         expect(task_row).to_be_visible()
-        expect(other.get_by_role("listitem").filter(has_text="Workshop time")).to_be_visible()
+        expect(other.get_by_role("listitem").filter(has_text=shared_event_title)).to_be_visible()
         expect(task_row.get_by_role("button")).to_have_count(0)
         expect(task_row).to_contain_text("Shared with workspace")
         assert json.loads(fetch(other, task_path + "/evidence")["text"]) == [

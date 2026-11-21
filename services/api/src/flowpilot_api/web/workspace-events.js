@@ -39,6 +39,7 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
 
   let generation = 0;
   let item;
+  let opener;
   let initial;
   let pending = false;
   let paused = false;
@@ -50,7 +51,7 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
   function closeEditor() {
     editor.reset();
     editor.hidden = true;
-    item = initial = undefined;
+    item = initial = opener = undefined;
   }
 
   function clear() {
@@ -62,8 +63,9 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     closeEditor();
   }
 
-  function open(record, schedule) {
+  function open(record, schedule, trigger = create) {
     item = record;
+    opener = trigger;
     title.value = item?.data.title ?? "";
     description.value = item?.data.description ?? "";
     if (schedule) {
@@ -83,9 +85,9 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
     title.focus();
   }
 
-  async function openExisting(record) {
+  async function openExisting(record, trigger) {
     const current = context();
-    if (!current || create.hidden || create.disabled) return;
+    if (!current || create.disabled) return;
     const version = generation;
     pending = true;
     syncControls();
@@ -100,7 +102,7 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
         offerReload();
         return;
       }
-      open(record, schedule);
+      open(record, schedule, trigger);
     } catch (status) {
       if (version !== generation || expired(status)) return;
       if (status === 403 || status === 404) deny(status);
@@ -200,10 +202,11 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
   });
   close.addEventListener("click", () => {
     if (pending) return;
+    const trigger = opener;
     closeEditor();
     if (!paused) feedback.textContent = "";
     syncControls();
-    (create.disabled ? document.querySelector("#retry-work") : create).focus();
+    if (trigger?.isConnected) (paused ? document.querySelector("#retry-work") : trigger).focus();
   });
 
   function renderActions(row, record, own) {
@@ -217,7 +220,7 @@ function createWorkspaceEvents({ request, context, expired, reload, offerReload,
       control.addEventListener("click", handler);
       actions.append(control);
     };
-    if (own) button("Edit event", () => void openExisting(record));
+    if (own) button("Edit event", event => void openExisting(record, event.currentTarget));
     button("Cancel event", () => {
       if (pending || paused || !editor.hidden || !row.isConnected) return;
       if (!window.confirm("Cancel this event? It cannot be reopened.")) return;

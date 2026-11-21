@@ -61,6 +61,7 @@ let expiresTimer;
 let nextCursor;
 let ownId;
 let editingTask;
+let taskOpener;
 let loadedTitle;
 let loadedDescription;
 let editorVersion = 0;
@@ -208,6 +209,7 @@ async function request(path, options, onProblem) {
 function closeTaskEditor() {
   editorVersion += 1;
   editingTask = undefined;
+  taskOpener = undefined;
   loadedTitle = loadedDescription = undefined;
   taskEditor.reset();
   taskEditor.hidden = true;
@@ -358,10 +360,11 @@ function syncWorkControls() {
   }
 }
 
-function openTaskEditor(task) {
-  if (newTask.hidden || newTask.disabled) return;
+function openTaskEditor(task, opener = newTask) {
+  if (!canWriteWork() || newTask.disabled || (!task && newTask.hidden)) return;
   closeTaskEditor();
   editingTask = task;
+  taskOpener = opener;
   taskHeading.textContent = task ? "Edit task" : "New task";
   saveTask.textContent = task ? "Save changes" : "Create task";
   taskTitle.value = task?.data.title ?? "";
@@ -444,7 +447,7 @@ function renderItem(item, today) {
       const edit = document.createElement("button");
       edit.type = "button";
       edit.textContent = "Edit task";
-      edit.addEventListener("click", () => openTaskEditor(item));
+      edit.addEventListener("click", () => openTaskEditor(item, edit));
       actions.append(edit);
     }
     const labels = {
@@ -463,7 +466,8 @@ function renderItem(item, today) {
     if (actions.childElementCount) row.append(actions);
   }
   if (workspaceView === "work" && canWriteWork() && item.creator_id === ownId
-    && item.visibility === "private" && (item.data.kind === "task" || item.data.kind === "event")) {
+    && item.visibility === "private"
+    && (item.data.kind === "task" || (item.data.kind === "event" && item.data.status === "scheduled"))) {
     const actions = document.createElement("div");
     actions.className = "actions task-actions sharing-actions";
     const share = document.createElement("button");
@@ -838,7 +842,11 @@ taskEditor.addEventListener("submit", async (event) => {
 });
 
 newTask.addEventListener("click", () => openTaskEditor());
-cancelTask.addEventListener("click", closeTaskEditor);
+cancelTask.addEventListener("click", () => {
+  const opener = taskOpener;
+  closeTaskEditor();
+  if (opener?.isConnected) opener.focus();
+});
 select.addEventListener("change", loadSelectedWorkspaceView);
 showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));

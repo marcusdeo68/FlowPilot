@@ -208,6 +208,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-039 | Keep canceled events free of work actions. | The existing Chromium lifecycle caught a Share button after cancellation. The fix keeps browser sharing available for scheduled events and preserves the terminal action check. |
+| FP-038 | Enable author edits from Shared work. | Audit found that hiding the create button also stopped the visible edit action. Chromium verifies editing both shared tasks and events and restoring edit focus on cancel. |
 | FP-037 | Recover an accepted workspace outside the bounded list. | Audit found that accepting a workspace beyond the first 100 could leave it out of the selector. Chromium omits the workspace on acceptance and on refresh and verifies an active-membership read supplies its current role. |
 | FP-036 | Observe live waiting locks in the invitation expiry test. | The first local run missed the worker under a transaction-cached activity snapshot. The regression checks live PostgreSQL locks, holds the unchanged row past expiry and verifies acceptance fails. |
 | FP-035 | Clear expired reminders while a poll is pending. | Audit found that a network delay could leave an already-started event or previous-day task visible. Chromium holds a request across both cutoffs and checks that the popup clears each expired title. |
