@@ -62,6 +62,7 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 - [x] Browse, create, reschedule, and cancel manual workspace events (0025).
 - [x] Opt-in reminders for due-today tasks and imminent events in an open workspace tab (0026).
 - [x] Choose reminder categories, event lead time, and snooze duration for the signed-in tab (0027).
+- [x] Review and share private tasks and events, and browse shared work by visibility (0030).
 - Unified Inbox with source evidence and review/edit/confirm/dispute actions.
 - Tasks & Projects and a schedule view.
 - Action review UI that makes sender account, recipients, target, and content visible before approval.

@@ -6,8 +6,12 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0030 adds [workspace sharing](implementation/0030-workspace-sharing.md).
+  Authors can review and share tasks and events, and work now supports visibility filters.
 - Increment 0029 adds [recipient-consented invitations](implementation/0029-workspace-invitations.md).
   Upgrade the workspace database to `0009_workspace_invitations` before use.
+  Merged as `abb2f3f` in [PR #36](https://github.com/marcusdeo68/FlowPilot/pull/36).
+  Independent verification passed 303 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44890351123) passed.
 - Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
   Merged as `48e0d31` in [PR #35](https://github.com/marcusdeo68/FlowPilot/pull/35).
   Independent verification passed 298 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44888015611) passed.
@@ -204,6 +208,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-039 | Keep canceled events free of work actions. | The existing Chromium lifecycle caught a Share button after cancellation. The fix keeps browser sharing available for scheduled events and preserves the terminal action check. |
+| FP-038 | Enable author edits from Shared work. | Audit found that hiding the create button also stopped the visible edit action. Chromium verifies editing both shared tasks and events and restoring edit focus on cancel. |
 | FP-037 | Recover an accepted workspace outside the bounded list. | Audit found that accepting a workspace beyond the first 100 could leave it out of the selector. Chromium omits the workspace on acceptance and on refresh and verifies an active-membership read supplies its current role. |
 | FP-036 | Observe live waiting locks in the invitation expiry test. | The first local run missed the worker under a transaction-cached activity snapshot. The regression checks live PostgreSQL locks, holds the unchanged row past expiry and verifies acceptance fails. |
 | FP-035 | Clear expired reminders while a poll is pending. | Audit found that a network delay could leave an already-started event or previous-day task visible. Chromium holds a request across both cutoffs and checks that the popup clears each expired title. |

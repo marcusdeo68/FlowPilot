@@ -61,6 +61,7 @@ let expiresTimer;
 let nextCursor;
 let ownId;
 let editingTask;
+let taskOpener;
 let loadedTitle;
 let loadedDescription;
 let editorVersion = 0;
@@ -116,6 +117,25 @@ const events = createWorkspaceEvents({
 });
 
 const reminders = createWorkspaceReminders({ request, expired, localDate });
+
+const sharing = createWorkspaceSharing({
+  request,
+  expired,
+  context() {
+    const option = select.selectedOptions[0];
+    if (!canWriteWork() || workspaceSelectionBusy || workspaceView !== "work") return;
+    return { path: "workspaces/" + encodeURIComponent(option.value), name: option.textContent };
+  },
+  syncControls: syncWorkControls,
+  reload(message) { void loadWork(false, "", "", message); },
+  offerReload() { retryWork.hidden = false; },
+  deny(status) {
+    if (status === 403) clearWorkspaceWriteHint();
+    clearWork();
+    sharing.showFeedback("You no longer have permission to share this item.");
+    retryWork.hidden = false;
+  },
+});
 
 const access = createWorkspaceAccess({
   request,
@@ -189,6 +209,7 @@ async function request(path, options, onProblem) {
 function closeTaskEditor() {
   editorVersion += 1;
   editingTask = undefined;
+  taskOpener = undefined;
   loadedTitle = loadedDescription = undefined;
   taskEditor.reset();
   taskEditor.hidden = true;
@@ -209,6 +230,7 @@ function clearWork() {
   newTask.hidden = true;
   taskUpdate = undefined;
   events.clear();
+  sharing.clear();
   closeTaskEditor();
 }
 
@@ -312,11 +334,13 @@ function switchWorkspaceView(view) {
 
 function syncWorkControls() {
   const eventLocked = events.locked();
-  const editorOpen = !taskEditor.hidden || eventLocked;
-  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || accessSaving || invitationSaving;
+  const sharingLocked = sharing.locked();
+  const editorOpen = !taskEditor.hidden || eventLocked || sharingLocked;
+  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || sharingLocked
+    || accessSaving || invitationSaving;
   select.disabled = workspaceLocked || !select.options.length;
   createButton.disabled = refreshWorkspaces.disabled = workspaceLocked;
-  nameInput.disabled = notesBusy || eventLocked || accessSaving || invitationSaving;
+  nameInput.disabled = notesBusy || eventLocked || sharingLocked || accessSaving || invitationSaving;
   notesPanel.inert = accessPanel.inert = workspaceSelectionBusy || invitationSaving;
   inboxPanel.inert = workPanel.inert = invitationSaving;
   invitationsPanel.inert = workspaceSelectionBusy || accessSaving || notesBusy || editorOpen
@@ -329,16 +353,18 @@ function syncWorkControls() {
   openEvents.disabled = navigationLocked;
   newTask.disabled = Boolean(taskUpdate) || editorOpen;
   events.disableCreate(newTask.disabled || workspaceSelectionBusy);
-  more.inert = retryWork.inert = eventLocked;
+  more.inert = retryWork.inert = eventLocked || sharingLocked;
   for (const button of items.querySelectorAll("button")) {
-    button.disabled = newTask.disabled || Boolean(button.closest(".event-actions") && events.paused());
+    button.disabled = newTask.disabled || Boolean(button.closest(".event-actions") && events.paused())
+      || Boolean(button.closest(".sharing-actions") && sharing.paused());
   }
 }
 
-function openTaskEditor(task) {
-  if (newTask.hidden || newTask.disabled) return;
+function openTaskEditor(task, opener = newTask) {
+  if (!canWriteWork() || newTask.disabled || (!task && newTask.hidden)) return;
   closeTaskEditor();
   editingTask = task;
+  taskOpener = opener;
   taskHeading.textContent = task ? "Edit task" : "New task";
   saveTask.textContent = task ? "Save changes" : "Create task";
   taskTitle.value = task?.data.title ?? "";
@@ -402,9 +428,7 @@ function renderItem(item, today) {
     if (today) metadata.push(item.data.due_date < today ? "Overdue" : "Due today");
     metadata.push("Due " + item.data.due_date);
   }
-  if (item.data.kind === "event") {
-    metadata.push(item.visibility === "private" ? "Private" : "Shared with workspace");
-  }
+  metadata.push(item.visibility === "private" ? "Private" : "Shared with workspace");
   detail.textContent = metadata.join(" · ");
   row.append(title, detail);
   if (item.data.kind === "event") renderEventTimes(row, item.data);
@@ -423,7 +447,7 @@ function renderItem(item, today) {
       const edit = document.createElement("button");
       edit.type = "button";
       edit.textContent = "Edit task";
-      edit.addEventListener("click", () => openTaskEditor(item));
+      edit.addEventListener("click", () => openTaskEditor(item, edit));
       actions.append(edit);
     }
     const labels = {
@@ -441,6 +465,20 @@ function renderItem(item, today) {
     }
     if (actions.childElementCount) row.append(actions);
   }
+  if (workspaceView === "work" && canWriteWork() && item.creator_id === ownId
+    && item.visibility === "private"
+    && (item.data.kind === "task" || (item.data.kind === "event" && item.data.status === "scheduled"))) {
+    const actions = document.createElement("div");
+    actions.className = "actions task-actions sharing-actions";
+    const share = document.createElement("button");
+    share.type = "button";
+    share.textContent = "Share with workspace";
+    share.addEventListener("click", () => {
+      if (row.isConnected) void sharing.open(item.id, share);
+    });
+    actions.append(share);
+    row.append(actions);
+  }
   return row;
 }
 
@@ -454,21 +492,25 @@ function localDate() {
   return parts.map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0")).join("-");
 }
 
-async function loadWork(append = false, savedMessage = "", eventMessage = "") {
+async function loadWork(append = false, savedMessage = "", eventMessage = "", shareMessage = "") {
   if (!append) {
     clearWork();
     taskFeedback.textContent = savedMessage;
     events.showFeedback(eventMessage);
+    sharing.showFeedback(shareMessage);
   }
   if (!session || !select.value) return;
   const today = workspaceView === "today" ? localDate() : undefined;
   const dueOnly = isDueView();
   const eventsOnly = !dueOnly && workView.value === "events";
+  const visibility = !dueOnly && ["private", "workspace"].includes(workView.value) ? workView.value : undefined;
+  const sharedOnly = visibility === "workspace";
   const version = ++workVersion;
   const active = sessionVersion;
   const path = "workspaces/" + encodeURIComponent(select.value) + (dueOnly ? "/work-due" : "/work-page");
   const query = new URLSearchParams({ limit: today ? "21" : "20" });
   if (eventsOnly) query.set("kind", "event");
+  if (visibility) query.set("visibility", visibility);
   if (append && nextCursor) query.set("after", nextCursor);
   workStatus.textContent = "Loading work items…";
   more.disabled = true;
@@ -478,8 +520,8 @@ async function loadWork(append = false, savedMessage = "", eventMessage = "") {
     // The due endpoint sorts by date, so later rows cannot qualify after a future date.
     const visible = today ? page.items.filter(item => item.data.due_date <= today) : page.items;
     items.append(...visible.slice(0, 20).map(item => renderItem(item, today)));
-    newTask.hidden = !canWriteWork() || eventsOnly;
-    events.showCreate(!dueOnly && canWriteWork());
+    newTask.hidden = !canWriteWork() || eventsOnly || sharedOnly;
+    events.showCreate(!dueOnly && !sharedOnly && canWriteWork());
     syncWorkControls();
     nextCursor = page.next_after;
     more.hidden = !nextCursor;
@@ -494,7 +536,7 @@ async function loadWork(append = false, savedMessage = "", eventMessage = "") {
         : items.childElementCount ? "" : "No unfinished tasks with due dates.";
     } else {
       workStatus.textContent = items.childElementCount ? ""
-        : eventsOnly ? "No events yet." : "No work items yet.";
+        : eventsOnly ? "No events yet." : sharedOnly ? "No shared work yet." : "No work items yet.";
     }
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
@@ -510,6 +552,7 @@ async function loadWork(append = false, savedMessage = "", eventMessage = "") {
     clearWork();
     taskFeedback.textContent = savedMessage;
     events.showFeedback(eventMessage);
+    sharing.showFeedback(shareMessage);
     workStatus.textContent = status === 403 || status === 404
       ? "This work list is unavailable. Refresh your workspaces or retry."
       : "Could not load work items.";
@@ -799,7 +842,11 @@ taskEditor.addEventListener("submit", async (event) => {
 });
 
 newTask.addEventListener("click", () => openTaskEditor());
-cancelTask.addEventListener("click", closeTaskEditor);
+cancelTask.addEventListener("click", () => {
+  const opener = taskOpener;
+  closeTaskEditor();
+  if (opener?.isConnected) opener.focus();
+});
 select.addEventListener("change", loadSelectedWorkspaceView);
 showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));

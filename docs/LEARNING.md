@@ -237,3 +237,10 @@ owner offer Observer access and inspect the pending offer in the recipient's
 session. Revoke the invitation before the recipient accepts. Explain why the
 workspace lock, offer version and two append-only histories protect different
 parts of the workflow.
+
+## Workspace sharing exercise
+
+Read [0030](implementation/0030-workspace-sharing.md). Open a task's sharing
+review. In another tab, edit its title or link another evidence item before you
+confirm. Explain why the older confirmation fails and which evidence fields an
+observer sees after reviewing the new version.

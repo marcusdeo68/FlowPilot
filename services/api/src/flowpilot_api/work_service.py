@@ -18,6 +18,7 @@ from flowpilot_api.access import (
     Membership,
     Visibility,
     require_work_access,
+    shared_evidence,
     visible_evidence,
 )
 from flowpilot_api.member_context import resolve_member
@@ -95,6 +96,12 @@ class DueTasks:
 class UpcomingEvents:
     items: list[StoredWork]
     has_more: bool
+
+
+@dataclass(frozen=True)
+class SharePreview:
+    item: StoredWork
+    evidence: list[dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -297,6 +304,7 @@ class WorkService:
         limit: int = 50,
         after: UUID | None = None,
         kind: Literal["event"] | None = None,
+        visibility: Visibility | None = None,
     ) -> WorkPage:
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
@@ -304,9 +312,14 @@ class WorkService:
             member = self._member(connection, principal, workspace_id)
             params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
             boundary = " AND kind = 'event'" if kind == "event" else ""
+            if visibility is not None:
+                boundary += " AND visibility = :visibility"
+                params["visibility"] = visibility
             if after is not None:
                 pivot = self._work(connection, member, after)
-                if kind is not None and pivot.data.kind != kind:
+                if (kind is not None and pivot.data.kind != kind) or (
+                    visibility is not None and pivot.visibility != visibility
+                ):
                     raise WorkNotFound
                 boundary += " AND (created_at, id) < (:created, :after)"
                 params.update(created=pivot.created_at, after=pivot.id)
@@ -577,18 +590,49 @@ class WorkService:
             self._audit(connection, member, updated, "status_changed", current.data.status)
             return updated
 
+    def _shareable_work(
+        self,
+        connection: Connection,
+        member: Membership,
+        work_id: UUID,
+        *,
+        expected_version: int | None = None,
+    ) -> StoredWork:
+        item = self._work(connection, member, work_id, write=True)
+        if item.creator_id != member.user_id:
+            raise AccessDenied
+        if expected_version is not None and item.version != expected_version:
+            raise VersionConflict
+        if item.visibility != Visibility.PRIVATE:
+            raise InvalidTransition("Work is already shared")
+        return item
+
+    def share_preview(
+        self, principal: Principal, workspace_id: UUID, work_id: UUID
+    ) -> SharePreview:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id, write=True)
+            # Evidence linking locks this same row before changing links and its version.
+            item = self._shareable_work(connection, member, work_id)
+            if isinstance(item.data, Event) and item.data.status != "scheduled":
+                raise InvalidTransition("Only scheduled events can be previewed")
+            evidence = []
+            for row in self._evidence_rows(connection, workspace_id, work_id):
+                fields = shared_evidence(
+                    EvidenceVisibility(row["visibility"]),
+                    summary=row["summary"],
+                    excerpt=row["excerpt"],
+                )
+                if fields:
+                    evidence.append(fields)
+            return SharePreview(item, evidence)
+
     def share_work(
         self, principal: Principal, workspace_id: UUID, work_id: UUID, *, expected_version: int
     ) -> StoredWork:
         with self.engine.begin() as connection:
             member = self._member(connection, principal, workspace_id, write=True)
-            current = self._work(connection, member, work_id, write=True)
-            if current.creator_id != member.user_id:
-                raise AccessDenied
-            if current.version != expected_version:
-                raise VersionConflict
-            if current.visibility != Visibility.PRIVATE:
-                raise InvalidTransition("Work is already shared")
+            self._shareable_work(connection, member, work_id, expected_version=expected_version)
             row = (
                 connection.execute(
                     text("""UPDATE work_items SET visibility = 'workspace',
@@ -700,20 +744,22 @@ class WorkService:
             self._audit(connection, member, updated, "evidence_linked")
             return updated
 
-    def evidence(self, principal: Principal, workspace_id: UUID, work_id: UUID) -> list[dict]:
-        with self.engine.begin() as connection:
-            member = self._member(connection, principal, workspace_id)
-            self._work(connection, member, work_id)
-            rows = connection.execute(
-                text("""SELECT e.visibility, s.owner_id, s.summary, s.excerpt
+    def _evidence_rows(self, connection: Connection, workspace_id: UUID, work_id: UUID):
+        return connection.execute(
+            text("""SELECT e.visibility, s.owner_id, s.summary, s.excerpt
                 FROM evidence_links e JOIN source_items s ON s.workspace_id = e.workspace_id
                     AND s.id = e.source_id AND s.owner_id = e.source_owner_id
                 WHERE e.workspace_id = :workspace AND e.work_id = :work
                 ORDER BY e.source_id"""),
-                {"workspace": workspace_id, "work": work_id},
-            ).mappings()
+            {"workspace": workspace_id, "work": work_id},
+        ).mappings()
+
+    def evidence(self, principal: Principal, workspace_id: UUID, work_id: UUID) -> list[dict]:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            self._work(connection, member, work_id)
             result = []
-            for row in rows:
+            for row in self._evidence_rows(connection, workspace_id, work_id):
                 projected = visible_evidence(
                     member,
                     workspace_id,

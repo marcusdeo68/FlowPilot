@@ -71,6 +71,7 @@ node --check services/api/src/flowpilot_api/web/workspace-events.js
 node --check services/api/src/flowpilot_api/web/workspace-reminders.js
 node --check services/api/src/flowpilot_api/web/workspace-access.js
 node --check services/api/src/flowpilot_api/web/workspace-invitations.js
+node --check services/api/src/flowpilot_api/web/workspace-sharing.js
 ```
 
 GitHub Actions runs these checks on Windows and Linux with Python 3.11 and 3.12.
@@ -160,3 +161,7 @@ owners can review membership history, invite registered synthetic users, and
 change existing roles. Recipients register and decide from **Invitations**.
 Apply `alembic upgrade head` before running the updated workspace API. See
 [increment 0029](docs/implementation/0029-workspace-invitations.md).
+
+Authors can open **Share with workspace** from a private task or scheduled event and
+review what members will see. Use **Shared work** and **My private work** in
+the Work view selector. See [increment 0030](docs/implementation/0030-workspace-sharing.md).
