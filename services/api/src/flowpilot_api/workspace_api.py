@@ -33,6 +33,9 @@ from flowpilot_api.inbox import InboxPage, InboxService
 from flowpilot_api.login import Exchange, LoginConfig, LoginFlow
 from flowpilot_api.login_transactions import InvalidLoginTransaction, LoginStorageUnavailable
 from flowpilot_api.membership_service import (
+    InvitationConflict,
+    InvitationInfo,
+    InvitationNotFound,
     LastOwnerConflict,
     MemberInfo,
     MemberNotFound,
@@ -125,6 +128,10 @@ class AddMember(Command):
 class ChangeMember(ExpectedVersion):
     role: Role
     active: bool = Field(strict=True)
+
+
+class InvitationDecision(ExpectedVersion):
+    decision: Literal["accept", "decline"]
 
 
 def create_workspace_app(
@@ -235,6 +242,8 @@ def create_workspace_app(
         (ProfileNotFound, 404, "Complete workspace onboarding first"),
         (MembershipConflict, 409, "Membership conflicts; reload its current state"),
         (LastOwnerConflict, 409, "Workspace must keep at least one active owner"),
+        (InvitationNotFound, 404, "Invitation not found"),
+        (InvitationConflict, 409, "Invitation changed, expired, or is unavailable"),
     ):
         app.add_exception_handler(exception, problem(code, message))
 
@@ -268,6 +277,10 @@ def create_workspace_app(
     def own_profile(user: Annotated[AccessIdentity, Depends(read_identity)]):
         return memberships.profile(user.principal)
 
+    @app.post("/api/v2/me", response_model=OwnProfile)
+    def register_profile(user: Annotated[AccessIdentity, Depends(write_identity)]):
+        return memberships.register_profile(user.principal)
+
     @app.get("/api/v2/workspaces", response_model=list[WorkspaceInfo])
     def my_workspaces(
         user: Annotated[AccessIdentity, Depends(read_identity)],
@@ -280,6 +293,12 @@ def create_workspace_app(
         payload: WorkspaceCreate, user: Annotated[AccessIdentity, Depends(write_identity)]
     ):
         return memberships.create_workspace(user.principal, payload)
+
+    @app.get("/api/v2/workspaces/{workspace_id}", response_model=WorkspaceInfo)
+    def selected_workspace(
+        workspace_id: UUID, user: Annotated[AccessIdentity, Depends(read_identity)]
+    ):
+        return memberships.workspace(user.principal, workspace_id)
 
     @app.get("/api/v2/workspaces/{workspace_id}/members", response_model=list[MemberInfo])
     def members(
@@ -324,6 +343,60 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
     ):
         return memberships.history(user.principal, workspace_id, limit=limit)
+
+    @app.get("/api/v2/invitations", response_model=list[InvitationInfo])
+    def received_invitations(
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ):
+        return memberships.invitations(user.principal, limit=limit)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/invitations", response_model=list[InvitationInfo])
+    def workspace_invitations(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ):
+        return memberships.invitations(user.principal, workspace_id=workspace_id, limit=limit)
+
+    @app.post(
+        "/api/v2/workspaces/{workspace_id}/invitations",
+        response_model=InvitationInfo,
+        status_code=201,
+    )
+    def offer_invitation(
+        workspace_id: UUID,
+        payload: AddMember,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return memberships.invite(user.principal, workspace_id, payload.user_id, role=payload.role)
+
+    @app.post("/api/v2/invitations/{invitation_id}/decision", response_model=InvitationInfo)
+    def answer_invitation(
+        invitation_id: UUID,
+        payload: InvitationDecision,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return memberships.decide_invitation(
+            user.principal,
+            invitation_id,
+            decision=payload.decision,
+            expected_version=payload.expected_version,
+        )
+
+    @app.post(
+        "/api/v2/workspaces/{workspace_id}/invitations/{invitation_id}/revoke",
+        response_model=InvitationInfo,
+    )
+    def remove_invitation(
+        workspace_id: UUID,
+        invitation_id: UUID,
+        payload: ExpectedVersion,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return memberships.revoke_invitation(
+            user.principal, workspace_id, invitation_id, expected_version=payload.expected_version
+        )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work", response_model=list[StoredWork])
     def list_work(

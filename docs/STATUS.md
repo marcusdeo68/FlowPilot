@@ -6,8 +6,11 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0029 adds [recipient-consented invitations](implementation/0029-workspace-invitations.md).
+  Upgrade the workspace database to `0009_workspace_invitations` before use.
 - Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
-  It connects the browser to the existing membership and audit routes.
+  Merged as `48e0d31` in [PR #35](https://github.com/marcusdeo68/FlowPilot/pull/35).
+  Independent verification passed 298 tests. All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44888015611) passed.
 - Increment 0027 adds [reminder settings](implementation/0027-reminder-settings.md)
   for category, event lead time and future snooze duration in the signed-in tab.
   Independent verification passed 294 tests with no skips, including 103
@@ -201,6 +204,8 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-037 | Recover an accepted workspace outside the bounded list. | Audit found that accepting a workspace beyond the first 100 could leave it out of the selector. Chromium omits the workspace on acceptance and on refresh and verifies an active-membership read supplies its current role. |
+| FP-036 | Observe live waiting locks in the invitation expiry test. | The first local run missed the worker under a transaction-cached activity snapshot. The regression checks live PostgreSQL locks, holds the unchanged row past expiry and verifies acceptance fails. |
 | FP-035 | Clear expired reminders while a poll is pending. | Audit found that a network delay could leave an already-started event or previous-day task visible. Chromium holds a request across both cutoffs and checks that the popup clears each expired title. |
 | FP-034 | Compare retained event instants in UTC. | With PostgreSQL set to America/New_York, an event crossing the fall clock change appeared to end before it started. The integration regression uses a non-UTC session, preserves the valid interval and checks that a repeated edit stays a no-op. |
 | FP-033 | Preserve untouched event instants when rescheduling. | Audit reproduced a one-hour change to the start when the browser and server disagreed about Havana's offset and the user moved only the end. The Chromium regression simulates offset disagreement and checks the original start survives. |

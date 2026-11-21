@@ -225,6 +225,24 @@ for a different work kind returns 404. See
 must match the cookie session. A mismatch returns 401. Bearer clients authenticate
 with verified access tokens. See [0028](implementation/0028-workspace-access.md).
 
+### Workspace invitations
+
+`POST /api/v2/me` returns the idempotently registered profile for the verified
+identity and requires write scope. Workspace owners use
+`GET|POST /api/v2/workspaces/{workspace_id}/invitations`. To offer a role, send
+`user_id` and `role`. To revoke a pending offer, post `expected_version` to
+`/api/v2/workspaces/{workspace_id}/invitations/{invitation_id}/revoke`.
+
+`GET /api/v2/invitations?limit=20` lists the current registered user's actionable
+invitations. `POST /api/v2/invitations/{invitation_id}/decision` takes `decision`
+(`accept` or `decline`) and `expected_version`. Acceptance creates the offered
+membership. `GET /api/v2/workspaces/{workspace_id}` verifies active membership and
+returns current workspace details for an accepted workspace outside the bounded list.
+Lists support limits 1 through 100. An unknown or out-of-scope
+invitation returns 404. Expired, stale and conflicting writes return 409. Cookie
+writes also require the same-origin CSRF token. See
+[0029](implementation/0029-workspace-invitations.md).
+
 ### In-app reminder candidates
 
 `GET /api/v2/workspaces/{workspace_id}/reminders?local_date=2030-09-30` returns

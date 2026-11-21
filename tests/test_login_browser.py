@@ -1914,16 +1914,12 @@ def test_workspace_browser_ignores_late_transition_after_workspace_switch(login_
     expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
 
 
-def test_workspace_access_grant_role_lifecycle_and_last_owner_conflict(login_browser, pg):
+def test_workspace_access_invitation_role_lifecycle_and_last_owner_conflict(login_browser):
     from playwright.sync_api import expect
 
-    page, _, origin, provider, _, _ = login_browser
-    memberships = MembershipService(pg[0])
-    teammate = Principal(provider, "synthetic-teammate")
-    memberships.create_workspace(teammate, WorkspaceCreate(name="Teammate registration"))
-    teammate_id = str(memberships.profile(teammate).id)
+    page, context, origin, provider, sign, _ = login_browser
     open_workspace(page, origin, provider)
-    create_workspace_in_browser(page, origin, "Test access management")
+    workspace_id = create_workspace_in_browser(page, origin, "Test access management")
     page.get_by_role("button", name="Workspace access", exact=True).click()
     panel = page.get_by_role("region", name="Workspace access", exact=True)
     roster = panel.get_by_role("list", name="Members", exact=True)
@@ -1936,9 +1932,80 @@ def test_workspace_access_grant_role_lifecycle_and_last_owner_conflict(login_bro
     expect(page.get_by_text("Keep at least one active owner.", exact=False)).to_be_visible()
     expect(own).to_contain_text("Owner · Active")
 
-    panel.get_by_label("Registered user ID", exact=True).fill(teammate_id)
-    panel.get_by_label("Access role", exact=True).select_option("observer")
-    panel.get_by_role("button", name="Grant access", exact=True).click()
+    browser = context.browser
+    assert browser is not None
+    recipient_context = browser.new_context()
+    try:
+        recipient = recipient_context.new_page()
+        recipient.goto(origin + "/api/v2/test-login-browser")
+        issued = fetch(
+            recipient,
+            "/api/v2/session",
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {sign('synthetic-teammate')}",
+            },
+        )
+        assert issued["status"] == 201
+        recipient.goto(origin + "/api/v2/workspace")
+        recipient.get_by_role("button", name="Register profile", exact=True).click()
+        expect(recipient.get_by_text("Profile registered.", exact=True)).to_be_visible()
+        teammate_id = recipient.locator("#invitation-user-id").inner_text()
+        assert teammate_id
+        selection = recipient.get_by_label("Workspace", exact=True)
+        expect(selection).to_be_disabled()
+        outgoing = panel.get_by_role("list", name="Pending invitations", exact=True)
+        incoming = recipient.get_by_role("list", name="Incoming invitations", exact=True)
+
+        def offer():
+            panel.get_by_label("Registered user ID", exact=True).fill(teammate_id)
+            panel.get_by_label("Access role", exact=True).select_option("observer")
+            panel.get_by_role("button", name="Send invitation", exact=True).click()
+            expect(outgoing.get_by_role("listitem")).to_contain_text(teammate_id)
+            expect(roster.get_by_text(teammate_id, exact=True)).to_have_count(0)
+            recipient.get_by_role("button", name="Refresh invitations", exact=True).click()
+            expect(incoming.get_by_text("Test access management", exact=True)).to_be_visible()
+            expect(incoming.get_by_role("listitem")).to_contain_text("Observer")
+            expect(selection).to_be_disabled()
+
+        offer()
+        incoming.get_by_role("button", name="Decline invitation", exact=True).click()
+        expect(recipient.get_by_text("Invitation declined.", exact=True)).to_be_visible()
+        panel.get_by_role("button", name="Refresh access details", exact=True).click()
+        expect(outgoing.get_by_role("listitem")).to_have_count(0)
+        offer()
+        outgoing.get_by_role("button", name="Revoke invitation", exact=True).click()
+        expect(outgoing.get_by_role("listitem")).to_have_count(0)
+        incoming.get_by_role("button", name="Accept invitation", exact=True).click()
+        expect(
+            recipient.get_by_text("This invitation changed or is no longer available.", exact=True)
+        ).to_be_visible()
+        expect(selection).to_be_disabled()
+
+        offer()
+        # A bounded list can omit the newly joined workspace. Recover through an authorized read.
+        recipient.route(
+            origin + "/api/v2/workspaces?limit=100", lambda route: route.fulfill(json=[]), times=1
+        )
+        with recipient.expect_response(origin + f"/api/v2/workspaces/{workspace_id}") as selected:
+            incoming.get_by_role("button", name="Accept invitation", exact=True).click()
+        assert selected.value.status == 200
+        expect(recipient.get_by_text("Invitation accepted.", exact=True)).to_be_visible()
+        expect(selection).to_have_value(workspace_id)
+        recipient.route(
+            origin + "/api/v2/workspaces?limit=100", lambda route: route.fulfill(json=[]), times=1
+        )
+        with recipient.expect_response(origin + f"/api/v2/workspaces/{workspace_id}") as refreshed:
+            recipient.get_by_role("button", name="Refresh workspaces", exact=True).click()
+        assert refreshed.value.status == 200
+        expect(selection).to_have_value(workspace_id)
+        recipient.get_by_role("button", name="Workspace access", exact=True).click()
+        expect(recipient.locator("#access-role")).to_have_text("Observer")
+        expect(recipient.get_by_role("list", name="Members", exact=True)).to_be_hidden()
+    finally:
+        recipient_context.close()
+
+    panel.get_by_role("button", name="Refresh access details", exact=True).click()
     row = roster.get_by_role("listitem").filter(has_text=teammate_id)
     expect(row).to_contain_text("Observer · Active")
     expect(history.get_by_text("Access granted", exact=True)).to_be_visible()
@@ -1960,7 +2027,7 @@ def test_workspace_access_grant_role_lifecycle_and_last_owner_conflict(login_bro
     expect(page.locator("#access-role")).to_have_text("Observer")
     expect(roster.get_by_role("listitem")).to_have_count(0)
     expect(history.get_by_role("listitem")).to_have_count(0)
-    expect(panel.get_by_role("button", name="Grant access")).to_be_hidden()
+    expect(panel.get_by_role("button", name="Send invitation")).to_be_hidden()
 
 
 def test_workspace_access_reloads_stale_versions_and_removes_own_workspace(login_browser, pg):
@@ -2035,7 +2102,7 @@ def test_workspace_access_binds_roster_reads_to_its_browser_session(login_browse
     roster = page.get_by_role("list", name="Members", exact=True)
     expect(roster.get_by_role("listitem")).to_have_count(2)
     expect(roster.get_by_role("button")).to_have_count(0)
-    expect(page.get_by_role("button", name="Grant access", exact=True)).to_be_hidden()
+    expect(page.get_by_role("button", name="Send invitation", exact=True)).to_be_hidden()
 
     context.clear_cookies()
     issued = fetch(

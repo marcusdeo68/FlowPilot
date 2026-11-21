@@ -7,6 +7,8 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
   const admin = document.querySelector("#access-admin");
   const roster = document.querySelector("#workspace-members");
   const history = document.querySelector("#access-history");
+  const outgoing = document.querySelector("#outgoing-invitations");
+  const offeredLimit = document.querySelector("#offered-limit");
   const memberLimit = document.querySelector("#member-limit");
   const historyLimit = document.querySelector("#history-limit");
   const form = document.querySelector("#grant-access");
@@ -35,6 +37,7 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
     admin.hidden = form.hidden = true;
     roster.replaceChildren();
     history.replaceChildren();
+    outgoing.replaceChildren();
     form.reset();
   }
 
@@ -113,6 +116,24 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
     return row;
   }
 
+  function renderInvitation(invitation) {
+    const row = document.createElement("li");
+    const detail = document.createElement("span");
+    detail.textContent = `${invitation.recipient_id} · ${labels[invitation.role]} · Expires ${new Date(invitation.expires_at).toLocaleString()}`;
+    row.append(detail);
+    if (context.canWrite) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Revoke invitation";
+      button.addEventListener("click", () => void write(
+        "/invitations/" + encodeURIComponent(invitation.id) + "/revoke", "POST",
+        { expected_version: invitation.version }, "Invitation revoked.",
+      ));
+      row.append(button);
+    }
+    return row;
+  }
+
   async function load(message = "") {
     if (context?.role !== "owner" || saving) return;
     const version = ++generation;
@@ -122,13 +143,16 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
     feedback.textContent = message;
     status.textContent = "Loading access details…";
     try {
-      const [members, changes] = await Promise.all([
+      const [members, changes, invitations] = await Promise.all([
         request(path + "/members?limit=100"),
         request(path + "/membership-history?limit=20"),
+        request(path + "/invitations?limit=20"),
       ]);
       if (version !== generation) return;
       roster.replaceChildren(...members.map(renderMember));
       history.replaceChildren(...changes.map(renderChange));
+      outgoing.replaceChildren(...invitations.map(renderInvitation));
+      offeredLimit.hidden = invitations.length < 20;
       memberLimit.hidden = members.length < 100;
       historyLimit.hidden = changes.length < 20;
       form.hidden = !context.canWrite;
@@ -164,7 +188,7 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
         unavailable();
         return;
       }
-      if (failure === 404 && method === "POST") {
+      if (failure === 404 && path === "/invitations") {
         feedback.textContent = "No registered user was found for that ID.";
         return;
       }
@@ -174,6 +198,8 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
       }
       const notice = detail === "Workspace must keep at least one active owner"
         ? "Keep at least one active owner. Grant ownership to another member before removing or demoting the last owner."
+        : failure === 409 && path.startsWith("/invitations")
+          ? "Invitation changed, already exists, or the recipient is already a member. Review the current access details."
         : failure === 409 ? "Membership changed or already exists. Review the current access details."
           : "Could not confirm the access change. Review the current access details before trying again.";
       if (own) refreshContext(notice);
@@ -202,7 +228,7 @@ function createWorkspaceAccess({ request, expired, lockNavigation, deny, refresh
       feedback.textContent = "Enter the user ID shared by the registered user.";
       return;
     }
-    void write("/members", "POST", { user_id: id, role: grantRole.value }, "Access granted.");
+    void write("/invitations", "POST", { user_id: id, role: grantRole.value }, "Invitation sent.");
   });
 
   return {

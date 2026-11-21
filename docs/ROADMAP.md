@@ -31,6 +31,7 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Separate signed-access-token workspace API factory with stored-member authorization (0007).
 - [x] API workspace creation/discovery, owner-only member administration, and last-owner protection (0008).
 - [x] Signed-in workspace access view for owners to manage memberships and review recent changes (0028).
+- [x] Register a synthetic profile and accept or decline a workspace invitation in the browser (0029).
 - [x] Private manual-source task suggestion, correction, dismissal, and version-bound acceptance (0009).
 - [x] Cursor-paginated owner-only source inbox with current review state (0010).
 - [x] Optional token-bounded browser sessions with CSRF, revocation and real-browser coverage (0012).
@@ -40,7 +41,7 @@ records, and authenticated dashboard wiring still need implementation and review
 - [x] Browser workspace selection, creation, and authorized work browsing (0017).
 - [x] Create private tasks and edit owned task details in the signed-in workspace (0018).
 - [x] Track a task through its status changes and find the earliest unfinished deadlines (0019).
-- [ ] Live identity-provider setup, invitation consent, remaining Stage 1 records,
+- [ ] Live identity-provider setup, invitation delivery, remaining Stage 1 records,
   and dashboard persistence migration.
 - Users, workspaces, memberships, roles, and server-side authorization boundaries.
 - Provider connections with owner, provider, granted scopes, and connection/revocation status.
