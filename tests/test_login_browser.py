@@ -23,6 +23,8 @@ from fastapi.responses import HTMLResponse
 from flowpilot_api.browser_sessions import COOKIE_NAME
 from flowpilot_api.identity import AccessTokenVerifier, IdentityConfig
 from flowpilot_api.login import LOGIN_PATH, PENDING_COOKIE, LoginConfig
+from flowpilot_api.membership_service import MembershipService, WorkspaceCreate
+from flowpilot_api.work_service import Principal
 from flowpilot_api.workspace_api import create_workspace_app
 from sqlalchemy import text
 
@@ -1910,6 +1912,183 @@ def test_workspace_browser_ignores_late_transition_after_workspace_switch(login_
     expect(selector).to_have_value(second)
     expect(empty).to_be_visible()
     expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+
+
+def test_workspace_access_grant_role_lifecycle_and_last_owner_conflict(login_browser, pg):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    memberships = MembershipService(pg[0])
+    teammate = Principal(provider, "synthetic-teammate")
+    memberships.create_workspace(teammate, WorkspaceCreate(name="Teammate registration"))
+    teammate_id = str(memberships.profile(teammate).id)
+    open_workspace(page, origin, provider)
+    create_workspace_in_browser(page, origin, "Test access management")
+    page.get_by_role("button", name="Workspace access", exact=True).click()
+    panel = page.get_by_role("region", name="Workspace access", exact=True)
+    roster = panel.get_by_role("list", name="Members", exact=True)
+    history = panel.get_by_role("list", name="Recent access changes", exact=True)
+    own = roster.get_by_role("listitem").filter(has_text="(you)")
+    expect(own).to_contain_text("Owner · Active")
+    assert page.locator("#access-user-id").inner_text() in own.inner_text()
+    own.get_by_role("combobox").select_option("member")
+    own.get_by_role("button", name="Save role").click()
+    expect(page.get_by_text("Keep at least one active owner.", exact=False)).to_be_visible()
+    expect(own).to_contain_text("Owner · Active")
+
+    panel.get_by_label("Registered user ID", exact=True).fill(teammate_id)
+    panel.get_by_label("Access role", exact=True).select_option("observer")
+    panel.get_by_role("button", name="Grant access", exact=True).click()
+    row = roster.get_by_role("listitem").filter(has_text=teammate_id)
+    expect(row).to_contain_text("Observer · Active")
+    expect(history.get_by_text("Access granted", exact=True)).to_be_visible()
+    row.get_by_role("combobox").select_option("member")
+    row.get_by_role("button", name="Save role").click()
+    expect(row).to_contain_text("Member · Active")
+    row.get_by_role("button", name="Remove access").click()
+    expect(row).to_contain_text("Member · Inactive")
+    row.get_by_role("button", name="Reactivate access").click()
+    expect(row).to_contain_text("Member · Active")
+    row.get_by_role("combobox").select_option("owner")
+    row.get_by_role("button", name="Save role").click()
+    expect(row).to_contain_text("Owner · Active")
+    expect(history.get_by_role("listitem").first).to_contain_text("version 5")
+
+    own.get_by_role("combobox").select_option("observer")
+    own.get_by_role("button", name="Save role").click()
+    expect(page.get_by_text("Role changed.", exact=True)).to_be_visible()
+    expect(page.locator("#access-role")).to_have_text("Observer")
+    expect(roster.get_by_role("listitem")).to_have_count(0)
+    expect(history.get_by_role("listitem")).to_have_count(0)
+    expect(panel.get_by_role("button", name="Grant access")).to_be_hidden()
+
+
+def test_workspace_access_reloads_stale_versions_and_removes_own_workspace(login_browser, pg):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    memberships = MembershipService(pg[0])
+    owner = Principal(provider, "new-browser-user")
+    teammate = Principal(provider, "second-synthetic-owner")
+    memberships.create_workspace(teammate, WorkspaceCreate(name="Teammate registration"))
+    teammate_id = memberships.profile(teammate).id
+    open_workspace(page, origin, provider)
+    fallback = create_workspace_in_browser(page, origin, "A remaining workspace")
+    departing = create_workspace_in_browser(page, origin, "B departing workspace")
+    from uuid import UUID
+
+    workspace_id = UUID(departing)
+    memberships.add_member(owner, workspace_id, teammate_id)
+    page.get_by_role("button", name="Workspace access", exact=True).click()
+    roster = page.get_by_role("list", name="Members", exact=True)
+    teammate_row = roster.get_by_role("listitem").filter(has_text=str(teammate_id))
+    expect(teammate_row).to_contain_text("Member · Active")
+    from flowpilot_api.access import Role
+
+    memberships.change_member(
+        owner, workspace_id, teammate_id, role=Role.OWNER, active=True, expected_version=1
+    )
+    teammate_row.get_by_role("button", name="Remove access").click()
+    expect(page.get_by_text("Membership changed or already exists.", exact=False)).to_be_visible()
+    expect(teammate_row).to_contain_text("Owner · Active")
+    own = roster.get_by_role("listitem").filter(has_text="(you)")
+    page.once("dialog", lambda dialog: dialog.accept())
+    own.get_by_role("button", name="Remove access").click()
+    pick = page.get_by_label("Workspace", exact=True)
+    expect(pick).to_have_value(fallback)
+    expect(pick.locator(f"option[value='{departing}']")).to_have_count(0)
+    expect(page.get_by_text("Access removed.", exact=True)).to_be_visible()
+    expect(teammate_row).to_have_count(0)
+    expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+
+
+def test_workspace_access_binds_roster_reads_to_its_browser_session(login_browser, pg):
+    from uuid import UUID
+
+    from flowpilot_api.access import Role
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, sign, _ = login_browser
+    memberships = MembershipService(pg[0])
+    owner = Principal(provider, "new-browser-user")
+    replacement = Principal(provider, "replacement-owner")
+    memberships.create_workspace(replacement, WorkspaceCreate(name="Teammate registration"))
+    replacement_id = memberships.profile(replacement).id
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Shared owner access")
+    memberships.add_member(owner, UUID(workspace), replacement_id, role=Role.OWNER)
+
+    context.clear_cookies()
+    page.goto(origin + "/api/v2/test-login-browser")
+    issued = fetch(
+        page,
+        "/api/v2/session",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {sign('new-browser-user', scope='flowpilot:read')}",
+        },
+    )
+    assert issued["status"] == 201
+    read_csrf = json.loads(issued["text"])["csrf_token"]
+    page.goto(origin + "/api/v2/workspace")
+    page.get_by_role("button", name="Workspace access", exact=True).click()
+    roster = page.get_by_role("list", name="Members", exact=True)
+    expect(roster.get_by_role("listitem")).to_have_count(2)
+    expect(roster.get_by_role("button")).to_have_count(0)
+    expect(page.get_by_role("button", name="Grant access", exact=True)).to_be_hidden()
+
+    context.clear_cookies()
+    issued = fetch(
+        page,
+        "/api/v2/session",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {sign('replacement-owner')}",
+        },
+    )
+    assert issued["status"] == 201
+    new_csrf = json.loads(issued["text"])["csrf_token"]
+    path = f"/api/v2/workspaces/{workspace}/members?limit=100"
+    assert fetch(page, path, headers={"X-CSRF-Token": new_csrf})["status"] == 200
+    assert fetch(page, "/api/v2/me", headers={"X-CSRF-Token": read_csrf})["status"] == 401
+    page.get_by_role("button", name="Refresh access details", exact=True).click()
+    expect(page.get_by_text("Your session is unavailable.", exact=False)).to_be_visible()
+    expect(roster.get_by_role("listitem")).to_have_count(0)
+
+
+def test_workspace_access_ignores_denial_from_previous_workspace(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "First access workspace")
+    second = create_workspace_in_browser(page, origin, "Second access workspace")
+    pick = page.get_by_label("Workspace", exact=True)
+    pick.select_option(first)
+    url = f"/api/v2/workspaces/{first}/membership-history?limit=20"
+    page.evaluate(
+        """url => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (path, options) => {
+            const response = await original(path, options);
+            if (path !== url) return response;
+            await new Promise(resolve => { window.releaseOldAccess = resolve; });
+            setTimeout(() => { window.oldAccessProcessed = true; }, 0);
+            return new Response(null, {status: 403});
+        };
+    }""",
+        url,
+    )
+    page.get_by_role("button", name="Workspace access", exact=True).click()
+    page.wait_for_function("() => typeof window.releaseOldAccess === 'function'")
+    pick.select_option(second)
+    roster = page.get_by_role("list", name="Members", exact=True)
+    expect(roster.get_by_role("listitem")).to_have_count(1)
+    page.evaluate("() => window.releaseOldAccess()")
+    page.wait_for_function("() => window.oldAccessProcessed === true")
+    expect(roster.get_by_role("listitem")).to_have_count(1)
+    expect(page.locator("#access-role")).to_have_text("Owner")
+    expect(page.get_by_text("Access details are unavailable.", exact=False)).to_have_count(0)
 
 
 def test_workspace_browser_clears_visible_work_when_session_expires(login_browser, pg):

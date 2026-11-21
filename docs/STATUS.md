@@ -1,18 +1,23 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-20. This file records implementation evidence, known issues, and
+Updated: 2026-11-21. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- Increment 0028 adds the signed-in [workspace access view](implementation/0028-workspace-access.md).
+  It connects the browser to the existing membership and audit routes.
 - Increment 0027 adds [reminder settings](implementation/0027-reminder-settings.md)
   for category, event lead time and future snooze duration in the signed-in tab.
   Independent verification passed 294 tests with no skips, including 103
   PostgreSQL-only and 43 Chromium tests. All local quality checks passed.
+  Merged as `7191f6b` in [PR #34](https://github.com/marcusdeo68/FlowPilot/pull/34).
+  All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44788723027) passed.
 - Increment 0026 adds [opt-in in-app reminders](implementation/0026-in-app-reminders.md)
   for due-today tasks and imminent events. It merged in [PR #33](https://github.com/marcusdeo68/FlowPilot/pull/33)
   as `65526b4` after all six [candidate checks](https://github.com/marcusdeo68/FlowPilot/actions/runs/44786936394) passed.
+  All six [post-merge jobs](https://github.com/marcusdeo68/FlowPilot/actions/runs/44787343118) passed.
   Preferences, snooze and dismissals
   are scoped to the workspace and signed-in tab. Independent verification passed
   292 tests with no skips, including 103 PostgreSQL-only and 41 Chromium tests.

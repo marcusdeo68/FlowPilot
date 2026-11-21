@@ -74,6 +74,12 @@ ownership/audit attribution, and does not revoke an identity's unrelated members
 Direct database administration can bypass application invariants; runtime database
 roles and reviewed invitation consent are still deployment requirements.
 
+Increment 0028 exposes the existing owner-only controls in the signed-in
+workspace. The browser binds authenticated requests to the session token already
+held by the tab. A supplied binding that mismatches the current cookie fails
+authentication. Owner roster and history clear when the view loses access or
+changes context. See [0028](implementation/0028-workspace-access.md).
+
 - Authentication and server-side workspace/member/role authorization.
 - Tenant isolation tests and review of every query and background job for object-level access checks.
 - PostgreSQL migrations, backups, recovery, encryption at rest, retention, deletion, and export procedures.

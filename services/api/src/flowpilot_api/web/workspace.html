@@ -9,6 +9,7 @@
   <script src="/api/v2/workspace-notes.js" defer></script>
   <script src="/api/v2/workspace-events.js" defer></script>
   <script src="/api/v2/workspace-reminders.js" defer></script>
+  <script src="/api/v2/workspace-access.js" defer></script>
   <script src="/api/v2/workspace.js" defer></script>
 </head>
 <body>
@@ -46,7 +47,9 @@
         <button id="show-work" type="button" aria-pressed="true" disabled>Work items</button>
         <button id="show-inbox" type="button" aria-pressed="false" disabled>Private inbox</button>
         <button id="show-notes" type="button" aria-pressed="false" disabled>Notes</button>
+        <button id="show-access" type="button" aria-pressed="false" disabled>Workspace access</button>
       </nav>
+      <p id="access-feedback" role="status"></p>
       <div class="actions">
         <button id="toggle-reminders" type="button" aria-pressed="false" hidden>In-app reminders</button>
         <p id="reminders-status" role="status"></p>
@@ -90,6 +93,36 @@
           <button id="dismiss-reminders" type="button">Dismiss reminders</button>
         </div>
       </aside>
+      <section id="access-panel" aria-labelledby="access-heading" hidden>
+        <h2 id="access-heading">Workspace access</h2>
+        <dl id="access-profile" hidden>
+          <dt>Your role</dt><dd id="access-role"></dd>
+          <dt>Your registered user ID</dt><dd id="access-user-id"></dd>
+        </dl>
+        <p id="access-status" role="status"></p>
+        <button id="refresh-access" type="button" hidden>Refresh access details</button>
+        <div id="access-admin" hidden>
+          <form id="grant-access" aria-labelledby="grant-access-heading" hidden>
+            <h3 id="grant-access-heading">Grant access</h3>
+            <p>Ask the registered user to share their FlowPilot user ID.</p>
+            <label for="grant-user-id">Registered user ID</label>
+            <input id="grant-user-id" required maxlength="36" spellcheck="false" autocomplete="off">
+            <label for="grant-role">Access role</label>
+            <select id="grant-role">
+              <option value="observer">Observer</option>
+              <option value="member" selected>Member</option>
+              <option value="owner">Owner</option>
+            </select>
+            <button type="submit">Grant access</button>
+          </form>
+          <h3>Members</h3>
+          <p id="member-limit" hidden>Showing up to 100 memberships.</p>
+          <ul id="workspace-members" aria-label="Members"></ul>
+          <h3>Recent access changes</h3>
+          <p id="history-limit" hidden>Showing up to 20 recent changes.</p>
+          <ul id="access-history" aria-label="Recent access changes"></ul>
+        </div>
+      </section>
       <section id="work-panel" aria-labelledby="work-heading">
         <h2 id="work-heading">Work items</h2>
         <label id="work-view-label" for="work-view">Work view</label>

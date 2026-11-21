@@ -37,6 +37,7 @@ jobs:
       - run: node --check services/api/src/flowpilot_api/web/workspace-notes.js
       - run: node --check services/api/src/flowpilot_api/web/workspace-events.js
       - run: node --check services/api/src/flowpilot_api/web/workspace-reminders.js
+      - run: node --check services/api/src/flowpilot_api/web/workspace-access.js
   postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 10
