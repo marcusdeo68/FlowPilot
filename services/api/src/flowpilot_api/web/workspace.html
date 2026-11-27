@@ -148,6 +148,7 @@
           <select id="work-view" disabled>
             <option value="all">All work</option>
             <option value="due">Due tasks</option>
+            <option value="schedule">Schedule</option>
             <option value="events">Events</option>
             <option value="workspace">Shared work</option>
             <option value="private">My private work</option>
@@ -155,6 +156,53 @@
           <button id="new-task" type="button" hidden>New task</button>
           <button id="new-event" type="button" hidden>New event</button>
         </div>
+        <div id="task-status-filter" hidden>
+          <label for="work-task-status">Task status</label>
+          <select id="work-task-status" disabled>
+            <option value="">Any status</option>
+            <option value="open">Open</option>
+            <option value="active">Active</option>
+            <option value="blocked">Blocked</option>
+            <option value="completed">Completed</option>
+            <option value="canceled">Canceled</option>
+          </select>
+          <label for="work-priority">Priority filter</label>
+          <select id="work-priority" disabled>
+            <option value="">Any priority</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div id="project-filter" hidden>
+          <label for="work-project">Project filter</label>
+          <select id="work-project" disabled><option value="">All projects</option></select>
+          <form id="create-project" hidden>
+            <label for="project-name">New project name</label>
+            <p id="project-help">Project names are visible to workspace members.</p>
+            <div class="actions">
+              <input id="project-name" maxlength="100" required aria-describedby="project-help">
+              <button id="save-project" type="submit">Create project</button>
+            </div>
+          </form>
+          <p id="project-feedback" role="status"></p>
+        </div>
+        <form id="work-search" role="search" aria-label="Work items" hidden>
+          <label for="work-search-title">Search work titles</label>
+          <div class="actions">
+            <input id="work-search-title" type="search" maxlength="200" autocomplete="off" disabled>
+            <button id="submit-work-search" type="submit" disabled>Search</button>
+            <button id="clear-work-search" type="button" disabled>Clear search</button>
+          </div>
+        </form>
+        <form id="due-date-filter" hidden>
+          <label for="due-from-date">Show due tasks from</label>
+          <div class="actions">
+            <input id="due-from-date" type="date" required min="0001-01-01" max="9999-12-31">
+            <button id="apply-due-date" type="submit">Filter due tasks</button>
+            <button id="clear-due-date" type="button">Clear due date filter</button>
+          </div>
+        </form>
         <form id="task-editor" aria-labelledby="task-editor-heading" hidden>
           <h3 id="task-editor-heading">New task</h3>
           <label for="task-title">Task title</label>
@@ -163,6 +211,14 @@
           <textarea id="task-description" maxlength="4000" rows="3"></textarea>
           <label for="task-due-date">Due date</label>
           <input id="task-due-date" type="date">
+          <label for="task-project">Task project</label>
+          <select id="task-project" disabled><option value="">No project</option></select>
+          <label for="task-priority">Task priority</label>
+          <select id="task-priority">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
           <div class="actions">
             <button id="save-task" type="submit">Create task</button>
             <button id="cancel-task" type="button">Cancel</button>
@@ -210,6 +266,24 @@
           </div>
         </form>
         <p id="share-feedback" role="status"></p>
+        <section id="schedule-deadlines" aria-labelledby="schedule-deadlines-heading" hidden>
+          <h3 id="schedule-deadlines-heading">Task deadlines</h3>
+          <form id="schedule-deadline-filter">
+            <label for="deadline-from-date">Show deadlines from</label>
+            <div class="actions">
+              <input id="deadline-from-date" type="date" required min="0001-01-01" max="9999-12-31">
+              <button type="submit">Show deadlines</button>
+            </div>
+          </form>
+          <p id="schedule-deadlines-status" role="status"></p>
+          <ul id="schedule-deadline-items" aria-label="Task deadlines"></ul>
+          <div class="actions">
+            <button id="more-schedule-deadlines" type="button" hidden>Load more deadlines</button>
+            <button id="retry-schedule-deadlines" type="button" hidden>Retry deadlines</button>
+            <button id="open-due-tasks" type="button" disabled>Open due tasks</button>
+          </div>
+        </section>
+        <h3 id="schedule-events-heading" hidden>Events</h3>
         <p id="work-status" role="status"></p>
         <ul id="work-items"></ul>
         <button id="more-work" type="button" hidden>Load more</button>
@@ -219,6 +293,7 @@
           <p id="today-events-status" role="status"></p>
           <ul id="today-event-items" aria-label="Upcoming events"></ul>
           <button id="retry-today-events" type="button" hidden>Retry upcoming events</button>
+          <button id="open-schedule" type="button" disabled>Open schedule</button>
           <button id="open-events" type="button" disabled>Open events</button>
         </section>
         <section id="today-reviews" aria-labelledby="today-reviews-heading" hidden>

@@ -1,6 +1,107 @@
 # Session handoff
 
-## Latest increment — workspace sharing
+## Outsider audit
+
+[0047](implementation/0047-schedule-page-consistency.md) covers browser
+edge cases found during the independent audit. See [STATUS](STATUS.md) for
+the local sign-off and outstanding hosted and browser coverage.
+
+## Latest increment — hosted image rehearsal
+
+[0046](implementation/0046-hosted-image-rehearsal.md) exercises the packaged
+Linux app in Railway mode before and after migration. The same check is
+configured in GitHub Actions. Live staging still needs the pilot’s assigned
+Railway HTTPS URL and an isolated environment.
+
+## Previous increment — page through Due tasks
+
+[0045](implementation/0045-due-task-pagination.md) adds **Load more** to Due
+tasks with or without an applied date filter.
+
+## Previous increment — filter Due tasks by date
+
+[0044](implementation/0044-due-task-date-filter.md) carries the applied date
+from Schedule into Due tasks and lets users change or clear it there.
+
+## Previous increment — browse deadlines in Schedule
+
+[0043](implementation/0043-schedule-deadline-browsing.md) adds a start date and
+deadline paging to Schedule. Today and Due tasks keep the existing API.
+
+## Previous increment — deadlines in Schedule
+
+[0042](implementation/0042-schedule-deadlines.md) adds a preview of unfinished
+tasks due today or later, using the viewer’s local calendar date. **Open due
+tasks** links to the existing task management view.
+
+## Previous increment — workspace Schedule
+
+[0041](implementation/0041-workspace-schedule.md) pages through ongoing and
+upcoming manual events by start time. Choose **Schedule** in **Work view** or
+**Open schedule** on Today. This increment requires no database migration.
+
+## Previous increment — local workspace preview
+
+[0040](implementation/0040-local-workspace-preview.md) opens the signed-in
+workspace in desktop Chromium with sample records in a disposable schema.
+The Railway pilot and live identity setup remain separate work.
+
+## Previous increment — task priorities
+
+[0039](implementation/0039-task-priority.md) adds Low, Normal, and High task
+priorities and a combined Work filter. Upgrade to `0011_task_priorities` before
+starting the workspace.
+
+## Previous increment — workspace projects
+
+[0038](implementation/0038-workspace-projects.md) adds project creation, task
+assignment, and the Work items project filter. Upgrade the workspace database
+to `0010_workspace_projects` before starting the updated application.
+
+## Previous increment — task status filtering
+
+[0037](implementation/0037-task-status-filter.md) adds status filtering in the
+paginated task views and combines it with title search.
+
+## Previous increment — work title search
+
+[0036](implementation/0036-work-title-search.md) adds title search in the
+signed-in Work views. The Railway pilot remains ready for synthetic staging
+checks once hosting is available.
+
+## Previous increment — Railway-only pilot
+
+[0035](implementation/0035-railway-direct-pilot.md) adds the direct Railway
+mode and its public HTTPS smoke check. Begin with synthetic staging in a
+dedicated Railway environment. Live sign-in and usage measurements are pending.
+
+## Previous increment — authenticated pilot ingress
+
+[0034](implementation/0034-authenticated-pilot-ingress.md) adds the locally
+tested Worker and backend credential check as an optional deployment path.
+
+## Previous increment — idle database connections
+
+[0033](implementation/0033-idle-database-connections.md) adds an optional
+connection mode for a low-traffic pilot. Verify Railway sleep and usage in
+staging. Public proxy trust and compatible sign-in remain the next launch checks.
+
+## Previous increment — Railway portfolio pilot preparation
+
+Target a free Railway pilot with synthetic data and a small group of invited
+friends after staging passes. [0032](implementation/0032-railway-pilot.md)
+records configuration and outstanding checks. The owner needs to connect
+Railway to the FlowPilot repository when staging is ready. Public proxy trust
+and compatible sign-in require live verification. Use [PORTFOLIO](PORTFOLIO.md)
+to distinguish implemented skills from the earlier AWS proposal.
+
+## Previous increment — hosted workspace foundation
+
+Increment 0031 adds opt-in HTTPS workspace hosting and a non-root image.
+See [0031](implementation/0031-hosted-workspace.md) for the generic host
+and proxy trust design.
+
+## Previous increment — workspace sharing
 
 Increment 0030 adds [review and sharing](implementation/0030-workspace-sharing.md)
 for private tasks and events, with Shared work and My private work filters.

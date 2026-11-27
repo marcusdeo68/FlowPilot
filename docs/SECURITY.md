@@ -3,10 +3,11 @@
 ## Current risk boundary
 
 The default dashboard/legacy API is a local development scaffold without identity
-or workspace authorization. The separate workspace API verifies access tokens and
-stored membership, but has no real provider/browser login configured and remains
-local-only too. Run both on `127.0.0.1` with synthetic data. Do not expose/deploy
-either or connect personal email, chat, notes, or calendar accounts yet.
+or workspace authorization. Run it on `127.0.0.1` with synthetic data. The separate
+workspace API verifies access tokens and stored membership. Its opt-in hosted
+mode requires the configured HTTPS hostname for application routes. Use synthetic
+data to verify staging. Live sign-in and provider data require the remaining
+deployment controls below. See [0031](implementation/0031-hosted-workspace.md).
 
 ## Implemented in the local scaffold
 
@@ -24,7 +25,7 @@ dashboard. Pure access policies have isolation tests but are not wired into the
 legacy API. These local protections are not authentication or network deployment
 readiness; see `docs/implementation/0004-verification-and-access-policies.md`.
 
-The first browser dashboard is also local-only. It uses same-origin calls to the unauthenticated manual API and includes sample-only inbox/schedule examples. Keep the server bound to loopback and do not deploy this version to AWS or expose it to a network. The dashboard does not connect external accounts and has no permission to send email or messages.
+The first browser dashboard is also local-only. It uses same-origin calls to the unauthenticated manual API and includes sample-only inbox/schedule examples. Keep it bound to loopback. The dashboard does not connect external accounts and has no permission to send email or messages.
 
 ## Required before multi-user or real provider data
 
@@ -41,21 +42,20 @@ atomically and does not authenticate a user. Browser initiation/callback protect
 provider review and returned-token verification are still required before exposing
 login routes. See [0015](implementation/0015-login-transactions.md).
 
-Increment 0012 optionally enables token-bounded opaque browser sessions on one
-explicit loopback origin. Credentials are hashed at rest; active-session writes
-and logout require exact Origin plus CSRF. Safe reads reject supplied foreign
-Origin/Fetch Metadata. SameSite alone does not isolate localhost ports. Cookie
-Secure is mandatory for configured HTTPS and omitted only for explicit loopback
-HTTP development. No proxy/public origin is supported. Revocation denies later
-authentication but cannot cancel admitted operations. Session/audit retention,
-request limits, provider revocation and full login remain deployment gaps; see
-[the session design](implementation/0012-browser-sessions.md).
+Increment 0012 adds token-bounded opaque browser sessions. Increment 0031 extends
+the allowed origin to one explicit HTTPS hostname in hosted mode. Credentials
+are hashed at rest. Active-session writes and logout require exact Origin and
+CSRF. Safe reads reject supplied foreign Origin or Fetch Metadata. Cookies use
+Secure for HTTPS, with an exception for loopback HTTP development. Session
+revocation blocks subsequent authentication. Admitted operations may finish.
+Session and audit retention, request limits, provider revocation, and real
+sign-in remain deployment gaps. See [the session design](implementation/0012-browser-sessions.md).
 
 Increment 0007's separate API verifies configured RS256 access tokens and resolves
 stored memberships. Configuration of a live identity provider remains open.
 The legacy dashboard remains unauthenticated. Signing-key refresh is throttled;
-request limits, HTTPS/proxy deployment, invitation consent, retention, and operational
-controls remain open; keep both factories local and synthetic. See implementation
+request limits, live invitation delivery, retention, and operational
+controls remain open. See implementation
 0007 for the accepted token profile, trusted key endpoint, and provider review.
 
 Increment 0005 implements internal PostgreSQL service checks for active stored
@@ -97,7 +97,11 @@ API can handle real accounts. See [0029](implementation/0029-workspace-invitatio
 - Structured logs that exclude message bodies, tokens, and unnecessary personal data.
 - Audit events with authenticated actor identity and access controls.
 - A data-flow and threat review before adding a model provider, connector, or deployment target.
-- For AWS: private database networking, least-privilege task/execution roles, encrypted secrets, image provenance/scanning, log retention without source bodies, a constrained GitHub OIDC trust policy, and reviewed Terraform plans.
+- For Railway: scope GitHub access to FlowPilot, keep the database private,
+  store credentials in service variables, verify HTTPS proxy behavior and
+  callback log privacy, and test deployment rollback and data recovery.
+  The direct pilot trusts other services in its dedicated environment.
+  Disable public TCP proxies. See the [Railway pilot guide](implementation/0035-railway-direct-pilot.md).
 
 ## AI and source-content trust boundaries
 

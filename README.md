@@ -2,9 +2,9 @@
 
 **From conversation to completion.** FlowPilot is a unified work coordination hub for bringing permitted signals from email, chat, notes, and calendars into a shared view of tasks, commitments, events, and approved follow-up actions.
 
-This repository currently contains a local API foundation, a dependency-free dashboard shell, and a deterministic commitment lifecycle. It does not yet connect to email, chat, notes, or calendar providers and does not call an AI model.
+The signed-in PostgreSQL workspace supports manual inbox review, tasks, projects, private notes, events, reminders, and work sharing. You can exercise these workflows with synthetic accounts. Live provider integrations and hosted sign-in remain planned.
 
-## Current foundation
+## Legacy loopback dashboard
 
 - Same-origin local dashboard served at `/` for Today, inbox, tasks, schedule, and review/send workflow previews.
 - Dashboard task capture and lifecycle changes use the existing local API; the task view distinguishes loading, empty, failed, and saved results. Inbox, schedule, and draft previews remain labeled samples.
@@ -16,6 +16,10 @@ This repository currently contains a local API foundation, a dependency-free das
 - No external actions, integrations, or authentication; use synthetic data only.
 
 ## Run locally
+
+To try the signed-in workspace with sample data, follow the
+[interactive workspace preview](docs/implementation/0040-local-workspace-preview.md).
+It includes a sample task, a project, a private note, and an upcoming event.
 
 Requires Python 3.11 or newer.
 
@@ -67,6 +71,8 @@ npx --yes --package pyright@1.1.407 pyright
 uv run --locked --extra dev python -m build
 node --check services/api/src/flowpilot_api/web/app.js
 node --check services/api/src/flowpilot_api/web/workspace.js
+node --check services/api/src/flowpilot_api/web/workspace-inbox.js
+node --check services/api/src/flowpilot_api/web/workspace-notes.js
 node --check services/api/src/flowpilot_api/web/workspace-events.js
 node --check services/api/src/flowpilot_api/web/workspace-reminders.js
 node --check services/api/src/flowpilot_api/web/workspace-access.js
@@ -81,9 +87,9 @@ commitment endpoints still have no identity or workspace authorization. See
 
 ## PostgreSQL foundation (internal service)
 
-The next storage adapter has a reversible Alembic migration and authorized
-services for manual sources, typed work, sharing, and audit history. It is not
-connected to the dashboard or HTTP authentication yet. Optional local PostgreSQL
+The signed-in workspace uses versioned Alembic migrations and authorized
+PostgreSQL services for manual sources, typed work, sharing, and audit history.
+The legacy dashboard uses SQLite. Optional local PostgreSQL
 setup, test isolation, design, and remaining limits are documented in
 [implementation 0005](docs/implementation/0005-postgres-work-storage.md).
 CI runs real-database checks separately; local runs skip them unless
@@ -110,7 +116,10 @@ supports manual dispatch and a daily 10:17 UTC maintenance check.
 The separate bearer-verified workspace API is described in
 [implementation 0007](docs/implementation/0007-verified-workspace-api.md). It requires
 explicit identity and PostgreSQL configuration. It runs separately from the local
-dashboard. Keep both applications on loopback with synthetic data.
+dashboard. Use loopback for local development and synthetic data for local or
+staging verification. See the [Railway pilot guide](docs/implementation/0032-railway-pilot.md)
+for the planned deployment and [portfolio evidence](docs/PORTFOLIO.md) for work
+already exercised.
 
 Verified-user workspace creation/discovery and owner-only membership management
 are documented in [implementation 0008](docs/implementation/0008-workspace-onboarding.md).
@@ -122,8 +131,8 @@ see [the source review walkthrough](docs/implementation/0009-private-task-review
 
 Optional bounded browser sessions for the verified API are described in
 [implementation 0012](docs/implementation/0012-browser-sessions.md). These require
-a compatible verified access token and explicit loopback origin. CI tests their
-lifecycle in Chromium with PostgreSQL.
+a compatible verified access token and an explicit browser origin. CI tests
+their lifecycle in Chromium with PostgreSQL.
 
 An opt-in generic authorization-code sign-in adapter is documented in
 [implementation 0016](docs/implementation/0016-browser-login.md). It is disabled
@@ -149,6 +158,17 @@ Open **Notes** in the signed-in workspace to create private sticky notes. Apply
 Open **Events** under **Work items** in the signed-in workspace to create a
 private event, reschedule it, or cancel it. **Today** shows upcoming and ongoing
 events. See [increment 0025](docs/implementation/0025-manual-workspace-events.md).
+Choose **Schedule** in **Work view** or **Open schedule** from Today to browse
+ongoing and upcoming events by start time. The view includes events beyond
+Today’s seven-day window. See [increment 0041](docs/implementation/0041-workspace-schedule.md).
+**Task deadlines** in Schedule starts from today. Choose a date and use
+**Load more deadlines** to browse unfinished tasks from that date.
+See [increment 0043](docs/implementation/0043-schedule-deadline-browsing.md).
+**Open due tasks** carries the selected Schedule date into the task management
+view. You can apply or clear the date there. See
+[increment 0044](docs/implementation/0044-due-task-date-filter.md).
+Use **Load more** in Due tasks to manage deadlines beyond the first 20.
+See [increment 0045](docs/implementation/0045-due-task-pagination.md).
 
 Turn on **In-app reminders** in a signed-in workspace to see tasks due today
 and events starting within 15 minutes. Use **Snooze 5 minutes** or **Dismiss

@@ -30,12 +30,39 @@ const eventsStatus = document.querySelector("#today-events-status");
 const eventItems = document.querySelector("#today-event-items");
 const retryEvents = document.querySelector("#retry-today-events");
 const openEvents = document.querySelector("#open-events");
+const openSchedule = document.querySelector("#open-schedule");
+const scheduleDeadlines = document.querySelector("#schedule-deadlines");
+const scheduleDeadlinesStatus = document.querySelector("#schedule-deadlines-status");
+const scheduleDeadlineItems = document.querySelector("#schedule-deadline-items");
+const retryScheduleDeadlines = document.querySelector("#retry-schedule-deadlines");
+const moreScheduleDeadlines = document.querySelector("#more-schedule-deadlines");
+const deadlineFilter = document.querySelector("#schedule-deadline-filter");
+const deadlineFromDate = document.querySelector("#deadline-from-date");
+const openDueTasks = document.querySelector("#open-due-tasks");
+const scheduleEventsHeading = document.querySelector("#schedule-events-heading");
 const reviewsStatus = document.querySelector("#today-reviews-status");
 const reviewItems = document.querySelector("#today-review-items");
 const retryReviews = document.querySelector("#retry-today-reviews");
 const reviewInInbox = document.querySelector("#review-in-inbox");
 const workViewLabel = document.querySelector("#work-view-label");
 const workView = document.querySelector("#work-view");
+const taskStatusFilter = document.querySelector("#task-status-filter");
+const workTaskStatus = document.querySelector("#work-task-status");
+const workPriority = document.querySelector("#work-priority");
+const projectFilter = document.querySelector("#project-filter");
+const workProject = document.querySelector("#work-project");
+const createProject = document.querySelector("#create-project");
+const projectName = document.querySelector("#project-name");
+const saveProject = document.querySelector("#save-project");
+const projectFeedback = document.querySelector("#project-feedback");
+const workSearch = document.querySelector("#work-search");
+const workSearchTitle = document.querySelector("#work-search-title");
+const submitWorkSearch = document.querySelector("#submit-work-search");
+const clearWorkSearch = document.querySelector("#clear-work-search");
+const dueDateFilter = document.querySelector("#due-date-filter");
+const dueFromDate = document.querySelector("#due-from-date");
+const applyDueDate = document.querySelector("#apply-due-date");
+const clearDueDate = document.querySelector("#clear-due-date");
 const workStatus = document.querySelector("#work-status");
 const items = document.querySelector("#work-items");
 const more = document.querySelector("#more-work");
@@ -46,19 +73,28 @@ const taskHeading = document.querySelector("#task-editor-heading");
 const taskTitle = document.querySelector("#task-title");
 const taskDescription = document.querySelector("#task-description");
 const taskDueDate = document.querySelector("#task-due-date");
+const taskProject = document.querySelector("#task-project");
+const taskPriority = document.querySelector("#task-priority");
 const saveTask = document.querySelector("#save-task");
 const cancelTask = document.querySelector("#cancel-task");
 const taskFeedback = document.querySelector("#task-feedback");
 const loginEnabled = document.body.dataset.loginEnabled === "true";
 const taskTransitions = JSON.parse(document.body.dataset.taskTransitions);
+const deadlineDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" });
 
 let session;
 let sessionVersion = 0;
 let workVersion = 0;
 let reviewVersion = 0;
 let eventVersion = 0;
+let scheduleDeadlineVersion = 0;
+let scheduleDeadlineDate = "";
+let nextDeadlineCursor;
 let expiresTimer;
 let nextCursor;
+let loadingDueMore = false;
+let workQuery = "";
+let dueFilterDate = "";
 let ownId;
 let editingTask;
 let taskOpener;
@@ -72,6 +108,10 @@ let notesBusy = false;
 let accessSaving = false;
 let invitationSaving = false;
 let workspaceSelectionBusy = false;
+let projects = [];
+let projectsWorkspace = "";
+let projectVersion = 0;
+let projectSaving = false;
 
 const inbox = createWorkspaceInbox({
   request,
@@ -83,6 +123,8 @@ const inbox = createWorkspaceInbox({
   denyWrites: clearWorkspaceWriteHint,
   openWork() {
     workView.value = "all";
+    resetWorkSearch();
+    workTaskStatus.value = workPriority.value = workProject.value = "";
     switchWorkspaceView("work");
     showWork.focus();
   },
@@ -108,10 +150,8 @@ const events = createWorkspaceEvents({
   reload(message) { void loadWork(false, "", message); },
   offerReload() { retryWork.hidden = false; },
   deny(status) {
-    if (status === 403) clearWorkspaceWriteHint();
-    clearWork();
+    clearDeniedWork(status);
     events.showFeedback("You no longer have permission to save this event.");
-    retryWork.hidden = false;
   },
   syncControls: syncWorkControls,
 });
@@ -130,10 +170,8 @@ const sharing = createWorkspaceSharing({
   reload(message) { void loadWork(false, "", "", message); },
   offerReload() { retryWork.hidden = false; },
   deny(status) {
-    if (status === 403) clearWorkspaceWriteHint();
-    clearWork();
+    clearDeniedWork(status);
     sharing.showFeedback("You no longer have permission to share this item.");
-    retryWork.hidden = false;
   },
 });
 
@@ -223,6 +261,7 @@ function closeTaskEditor() {
 function clearWork() {
   workVersion += 1;
   nextCursor = undefined;
+  loadingDueMore = false;
   items.replaceChildren();
   workStatus.textContent = "";
   more.hidden = retryWork.hidden = true;
@@ -246,7 +285,9 @@ function clearSession() {
   access.clear();
   invitations.clear();
   clearTodayLists();
+  clearScheduleDeadlines();
   workspaceView = "work";
+  resetWorkFilters();
   syncWorkspaceNavigation();
   clearWork();
   select.replaceChildren();
@@ -300,6 +341,7 @@ function loadSelectedWorkspaceView() {
   notes.clear();
   access.clear();
   clearTodayLists();
+  clearScheduleDeadlines();
   if (workspaceView === "inbox") {
     clearWork();
     if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
@@ -317,7 +359,7 @@ function loadSelectedWorkspaceView() {
       });
     }
   } else {
-    void loadWork();
+    loadWorkView();
     if (workspaceView === "today") {
       void loadTodayReviews();
       void loadTodayEvents();
@@ -336,7 +378,7 @@ function syncWorkControls() {
   const eventLocked = events.locked();
   const sharingLocked = sharing.locked();
   const editorOpen = !taskEditor.hidden || eventLocked || sharingLocked;
-  const workspaceLocked = workspaceSelectionBusy || notesBusy || eventLocked || sharingLocked
+  const workspaceLocked = workspaceSelectionBusy || projectSaving || notesBusy || eventLocked || sharingLocked
     || accessSaving || invitationSaving;
   select.disabled = workspaceLocked || !select.options.length;
   createButton.disabled = refreshWorkspaces.disabled = workspaceLocked;
@@ -345,15 +387,32 @@ function syncWorkControls() {
   inboxPanel.inert = workPanel.inert = invitationSaving;
   invitationsPanel.inert = workspaceSelectionBusy || accessSaving || notesBusy || editorOpen
     || inboxSaving || taskUpdate === "pending";
-  workView.disabled = editorOpen || taskUpdate === "pending" || !select.value;
+  workView.disabled = editorOpen || projectSaving || taskUpdate === "pending" || !select.value;
+  workSearch.hidden = workspaceView !== "work" || isDueView() || isScheduleView();
+  scheduleEventsHeading.hidden = !isScheduleView();
+  workSearchTitle.disabled = submitWorkSearch.disabled = clearWorkSearch.disabled =
+    workView.disabled || workspaceSelectionBusy;
+  dueDateFilter.hidden = workspaceView !== "work" || workView.value !== "due";
+  dueFromDate.disabled = applyDueDate.disabled = clearDueDate.disabled =
+    workView.disabled || workspaceSelectionBusy;
+  taskStatusFilter.hidden = !supportsTaskStatus();
+  workTaskStatus.disabled = workPriority.disabled = submitWorkSearch.disabled;
+  projectFilter.hidden = !supportsTaskStatus();
+  createProject.hidden = !canWriteWork();
+  workProject.disabled = saveProject.disabled = projectName.disabled =
+    submitWorkSearch.disabled || !projectsWorkspace;
+  taskProject.disabled = taskEditor.hidden || saveTask.disabled || !projectsWorkspace;
+  taskPriority.disabled = taskEditor.hidden || saveTask.disabled;
   const navigationLocked = workView.disabled || inboxSaving || notesBusy || accessSaving || invitationSaving;
   showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
   showAccess.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
-  openEvents.disabled = navigationLocked;
-  newTask.disabled = Boolean(taskUpdate) || editorOpen;
+  openEvents.disabled = openSchedule.disabled = navigationLocked;
+  openDueTasks.disabled = navigationLocked || workspaceSelectionBusy;
+  newTask.disabled = Boolean(taskUpdate) || editorOpen || projectSaving || loadingDueMore;
   events.disableCreate(newTask.disabled || workspaceSelectionBusy);
-  more.inert = retryWork.inert = eventLocked || sharingLocked;
+  retryWork.inert = eventLocked || sharingLocked;
+  more.inert = retryWork.inert || (isDueTasksView() && (editorOpen || Boolean(taskUpdate)));
   for (const button of items.querySelectorAll("button")) {
     button.disabled = newTask.disabled || Boolean(button.closest(".event-actions") && events.paused())
       || Boolean(button.closest(".sharing-actions") && sharing.paused());
@@ -370,6 +429,8 @@ function openTaskEditor(task, opener = newTask) {
   taskTitle.value = task?.data.title ?? "";
   taskDescription.value = task?.data.description ?? "";
   taskDueDate.value = task?.data.due_date ?? "";
+  selectTaskProject(task ? task.project_id ?? "" : selectedProject());
+  taskPriority.value = task ? task.priority ?? "normal" : (selectedPriority() || "normal");
   // Textareas normalize line endings. Keep the saved text when it was left alone.
   loadedTitle = taskTitle.value;
   loadedDescription = taskDescription.value;
@@ -394,7 +455,7 @@ async function changeTaskStatus(item, target, row) {
     });
     if (!row.isConnected) return;
     const message = "Task status updated.";
-    if (isDueView()) {
+    if (isDueView() || selectedTaskStatus()) {
       void loadWork(false, message);
     } else {
       row.replaceWith(renderItem(updated));
@@ -405,8 +466,9 @@ async function changeTaskStatus(item, target, row) {
   } catch (status) {
     if (!row.isConnected || expired(status)) return;
     if (status === 403 || status === 404) {
-      clearWork();
+      clearDeniedWork(status);
       taskFeedback.textContent = "You no longer have permission to update this task.";
+      return;
     } else {
       taskUpdate = "refresh";
       syncWorkControls();
@@ -420,10 +482,15 @@ async function changeTaskStatus(item, target, row) {
 
 function renderItem(item, today) {
   const row = document.createElement("li");
+  row.dataset.workId = item.id;
   const title = document.createElement("strong");
   const detail = document.createElement("span");
   title.textContent = item.data.title;
   const metadata = [item.data.kind, item.data.status];
+  if (item.priority === "high") metadata.push("High priority");
+  if (item.priority === "low") metadata.push("Low priority");
+  const project = projects.find(({ id }) => id === item.project_id);
+  if (project) metadata.push(project.name);
   if (item.data.kind === "task" && item.data.due_date) {
     if (today) metadata.push(item.data.due_date < today ? "Overdue" : "Due today");
     metadata.push("Due " + item.data.due_date);
@@ -483,7 +550,88 @@ function renderItem(item, today) {
 }
 
 function isDueView() {
-  return workspaceView === "today" || workView.value === "due";
+  return workspaceView === "today" || isDueTasksView();
+}
+
+function isDueTasksView() {
+  return workspaceView === "work" && workView.value === "due";
+}
+
+function isScheduleView() {
+  return workspaceView === "work" && workView.value === "schedule";
+}
+
+function supportsTaskStatus() {
+  return workspaceView === "work" && !["due", "events", "schedule"].includes(workView.value);
+}
+
+function selectedTaskStatus() {
+  return supportsTaskStatus() ? workTaskStatus.value : "";
+}
+
+function selectedProject() {
+  return supportsTaskStatus() ? workProject.value : "";
+}
+
+function selectedPriority() {
+  return supportsTaskStatus() ? workPriority.value : "";
+}
+
+function selectTaskProject(id) {
+  taskProject.querySelector("[data-current-project]")?.remove();
+  if (id && !projects.some(project => project.id === id)) {
+    const current = new Option("Current project", id);
+    current.dataset.currentProject = "";
+    taskProject.add(current);
+  }
+  taskProject.value = id;
+}
+
+function showProjects(list) {
+  const selected = workProject.value;
+  projects = list;
+  workProject.replaceChildren(new Option("All projects", ""), ...list.map(p => new Option(p.name, p.id)));
+  taskProject.replaceChildren(new Option("No project", ""), ...list.map(p => new Option(p.name, p.id)));
+  if (list.some(p => p.id === selected)) workProject.value = selected;
+  if (editingTask?.project_id) selectTaskProject(editingTask.project_id);
+}
+
+function clearProjectCatalog() {
+  projectVersion += 1;
+  projectsWorkspace = "";
+  showProjects([]);
+  projectFeedback.textContent = "";
+}
+
+async function loadProjects() {
+  const id = select.value;
+  if (projectsWorkspace === id) return;
+  const version = ++projectVersion;
+  try {
+    const list = await request("workspaces/" + encodeURIComponent(id) + "/projects");
+    if (version !== projectVersion || select.value !== id) return;
+    projectsWorkspace = id;
+    showProjects(list);
+    projectFeedback.textContent = "";
+  } catch (status) {
+    if (version !== projectVersion || select.value !== id || expired(status)) return;
+    if (status === 403) throw status;
+    projectFeedback.textContent = "Could not load projects. Refresh workspaces to retry.";
+  }
+}
+
+function resetWorkSearch() {
+  workQuery = workSearchTitle.value = "";
+}
+
+function resetWorkFilters() {
+  resetWorkSearch();
+  dueFilterDate = dueFromDate.value = "";
+  workTaskStatus.value = "";
+  workPriority.value = "";
+  clearProjectCatalog();
+  projectSaving = false;
+  createProject.reset();
 }
 
 function localDate() {
@@ -492,7 +640,25 @@ function localDate() {
   return parts.map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0")).join("-");
 }
 
+function loadWorkView() {
+  void loadWork();
+  void loadScheduleDeadlines();
+}
+
+function overlapsLoadedRows(list, incoming) {
+  const loadedIds = new Set(Array.from(list.children, row => row.dataset.workId));
+  return incoming.some(item => loadedIds.has(item.id));
+}
+
+function restartWorkList(schedule) {
+  clearWork();
+  workStatus.textContent = (schedule ? "The schedule" : "The due task list")
+    + " changed. Retry to start from the first page.";
+  retryWork.hidden = false;
+}
+
 async function loadWork(append = false, savedMessage = "", eventMessage = "", shareMessage = "") {
+  if (append && (!nextCursor || more.inert || more.disabled)) return;
   if (!append) {
     clearWork();
     taskFeedback.textContent = savedMessage;
@@ -502,51 +668,90 @@ async function loadWork(append = false, savedMessage = "", eventMessage = "", sh
   if (!session || !select.value) return;
   const today = workspaceView === "today" ? localDate() : undefined;
   const dueOnly = isDueView();
-  const eventsOnly = !dueOnly && workView.value === "events";
+  const dueTasks = isDueTasksView();
+  const dueFrom = dueTasks ? dueFilterDate : "";
+  const schedule = isScheduleView();
+  const eventsOnly = schedule || (!dueOnly && workView.value === "events");
   const visibility = !dueOnly && ["private", "workspace"].includes(workView.value) ? workView.value : undefined;
   const sharedOnly = visibility === "workspace";
+  const titleQuery = dueOnly || schedule ? "" : workQuery;
+  const taskStatus = selectedTaskStatus();
+  const projectId = selectedProject();
+  const priority = selectedPriority();
   const version = ++workVersion;
   const active = sessionVersion;
-  const path = "workspaces/" + encodeURIComponent(select.value) + (dueOnly ? "/work-due" : "/work-page");
-  const query = new URLSearchParams({ limit: today ? "21" : "20" });
-  if (eventsOnly) query.set("kind", "event");
-  if (visibility) query.set("visibility", visibility);
-  if (append && nextCursor) query.set("after", nextCursor);
+  const path = "workspaces/" + encodeURIComponent(select.value)
+    + (schedule ? "/work-schedule" : dueTasks ? "/work-due-page" : today ? "/work-due" : "/work-page");
+  const query = { limit: today ? 21 : 20 };
+  if (dueFrom) query.from_date = dueFrom;
+  if (eventsOnly && !schedule) query.kind = "event";
+  if (visibility) query.visibility = visibility;
+  if (taskStatus) query.task_status = taskStatus;
+  if (projectId) query.project_id = projectId;
+  if (priority) query.priority = priority;
+  if (append && nextCursor) Object.assign(query, nextCursor);
   workStatus.textContent = "Loading work items…";
   more.disabled = true;
+  if (append && dueTasks) {
+    loadingDueMore = true;
+    syncWorkControls();
+  }
   try {
-    const page = await request(path + "?" + query);
+    const listing = titleQuery
+      ? request(path + "/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...query, q: titleQuery }),
+      })
+      : request(path + "?" + new URLSearchParams(query));
+    const [page] = await Promise.all([listing, !eventsOnly && loadProjects()]);
     if (version !== workVersion || !session) return;
+    if (append && (dueTasks || schedule) && overlapsLoadedRows(items, page.items)) {
+      restartWorkList(schedule);
+      return;
+    }
     // The due endpoint sorts by date, so later rows cannot qualify after a future date.
     const visible = today ? page.items.filter(item => item.data.due_date <= today) : page.items;
     items.append(...visible.slice(0, 20).map(item => renderItem(item, today)));
     newTask.hidden = !canWriteWork() || eventsOnly || sharedOnly;
-    events.showCreate(!dueOnly && !sharedOnly && canWriteWork());
+    events.showCreate(!dueOnly && !sharedOnly && !taskStatus && !projectId && !priority && canWriteWork());
+    loadingDueMore = false;
     syncWorkControls();
-    nextCursor = page.next_after;
+    nextCursor = page.next_after ? { after: page.next_after } : undefined;
+    if ((schedule || dueTasks) && nextCursor) nextCursor.after_version = page.items.at(-1).version;
     more.hidden = !nextCursor;
     more.disabled = false;
     if (today) {
       workStatus.textContent = visible.length > 20
         ? "Showing the 20 earliest tasks due by today. Open Work items to see more."
         : visible.length ? "" : "No tasks due today or overdue.";
-    } else if (dueOnly) {
-      workStatus.textContent = page.has_more
-        ? "Showing the 20 earliest deadlines. Switch to All work for the full list."
-        : items.childElementCount ? "" : "No unfinished tasks with due dates.";
+    } else if (dueTasks) {
+      const empty = dueFrom ? "No unfinished tasks due from this date." : "No unfinished tasks with due dates.";
+      workStatus.textContent = items.childElementCount ? "" : empty;
+    } else if (schedule) {
+      workStatus.textContent = items.childElementCount ? "" : "No ongoing or upcoming events.";
     } else {
       workStatus.textContent = items.childElementCount ? ""
+        : taskStatus || projectId || priority ? "No tasks match the current filters."
+        : titleQuery ? "No work titles match your search."
         : eventsOnly ? "No events yet." : sharedOnly ? "No shared work yet." : "No work items yet.";
     }
   } catch (status) {
     if (active !== sessionVersion || version !== workVersion || expired(status)) return;
-    if (clearDeniedToday(status)) {
+    if (clearDeniedFocus(status)) {
       taskFeedback.textContent = savedMessage;
       return;
     }
+    if (status === 403) clearProjectCatalog();
     if (append && status !== 403 && status !== 404) {
       workStatus.textContent = "Could not load more work items. Try again.";
       more.disabled = false;
+      loadingDueMore = false;
+      syncWorkControls();
+      return;
+    }
+    if ((schedule || dueTasks) && append && status === 404) {
+      restartWorkList(schedule);
       return;
     }
     clearWork();
@@ -579,12 +784,24 @@ function clearTodayLists() {
   clearTodayEvents();
 }
 
-function clearDeniedToday(status) {
-  if (status !== 403 || workspaceView !== "today") return false;
+function clearDeniedFocus(status) {
+  const today = workspaceView === "today";
+  if (status !== 403 || (!today && !isScheduleView())) return false;
   clearWork();
-  clearTodayLists();
-  workStatus.textContent = "Today is unavailable. Refresh your workspaces to try again.";
+  clearProjectCatalog();
+  if (today) clearTodayLists();
+  else clearScheduleDeadlines();
+  workStatus.textContent = (today ? "Today" : "Schedule") + " is unavailable. Refresh your workspaces to try again.";
   return true;
+}
+
+function clearDeniedWork(status) {
+  if (status === 403) clearWorkspaceWriteHint();
+  if (!clearDeniedFocus(status)) {
+    if (status === 403) clearProjectCatalog();
+    clearWork();
+    retryWork.hidden = false;
+  }
 }
 
 async function loadTodayReviews() {
@@ -603,7 +820,7 @@ async function loadTodayReviews() {
     }
     reviewsStatus.textContent = proposals.length ? "" : "No pending reviews.";
   } catch (status) {
-    if (version !== reviewVersion || expired(status) || clearDeniedToday(status)) return;
+    if (version !== reviewVersion || expired(status) || clearDeniedFocus(status)) return;
     reviewsStatus.textContent = status === 404
       ? "Pending reviews are unavailable."
       : "Could not load pending reviews.";
@@ -634,7 +851,7 @@ async function loadTodayEvents() {
       ? "Showing the five earliest events."
       : page.items.length ? "" : "No events in the next seven days.";
   } catch (status) {
-    if (version !== eventVersion || expired(status) || clearDeniedToday(status)) return;
+    if (version !== eventVersion || expired(status) || clearDeniedFocus(status)) return;
     eventsStatus.textContent = status === 404
       ? "Upcoming events are unavailable."
       : "Could not load upcoming events.";
@@ -642,10 +859,84 @@ async function loadTodayEvents() {
   }
 }
 
+function resetDeadlinePage() {
+  scheduleDeadlineVersion += 1;
+  nextDeadlineCursor = undefined;
+  retryScheduleDeadlines.hidden = moreScheduleDeadlines.hidden = true;
+  scheduleDeadlineItems.replaceChildren();
+  scheduleDeadlinesStatus.textContent = "";
+}
+
+function clearScheduleDeadlines() {
+  resetDeadlinePage();
+  scheduleDeadlineDate = deadlineFromDate.value = "";
+  scheduleDeadlines.hidden = true;
+}
+
+function showDeadlineRetry(message) {
+  resetDeadlinePage();
+  scheduleDeadlinesStatus.textContent = message;
+  retryScheduleDeadlines.hidden = false;
+}
+
+async function loadScheduleDeadlines(append = false) {
+  if (!isScheduleView() || !session || !select.value) {
+    clearScheduleDeadlines();
+    return;
+  }
+  if (append && !nextDeadlineCursor) return;
+  if (!append) resetDeadlinePage();
+  const version = ++scheduleDeadlineVersion;
+  if (!scheduleDeadlineDate) scheduleDeadlineDate = deadlineFromDate.value = localDate();
+  scheduleDeadlines.hidden = false;
+  scheduleDeadlinesStatus.textContent = "Loading deadlines…";
+  moreScheduleDeadlines.disabled = true;
+  const changedMessage = "The deadline list changed. Retry to start from the first page.";
+  try {
+    const query = new URLSearchParams({
+      limit: 5, from_date: scheduleDeadlineDate, ...(append ? nextDeadlineCursor : {}),
+    });
+    const path = "workspaces/" + encodeURIComponent(select.value) + "/work-due-page?" + query;
+    const page = await request(path);
+    if (version !== scheduleDeadlineVersion) return;
+    if (append && overlapsLoadedRows(scheduleDeadlineItems, page.items)) {
+      showDeadlineRetry(changedMessage);
+      return;
+    }
+    for (const { id, data: task } of page.items) {
+      const row = document.createElement("li");
+      row.dataset.workId = id;
+      const title = document.createElement("strong");
+      const due = document.createElement("time");
+      title.textContent = task.title;
+      due.dateTime = task.due_date;
+      due.textContent = deadlineDateFormat.format(new Date(task.due_date + "T00:00:00Z"));
+      row.append(title, " · Due ", due);
+      scheduleDeadlineItems.append(row);
+    }
+    nextDeadlineCursor = page.next_after
+      ? { after: page.next_after, after_version: page.items.at(-1).version }
+      : undefined;
+    moreScheduleDeadlines.hidden = !nextDeadlineCursor;
+    moreScheduleDeadlines.disabled = false;
+    scheduleDeadlinesStatus.textContent = scheduleDeadlineItems.childElementCount
+      ? "" : "No task deadlines from this date.";
+  } catch (status) {
+    if (version !== scheduleDeadlineVersion || expired(status) || clearDeniedFocus(status)) return;
+    if (append && status !== 404) {
+      scheduleDeadlinesStatus.textContent = "Could not load more deadlines. Try again.";
+      moreScheduleDeadlines.disabled = false;
+      return;
+    }
+    showDeadlineRetry(append ? changedMessage : "Could not load deadlines.");
+  }
+}
+
 async function loadWorkspaces(created, preferredId) {
   if (!session) return;
   const version = sessionVersion;
-  const preferred = created?.id ?? preferredId ?? select.value;
+  const previous = select.value;
+  const preferred = created?.id ?? preferredId ?? previous;
   workspaceSelectionBusy = true;
   reminders.select(undefined, session);
   inbox.clear();
@@ -653,6 +944,7 @@ async function loadWorkspaces(created, preferredId) {
   access.clear();
   invitations.clear();
   clearTodayLists();
+  clearScheduleDeadlines();
   clearWork();
   select.replaceChildren();
   syncWorkControls();
@@ -688,6 +980,11 @@ async function loadWorkspaces(created, preferredId) {
       return option;
     }));
     if (listed || extra) select.value = preferred;
+    if (select.value !== previous) resetWorkFilters();
+    else {
+      projectVersion += 1;
+      projectsWorkspace = "";
+    }
     if (workspaces.length === 100) {
       workspaceStatus.textContent = "Showing the first 100 workspaces.";
     } else {
@@ -804,7 +1101,14 @@ taskEditor.addEventListener("submit", async (event) => {
       : taskDescription.value.trim() || null,
     due_date: taskDueDate.value || null,
   };
+  const projectId = taskProject.disabled ? null : taskProject.value || null;
+  if (task && !taskProject.disabled && projectId !== (task.project_id ?? null)) {
+    details.project_id = projectId;
+  }
+  const priority = taskPriority.value;
+  if (task && priority !== (task.priority ?? "normal")) details.priority = priority;
   saveTask.disabled = cancelTask.disabled = true;
+  taskProject.disabled = taskPriority.disabled = true;
   taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = true;
   taskFeedback.textContent = "Saving task…";
   try {
@@ -813,7 +1117,7 @@ taskEditor.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token },
       body: JSON.stringify(task
         ? { expected_version: task.version, details }
-        : { item: { kind: "task", ...details } }),
+        : { item: { kind: "task", ...details }, priority, ...(projectId ? { project_id: projectId } : {}) }),
     });
     if (version !== editorVersion) return;
     void loadWork(false, task ? "Task updated." : "Task created.");
@@ -823,9 +1127,8 @@ taskEditor.addEventListener("submit", async (event) => {
       taskFeedback.textContent = "This task changed. Close the editor, refresh the work list, and reopen the task.";
       retryWork.hidden = false;
     } else if (status === 403 || status === 404) {
-      clearWork();
+      clearDeniedWork(status);
       taskFeedback.textContent = "You no longer have permission to save this task.";
-      retryWork.hidden = false;
     } else {
       taskFeedback.textContent = status === 422
         ? "Check the title, description, and due date."
@@ -837,6 +1140,7 @@ taskEditor.addEventListener("submit", async (event) => {
     if (version === editorVersion) {
       cancelTask.disabled = false;
       taskTitle.readOnly = taskDescription.readOnly = taskDueDate.readOnly = false;
+      syncWorkControls();
     }
   }
 });
@@ -847,7 +1151,10 @@ cancelTask.addEventListener("click", () => {
   closeTaskEditor();
   if (opener?.isConnected) opener.focus();
 });
-select.addEventListener("change", loadSelectedWorkspaceView);
+select.addEventListener("change", () => {
+  resetWorkFilters();
+  loadSelectedWorkspaceView();
+});
 showToday.addEventListener("click", () => switchWorkspaceView("today"));
 showWork.addEventListener("click", () => switchWorkspaceView("work"));
 showInbox.addEventListener("click", () => switchWorkspaceView("inbox"));
@@ -859,12 +1166,101 @@ reviewInInbox.addEventListener("click", () => {
 });
 retryReviews.addEventListener("click", loadTodayReviews);
 retryEvents.addEventListener("click", loadTodayEvents);
-openEvents.addEventListener("click", () => {
-  workView.value = "events";
+function openEventView(view) {
+  workView.value = view;
+  resetWorkSearch();
   switchWorkspaceView("work");
   showWork.focus();
+}
+openEvents.addEventListener("click", () => openEventView("events"));
+openSchedule.addEventListener("click", () => openEventView("schedule"));
+retryScheduleDeadlines.addEventListener("click", () => loadScheduleDeadlines());
+moreScheduleDeadlines.addEventListener("click", () => loadScheduleDeadlines(true));
+deadlineFilter.addEventListener("submit", event => {
+  event.preventDefault();
+  scheduleDeadlineDate = deadlineFromDate.value;
+  void loadScheduleDeadlines();
 });
-workView.addEventListener("change", () => loadWork());
+openDueTasks.addEventListener("click", () => {
+  dueFilterDate = dueFromDate.value = scheduleDeadlineDate;
+  workView.value = "due";
+  loadWorkView();
+  workView.focus();
+});
+workView.addEventListener("change", () => {
+  dueFilterDate = dueFromDate.value = "";
+  loadWorkView();
+});
+dueDateFilter.addEventListener("submit", event => {
+  event.preventDefault();
+  if (dueDateFilter.hidden || applyDueDate.disabled) return;
+  dueFilterDate = dueFromDate.value;
+  void loadWork();
+});
+clearDueDate.addEventListener("click", () => {
+  if (dueDateFilter.hidden || clearDueDate.disabled) return;
+  dueFilterDate = dueFromDate.value = "";
+  dueFromDate.focus();
+  void loadWork();
+});
+workTaskStatus.addEventListener("change", () => loadWork());
+workPriority.addEventListener("change", () => loadWork());
+workProject.addEventListener("change", () => loadWork());
+createProject.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (saveProject.disabled || !session || !select.value) return;
+  const name = projectName.value.trim();
+  if (!name) {
+    projectFeedback.textContent = "Enter a project name.";
+    return;
+  }
+  const id = select.value;
+  const version = sessionVersion;
+  projectSaving = true;
+  syncWorkControls();
+  projectFeedback.textContent = "Creating project…";
+  try {
+    const project = await request("workspaces/" + encodeURIComponent(id) + "/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (version !== sessionVersion || id !== select.value) return;
+    showProjects([...projects, project].sort((a, b) => a.name.localeCompare(b.name)));
+    workProject.value = project.id;
+    createProject.reset();
+    projectFeedback.textContent = "Project created.";
+    void loadWork();
+  } catch (status) {
+    if (version !== sessionVersion || id !== select.value || expired(status)) return;
+    if (status === 403) {
+      clearDeniedWork(status);
+      createProject.reset();
+      projectFeedback.textContent = "You no longer have permission to create projects. Refresh your workspaces.";
+      return;
+    }
+    projectFeedback.textContent = status === 409
+      ? "A project with that name already exists."
+      : "Could not confirm project creation. Refresh workspaces before retrying.";
+  } finally {
+    if (version === sessionVersion && id === select.value) {
+      projectSaving = false;
+      syncWorkControls();
+    }
+  }
+});
+workSearch.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (workSearch.hidden || submitWorkSearch.disabled) return;
+  workQuery = workSearchTitle.value = workSearchTitle.value.trim();
+  void loadWork();
+});
+clearWorkSearch.addEventListener("click", () => {
+  if (workSearch.hidden || clearWorkSearch.disabled) return;
+  resetWorkSearch();
+  workSearchTitle.focus();
+  void loadWork();
+});
 more.addEventListener("click", () => loadWork(true));
 retryWork.addEventListener("click", () => loadWork());
 refreshWorkspaces.addEventListener("click", () => loadWorkspaces());
