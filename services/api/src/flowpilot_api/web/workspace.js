@@ -335,7 +335,7 @@ function syncWorkspaceNavigation() {
   showAccess.setAttribute("aria-pressed", String(workspaceView === "access"));
 }
 
-function loadSelectedWorkspaceView() {
+function loadSelectedWorkspaceView(review) {
   reminders.select(session ? select.value || undefined : undefined, session);
   inbox.clear();
   notes.clear();
@@ -344,7 +344,7 @@ function loadSelectedWorkspaceView() {
   clearScheduleDeadlines();
   if (workspaceView === "inbox") {
     clearWork();
-    if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork());
+    if (session && select.value) inbox.show(select.value, session.csrf_token, canWriteWork(), review);
   } else if (workspaceView === "notes") {
     clearWork();
     if (session && select.value) notes.show(select.value, session.csrf_token, canWriteWork());
@@ -367,11 +367,11 @@ function loadSelectedWorkspaceView() {
   }
 }
 
-function switchWorkspaceView(view) {
+function switchWorkspaceView(view, review) {
   if (workspaceView === view) return;
   workspaceView = view;
   syncWorkspaceNavigation();
-  loadSelectedWorkspaceView();
+  loadSelectedWorkspaceView(review);
 }
 
 function syncWorkControls() {
@@ -407,6 +407,7 @@ function syncWorkControls() {
   showToday.disabled = showWork.disabled = showInbox.disabled = showNotes.disabled = navigationLocked;
   showAccess.disabled = navigationLocked;
   reviewInInbox.disabled = showInbox.disabled;
+  for (const button of reviewItems.querySelectorAll("button")) button.disabled = navigationLocked;
   openEvents.disabled = openSchedule.disabled = navigationLocked;
   openDueTasks.disabled = navigationLocked || workspaceSelectionBusy;
   newTask.disabled = Boolean(taskUpdate) || editorOpen || projectSaving || loadingDueMore;
@@ -815,7 +816,12 @@ async function loadTodayReviews() {
     if (version !== reviewVersion) return;
     for (const proposal of proposals) {
       const item = document.createElement("li");
-      item.textContent = proposal.title;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = proposal.title;
+      button.disabled = showInbox.disabled;
+      button.addEventListener("click", () => switchWorkspaceView("inbox", proposal));
+      item.append(button);
       reviewItems.append(item);
     }
     reviewsStatus.textContent = proposals.length ? "" : "No pending reviews.";

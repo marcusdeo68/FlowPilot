@@ -1,5 +1,10 @@
 # Session handoff
 
+## Open a review from Today
+
+[0048](implementation/0048-open-review-from-today.md) connects a pending
+suggestion on Today to its private inbox detail view.
+
 ## Outsider audit
 
 [0047](implementation/0047-schedule-page-consistency.md) covers browser

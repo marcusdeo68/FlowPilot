@@ -125,28 +125,29 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
   }
 
   function forgetSource(source) {
-    source.button.closest("li").remove();
+    source.button?.closest("li")?.remove();
     closeDetail();
     listStatus.textContent = "This source or suggestion is unavailable. Refresh the inbox.";
   }
 
-  function renderSource(entry) {
+  function renderSource(entry, selected) {
     const row = document.createElement("li");
     const button = document.createElement("button");
     const badge = document.createElement("span");
-    const source = { entry, button, badge };
+    const source = selected?.entry.id === entry.id ? selected : { entry };
+    Object.assign(source, { button, badge });
     button.type = "button";
     button.textContent = entry.summary;
     const date = document.createElement("time");
     date.dateTime = entry.created_at;
     date.textContent = new Date(entry.created_at).toLocaleDateString();
-    badge.textContent = statusLabels[entry.review?.state] ?? "No suggestion";
+    badge.textContent = statusLabels[source.entry.review?.state ?? entry.review?.state] ?? "No suggestion";
     button.addEventListener("click", () => openSource(source));
     row.append(button, badge, date);
     return row;
   }
 
-  async function loadInbox(append = false, savedMessage = "") {
+  async function loadInbox(append = false, savedMessage = "", target) {
     const active = context;
     if (!active || saving || (append && (!nextCursor || listRequest))) return;
     const token = {};
@@ -165,7 +166,7 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
     try {
       const page = await request(active.base + "/sources?" + query);
       if (context !== active || listRequest !== token) return;
-      list.append(...page.items.map(renderSource));
+      list.append(...page.items.map(entry => renderSource(entry, target ?? opened?.source)));
       nextCursor = page.next_after;
       addSource.hidden = !active.canWrite;
       more.hidden = !nextCursor;
@@ -189,6 +190,7 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
       if (context === active && listRequest === token) {
         listRequest = undefined;
         syncControls();
+        if (target) void openSource(target);
       }
     }
   }
@@ -203,7 +205,7 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
     state.textContent = statusLabels[proposal?.state] ?? "No suggestion yet.";
     if (proposal) {
       selection.source.entry.review = { id: proposal.id, state: proposal.state };
-      selection.source.badge.textContent = state.textContent;
+      if (selection.source.badge) selection.source.badge.textContent = state.textContent;
       title.value = proposal.title;
       selection.displayTitle = title.value;
       dueDate.value = proposal.due_date ?? "";
@@ -213,7 +215,7 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
 
   async function openSource(source) {
     const active = context;
-    if (!active || saving || !source.button.isConnected) return;
+    if (!active || saving || (source.button && !source.button.isConnected)) return;
     closeDetail();
     const selection = { source };
     opened = selection;
@@ -376,7 +378,7 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
   closeDetailButton.addEventListener("click", () => {
     const button = opened?.source.button;
     closeDetail();
-    button?.focus();
+    (button ?? refresh).focus();
   });
   refresh.addEventListener("click", () => loadInbox());
   more.addEventListener("click", () => loadInbox(true));
@@ -384,9 +386,10 @@ function createWorkspaceInbox({ request, expired, openWork, lockWorkNavigation, 
 
   return {
     clear,
-    show(workspaceId, csrf, canWrite) {
+    show(workspaceId, csrf, canWrite, review) {
       context = { base: "workspaces/" + encodeURIComponent(workspaceId), csrf, canWrite };
-      void loadInbox();
+      const target = review && { entry: { id: review.source_id, review: { id: review.id } } };
+      void loadInbox(false, "", target);
     },
   };
 }
