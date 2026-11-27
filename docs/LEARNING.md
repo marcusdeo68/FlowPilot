@@ -1,5 +1,35 @@
 # Learning guide for the current foundation
 
+## Liveness and readiness in a packaged deployment
+
+Run the hosted image rehearsal and compare the probe responses before and after
+migration. Explain why Compose waits for liveness when starting the app, then
+checks readiness separately. [Hosted image rehearsal](implementation/0046-hosted-image-rehearsal.md)
+
+## Calendar dates and event times
+
+In the local preview, compare a task due on a particular day with a meeting at
+9 a.m. Use the workstation’s time zone settings or the browser test’s time zone
+override to compare the displayed task date and which deadlines count as
+upcoming. Trace `localDate()` in the browser and `from_date` in the API to see
+where the cutoff is applied. [Schedule deadlines](implementation/0042-schedule-deadlines.md)
+
+Run the deadline API with a page size of one and two tasks due the same day.
+Trace why the next page looks for a later due date or an earlier creation time
+on the same day. [Deadline browsing](implementation/0043-schedule-deadline-browsing.md)
+
+In the Due tasks browser test, trace the control state while a page load is
+pending. Explain how starting an edit during that request could lose
+the draft if the cursor had changed. [Due task pagination](implementation/0045-due-task-pagination.md)
+
+## Paging by a mutable date
+
+Trace `WorkService.list_schedule` and its test in 0041. Create two events
+that start at the same instant and follow the pages with a limit of one.
+Explain how the ID breaks the tie. Reschedule the event used as the cursor
+and compare its old version with the version after the edit.
+See [Schedule](implementation/0041-workspace-schedule.md).
+
 This project assumes basic Python and Java knowledge, but limited experience with web services and production systems. The goal is to understand the request path and trade-offs, not memorize every line.
 
 ## Concepts in this increment
@@ -244,3 +274,59 @@ Read [0030](implementation/0030-workspace-sharing.md). Open a task's sharing
 review. In another tab, edit its title or link another evidence item before you
 confirm. Explain why the older confirmation fails and which evidence fields an
 observer sees after reviewing the new version.
+
+## Hosted workspace exercise
+
+Read [0031](implementation/0031-hosted-workspace.md). Trace a request from the
+browser through the load balancer to the workspace. Explain where HTTPS ends,
+how Uvicorn learns the original scheme, and why choosing a trusted proxy list
+still leaves the application responsible for checking Host and Origin.
+
+## Railway deployment exercise
+
+Read [0032](implementation/0032-railway-pilot.md). Trace the database URL from a
+Railway variable to the migration and application processes. Explain why
+`/readyz` should fail after a database connection succeeds if the migration
+revision is wrong, and how the separate probe hostname limits access.
+
+## Database connection exercise
+
+Read [0033](implementation/0033-idle-database-connections.md). Trace a PostgreSQL
+connection from checkout through commit or rollback and scope exit. Explain
+which settings reuse the connection and why closing it can help an idle service sleep.
+
+## Authenticated proxy exercise
+
+Read [0034](implementation/0034-authenticated-pilot-ingress.md). Trace a login
+POST through the Worker and app, then explain why the gateway returns the
+identity provider's redirect to the browser and why FlowPilot still checks Origin.
+
+## Railway pilot exercise
+
+Read [0035](implementation/0035-railway-direct-pilot.md). Explain why the app
+can require one exact HTTPS header but still depends on which services can
+reach its listener. Trace how the smoke command detects a public readiness probe.
+
+## Work search exercise
+
+Read [0036](implementation/0036-work-title-search.md). Compare a search that
+matches titles before pagination with searching only the items already visible
+in the browser. Explain where membership is checked in both cases.
+
+## Task status exercise
+
+Read [0037](implementation/0037-task-status-filter.md). Start a task while
+viewing Open tasks and explain why it disappears from the list. Explain why
+canceling an event still leaves it out of the Canceled task filter.
+
+## Project assignment exercise
+
+Read [0038](implementation/0038-workspace-projects.md). Assign a private task
+to a project and open its sharing review. Move the task to another project in
+a second session, then explain why the original sharing approval expires.
+
+## Priority exercise
+
+Read [0039](implementation/0039-task-priority.md). Mark a private task High,
+open its sharing preview, and change it to Low in another session. Explain the
+version change and how an authorized High filter responds.

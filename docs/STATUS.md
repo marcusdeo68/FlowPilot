@@ -1,11 +1,123 @@
 # FlowPilot maintenance and implementation tracker
 
-Updated: 2026-11-21. This file records implementation evidence, known issues, and
+Updated: 2026-11-27. This file records implementation evidence, known issues, and
 the next increment. Implementation notes explain design; GitHub Actions records
 verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- The [outsider audit](implementation/0047-schedule-page-consistency.md)
+  reproduced duplicate Schedule rows when an already displayed event or
+  deadline moved to a later page. The local synthetic preview also ran
+  headlessly and displayed the seeded task and event. Final local verification
+  of FP-052 through FP-054 on the working tree based on `2db7e43` passed
+  368 tests with zero failures, errors, or skips, including 124 PostgreSQL-only
+  and 60 Chromium cases. Lint, formatting, types, JavaScript checks, package
+  builds, documentation links, and both Linux container rehearsal phases
+  passed. The candidate awaits exact-revision GitHub CI and live pilot checks.
+
+- Increment 0046 adds a [hosted image rehearsal](implementation/0046-hosted-image-rehearsal.md)
+  to the workspace image job with disposable PostgreSQL. On the working tree
+  based on `2db7e43`, the independent local regression report recorded 363 tests,
+  zero failures, zero errors, and zero skips. The Linux container rehearsal
+  passed before and after migration. Exact-revision CI and live Railway
+  verification remain pending.
+- Increment 0045 adds [pagination in Due tasks](implementation/0045-due-task-pagination.md)
+  with or without a date filter. Independent verification passed all 363 tests
+  with zero skips, including 124 PostgreSQL-only and 55 Chromium tests.
+  Lint, type checks, package and Linux image builds, JavaScript checks, and
+  documentation links passed. GitHub CI for this revision is pending.
+- Increment 0044 adds [date filtering in Due tasks](implementation/0044-due-task-date-filter.md)
+  and carries the applied date over from Schedule. Independent PostgreSQL and
+  Chromium verification passed all 363 tests with zero skips, including 124
+  PostgreSQL-only and 55 Chromium tests. Lint, type checks, documentation,
+  package and Linux image builds, and the container migration check passed.
+  GitHub CI for this revision is pending.
+- Increment 0043 adds [date selection and deadline paging](implementation/0043-schedule-deadline-browsing.md)
+  in Schedule. The independent run passed all 362 tests with zero skips,
+  including 124 PostgreSQL-only and 54 Chromium tests. A separate browser
+  check verified recovery after the cursor task was canceled. Lint, type
+  checks, package and Linux image builds, JavaScript checks, and documentation
+  links passed. GitHub CI for this revision is pending.
+- Increment 0042 adds [upcoming task deadlines](implementation/0042-schedule-deadlines.md)
+  to Schedule. The preview uses the viewer's local calendar date and the
+  existing workspace read permissions. Independent verification passed all 362
+  tests with zero skips, including 124 PostgreSQL-only and 54 Chromium tests.
+  The preview smoke test, lint, type checks, package and Linux image builds,
+  JavaScript checks, and documentation links passed. GitHub CI for this revision
+  is pending.
+- Increment 0041 adds [workspace Schedule](implementation/0041-workspace-schedule.md)
+  for ongoing and upcoming events, sorted by start time. Independent verification
+  passed all 361 tests with zero skips, including 124 PostgreSQL-only and 53
+  Chromium tests. Lint, type checks, package and Linux image builds, JavaScript
+  checks, and documentation links passed. GitHub CI for this revision is pending.
+- Increment 0040 adds a [local workspace preview](implementation/0040-local-workspace-preview.md)
+  with synthetic sign-in, a sample project, a high-priority task, a private
+  note, and an upcoming event. The preview passed in headless and desktop
+  Chromium with PostgreSQL. The Docker Compose test database reached healthy
+  status with the documented startup command. After a Compose container
+  restart interrupted the first full run, the independent rerun passed all
+  359 tests with zero skips. Ruff, Pyright, package builds, JavaScript checks,
+  Worker tests, and documentation links passed. Exact-revision CI is pending.
+
+- Increment 0039 adds [manual task priorities](implementation/0039-task-priority.md).
+  Apply Alembic migration `0011_task_priorities` before starting the updated
+  workspace. Independent verification passed 359 tests with zero skips,
+  including 123 PostgreSQL-only and 52 Chromium tests. Lint, type checks,
+  Python package and Linux image builds, and documentation checks passed.
+  Container runtime verification and exact-revision GitHub CI remain pending.
+- Increment 0038 adds [workspace project grouping](implementation/0038-workspace-projects.md).
+  Apply Alembic migration `0010_workspace_projects` before running the updated
+  workspace. Independent verification passed 356 tests with zero skips,
+  including 121 PostgreSQL-only and 51 Chromium tests. Lint, type checks,
+  Python package and Linux image builds, and documentation checks passed.
+  The image's runtime migration check and exact-revision GitHub CI remain pending.
+- Increment 0037 adds [task status filtering](implementation/0037-task-status-filter.md)
+  in the paginated Work views. The filter works with title search and uses the
+  existing task lifecycle and visibility rules. Independent verification passed
+  353 tests with zero skips, including 119 PostgreSQL-only and 50 Chromium tests.
+  Lint, type checks, package builds, and documentation checks passed. The
+  container image check and GitHub CI remain pending.
+- Increment 0036 adds [work title search](implementation/0036-work-title-search.md).
+  The workspace searches authorized titles before pagination, with the term
+  in the request body. No schema migration is needed. Independent verification
+  passed all 351 tests, including 118 PostgreSQL-only and 49 Chromium tests,
+  with zero skips. An earlier Chromium startup timeout passed on retry and in
+  the clean full run. Lint, type checks, package builds, and docs checks passed.
+- Increment 0035 adds [Railway-only pilot ingress and public verification](implementation/0035-railway-direct-pilot.md).
+  Independent verification passed 349 Python tests with zero skips, including
+  117 PostgreSQL-only tests and 48 Chromium tests, plus two Node Worker tests.
+  Lint, type checks, package builds, and documentation links passed. The
+  reviewer also booted the app with the documented anonymous staging settings
+  and confirmed all five expected responses locally.
+  Real topology, HTTPS, callback log privacy, and identity remain unverified.
+- Increment 0034 adds [authenticated pilot ingress](implementation/0034-authenticated-pilot-ingress.md).
+  Independent verification passed 338 Python tests with no skips, two Worker
+  tests, lint, formatting, type checks, and the package build. Live provider
+  traffic, callback log privacy, and sign-in verification remain pending.
+- Increment 0033 adds [idle database connection cleanup](implementation/0033-idle-database-connections.md).
+  The optional `FLOWPILOT_DATABASE_POOL=disabled` setting closes PostgreSQL
+  connections after each use. Independent verification passed 331 tests with
+  zero skips, including 113 PostgreSQL-only and 48 Chromium tests. Lint,
+  formatting, typecheck, package build, JavaScript syntax, and documentation
+  checks passed. The rebuilt container migrated a disposable schema and left
+  zero PostgreSQL sessions open after repeated readiness checks. Live Railway
+  sleep and usage measurements are pending.
+- Increment 0032 adds [Railway deployment preparation](implementation/0032-railway-pilot.md),
+  including a scoped readiness probe and support for Railway's PostgreSQL URL.
+  The local container reported readiness after migrating a disposable schema.
+  Independent local verification passed 325 tests with zero skips, including
+  112 PostgreSQL-only and 48 Chromium tests. Lint, formatting, typecheck,
+  package build, JavaScript syntax, and documentation links passed.
+  GitHub CI for this working tree, staging, and sign-in verification are pending.
+  [Portfolio evidence](PORTFOLIO.md) records implemented skills and unused services.
+- Increment 0031 adds [hosted workspace configuration and packaging](implementation/0031-hosted-workspace.md).
+  Hosted requests require the configured HTTPS host, and the container includes
+  migrations. The image smoke check verified the non-root runtime, timezone
+  data, health and readiness behavior, proxy trust defaults, and Alembic head
+  `0009_workspace_invitations`. Independent local verification passed all 319
+  tests with no skips, including 111 PostgreSQL-only and 48 Chromium tests.
+  Live sign-in and deployment infrastructure are pending.
 - Increment 0030 adds [workspace sharing](implementation/0030-workspace-sharing.md).
   Authors can review and share tasks and events, and work now supports visibility filters.
 - Increment 0029 adds [recipient-consented invitations](implementation/0029-workspace-invitations.md).
@@ -197,7 +309,9 @@ verification for each revision. Update this file when an item's state changes.
 | ID | Type / status | Evidence and impact | Next action / closure evidence |
 | --- | --- | --- | --- |
 | FP-009 | Coverage expansion / planned | Chromium covers the local workflow; Firefox/WebKit, mobile navigation, visual comparison, and full accessibility auditing are not yet covered. | Add these checks alongside the upcoming authenticated frontend. No unverified accessibility claim. |
-| FP-010 | Deployment readiness / planned | Verified API, onboarding/admin API, browser sessions, and the opt-in sign-in adapter have synthetic coverage. Live identity configuration, invitation consent, request limits, session retention, and production database roles/operations remain incomplete. | Keep loopback/synthetic-only; verify each capability before network exposure. |
+| FP-010 | Deployment readiness / planned | The signed-in workspace has hosted transport and container coverage with synthetic identity. Live identity configuration, invitation delivery, request limits, session retention, and production database roles and operations remain incomplete. | Keep staging synthetic and verify transport, sign-in, and workspace isolation through the actual load balancer before using real accounts. |
+| FP-043 | Railway staging verification gap | Railway does not publish a stable edge peer range and private service requests bypass the HTTP edge. [0035](implementation/0035-railway-direct-pilot.md) limits the pilot to a trusted, dedicated environment. | Verify actual public ingress, private reachability, and callback log privacy with synthetic staging before hosted sign-in. |
+| FP-044 | Railway idle usage / verification gap | Railway counts outbound traffic for inactivity, and persistent database connections can interfere with sleep. [0033](implementation/0033-idle-database-connections.md) removes the app's retained connections when enabled. | Verify sleep, first authenticated request latency, and combined app and database usage in Railway staging. |
 
 Do not put secrets, message bodies, or private customer data in reproductions.
 New confirmed defects get a stable FP identifier, reproduction steps or a failing
@@ -208,6 +322,19 @@ Keep resolved entries so the reason for a fix remains discoverable.
 
 | ID | Resolution | Evidence |
 | --- | --- | --- |
+| FP-054 | Clear old Work filters when following an accepted inbox task. | The browser workflow sets project, Completed, and High filters before accepting an open task, follows **Go to work list**, and checks the filters and the resulting task row. |
+| FP-053 | Clear stale workspace data and the cached write role after forbidden task, project, event, or sharing actions. | A denied task change in Today could leave review and event titles visible. A denied project creation in Work could leave project names and write controls visible. Regression cases cover stale responses and task and project write denials. |
+| FP-052 | Restart the affected Schedule list if a later page repeats a visible ID. | Move a visible deadline or event across the page boundary in another session, then load more. Chromium checks the retry, preserved sibling panel, and current ordering. |
+| FP-051 | Restart Due tasks if a task moves across the page boundary. | The audit found that rescheduling an already listed task could repeat it with an older version still on screen. Chromium reschedules a listed task before paging and verifies that retry shows it once in the new position. |
+| FP-050 | Clear the Schedule deadline preview when an event or sharing request is denied. | The audit found that a 403 on an event change could leave task titles visible after workspace access ended. Chromium denies an event change and verifies that both lists clear until workspace refresh. |
+| FP-049 | Keep the Schedule cursor event stable through the page query. | The audit found that a reschedule between the cursor check and page query could repeat the cursor event. PostgreSQL coverage verifies that a competing writer cannot lock that row until the page query finishes. |
+| FP-048 | Clear cached project names when the active workspace rejects work access. | The project list is cached per workspace. A current 403 now clears the cache, and Chromium verifies the selector no longer shows project names. |
+| FP-047 | Preserve a task's project when a tab has an older project list. | A task can reference a project created from another session. The editor retains its project ID when the catalog has yet to refresh. Chromium verifies that editing the title keeps the assignment. |
+| FP-046 | Reload a status-filtered page after a task moves to a new status. | A Chromium regression found that starting a task left it displayed in the Open filter because the browser replaced only that row. It now checks that the task leaves Open and appears under Active. |
+| FP-045 | Return a clean validation error for malformed Unicode. | The search audit found that a lone escaped surrogate led FastAPI's validation response to fail while encoding it. A PostgreSQL HTTP regression sends the same payload and verifies a 422 response. |
+| FP-042 | Accept a standard PostgreSQL URL for the app and migrations. | The engine rejected hosting URLs beginning with `postgresql://`. Coverage verifies psycopg selection with both accepted schemes and preservation of connection options and escaped credentials. |
+| FP-041 | Allow the hosted proxy test to dispose of its synthetic SQLite connection after the readiness request. | The audit reproduced a swallowed SQLite thread-affinity error at cleanup. The focused pytest run with error-level logging passes without the cleanup error. |
+| FP-040 | Make the public listener's probe rules and the migration requirement explicit. | The audit confirmed that a trusted public route can reach the app's probe paths unless the listener blocks them. AWS also documents fail-open when all targets are unhealthy. [0031](implementation/0031-hosted-workspace.md) records both constraints and the staging checks. |
 | FP-039 | Keep canceled events free of work actions. | The existing Chromium lifecycle caught a Share button after cancellation. The fix keeps browser sharing available for scheduled events and preserves the terminal action check. |
 | FP-038 | Enable author edits from Shared work. | Audit found that hiding the create button also stopped the visible edit action. Chromium verifies editing both shared tasks and events and restoring edit focus on cancel. |
 | FP-037 | Recover an accepted workspace outside the bounded list. | Audit found that accepting a workspace beyond the first 100 could leave it out of the selector. Chromium omits the workspace on acceptance and on refresh and verifies an active-membership read supplies its current role. |
@@ -258,12 +385,15 @@ These are planned capabilities, not reported bugs. Stage 1 is incomplete.
 2. Increment 0007's signed-access-token API and PostgreSQL HTTP checks are verified.
    Workspace creation/discovery and member administration are verified in 0008.
    Increment 0012 adds optional browser sessions and 0016 adds opt-in browser
-   login with synthetic provider coverage. Next choose and configure a compatible
-   identity provider, implement invitation acceptance, and migrate the dashboard.
+   login with synthetic provider coverage. The signed-in workspace and invitation
+   acceptance are implemented with synthetic coverage. Next verify compatible
+   identity, the HTTPS edge, and workspace isolation in synthetic staging.
 3. Private task review (0009) and manual source discovery (0010) now have API
-   implementations. Next: interactive review and authenticated browser coverage.
-4. Only after access controls: provider review and one read-only pilot. AWS
-   provisioning also needs an agreed spending limit and deployment readiness.
+   implementations. Increment 0020 added interactive inbox review and
+   authenticated Chromium coverage for capturing a source and accepting a task.
+4. Verify an isolated Railway deployment with synthetic data and the free
+   allowance. Review access controls before inviting friends or connecting any
+   live provider.
 
 ## Check cadence and handoff
 

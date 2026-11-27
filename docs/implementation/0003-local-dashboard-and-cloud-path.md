@@ -2,6 +2,10 @@
 
 **Status: local dashboard shell implemented; cloud delivery planned.**
 
+This note records the original AWS learning proposal. The current deployment
+target is the [Railway pilot](0032-railway-pilot.md). Use [portfolio evidence](../PORTFOLIO.md)
+for résumé claims based on completed work.
+
 ## What changed
 
 The API now serves a same-origin dashboard at `/`. The shell presents a command-center layout for Today, a unified inbox, tasks, schedule, review/send, and connections. The manual task workflow is functional: the user can create a local commitment, see saved records, and advance eligible records through the existing deterministic lifecycle. The empty workspace shows clearly labeled sample cards for product review; those cards are not real messages or connected source records.
@@ -18,7 +22,7 @@ The product needs to demonstrate the daily loop before integrations: notice what
 - **Server-owned state:** Creating a task and completing it use the existing API. The UI sends a requested transition; the server checks the lifecycle and expected version. Sample task checkboxes are disabled because samples are not stored records.
 - **Explicit prototype boundary:** The API remains unauthenticated SQLite local-development software. The UI does not create workspace isolation or provider authorization, and is not suitable for network exposure.
 
-## AWS path and trade-offs
+## Historical AWS proposal and trade-offs
 
 AWS is a strong portfolio target when it demonstrates a coherent delivery pipeline rather than a collection of services. Keep the app as a modular monolith, package it in a container, store images in ECR, and run the API/UI on ECS Fargate. Fargate runs ECS tasks without the project managing EC2 hosts ([AWS Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html)). Move persistence to PostgreSQL and then use RDS for managed database operations ([RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html)). Use Secrets Manager, task-specific least-privilege IAM, CloudWatch, and Terraform.
 
@@ -26,7 +30,7 @@ GitHub Actions should authenticate to AWS via OIDC with a trust condition limite
 
 Do not deploy the current unauthenticated scaffold. Complete workspace authorization, PostgreSQL migrations, secrets design, and a reviewed threat model first. The architecture can create ongoing charges (including networking, load balancing, database, container, logs, and storage), so resource creation needs a deliberate low-cost plan and an agreed spend boundary.
 
-## Resume-ready skills this roadmap can demonstrate
+## Originally proposed learning areas
 
 1. **Secure multi-tenant backend:** object-level authorization, workspace isolation, migrations, optimistic concurrency, append-only audit, and exact-payload approvals.
 2. **Cloud and DevOps:** Docker, ECS/Fargate, ECR, RDS, IAM, VPC networking, Terraform, GitHub Actions OIDC, rollback, and CloudWatch.

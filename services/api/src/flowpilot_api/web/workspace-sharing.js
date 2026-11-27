@@ -36,7 +36,7 @@ function createWorkspaceSharing({ request, expired, context, syncControls, reloa
     dismiss();
   }
 
-  function render(data, projections) {
+  function render(data, projections, projectName, priority) {
     const rows = [
       ["Type", data.kind], ["Title", data.title],
       ["Description", data.description ?? "None"], ["Status", data.status],
@@ -45,6 +45,8 @@ function createWorkspaceSharing({ request, expired, context, syncControls, reloa
       ["Start", data.starts_at], ["End", data.ends_at], ["Time zone", data.time_zone],
     );
     else rows.push(["Due date", data.due_date ?? "None"]);
+    if (projectName) rows.push(["Project", projectName]);
+    if (priority) rows.push(["Priority", priority[0].toUpperCase() + priority.slice(1)]);
     for (const [label, value] of rows) {
       const term = document.createElement("dt");
       const description = document.createElement("dd");
@@ -81,7 +83,7 @@ function createWorkspaceSharing({ request, expired, context, syncControls, reloa
     try {
       const preview = await request(path + "/share-preview");
       if (active !== generation) return;
-      render(preview.item.data, preview.evidence);
+      render(preview.item.data, preview.evidence, preview.project_name, preview.item.priority);
       version = preview.item.version;
       confirm.disabled = false;
       feedback.textContent = "";

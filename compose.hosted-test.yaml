@@ -1,0 +1,51 @@
+# Disposable rehearsal for the packaged workspace, with no published ports.
+name: flowpilot-hosted-tests
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: flowpilot
+      POSTGRES_PASSWORD: synthetic-hosted-test-only
+      POSTGRES_DB: flowpilot_hosted_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U flowpilot -d flowpilot_hosted_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  workspace:
+    image: flowpilot-workspace:ci
+    volumes:
+      - type: bind
+        source: ./tests/hosted_image_smoke.py
+        target: /tmp/hosted_image_smoke.py
+        read_only: true
+        bind:
+          create_host_path: false
+    environment:
+      FLOWPILOT_HOSTED: '1'
+      FLOWPILOT_RAILWAY_EDGE: '1'
+      FLOWPILOT_BROWSER_ORIGIN: https://flowpilot-ci.up.railway.app
+      FLOWPILOT_PROBE_HOST: healthcheck.railway.app
+      FORWARDED_ALLOW_IPS: ''
+      FLOWPILOT_DATABASE_URL: postgresql://flowpilot:synthetic-hosted-test-only@postgres:5432/flowpilot_hosted_test
+      FLOWPILOT_DATABASE_POOL: disabled
+      FLOWPILOT_OIDC_ISSUER: https://identity.invalid
+      FLOWPILOT_OIDC_AUDIENCE: flowpilot-synthetic
+      FLOWPILOT_OIDC_JWKS_URL: https://identity.invalid/jwks
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import Request, urlopen; urlopen(Request('http://127.0.0.1:8000/healthz', headers={'Host': 'healthcheck.railway.app'}), timeout=2).close()"
+      interval: 2s
+      timeout: 3s
+      retries: 30
+networks:
+  default:
+    internal: true

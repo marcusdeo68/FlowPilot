@@ -123,6 +123,115 @@ def test_work_page_signed_http_contract(workspace_client):
     assert isinstance(client.get(base + "/work", headers=read).json(), list)
 
 
+def test_work_title_search_is_literal_authorized_and_paginated(workspace_client):
+    client, ws, other, _, sign = workspace_client
+    path = f"/api/v2/workspaces/{ws}/work-page/search"
+    read = {"Authorization": "Bearer " + sign("observer", overrides={"scope": "flowpilot:read"})}
+
+    def create(title, visibility="workspace", workspace=ws, actor="member"):
+        response = client.post(
+            f"/api/v2/workspaces/{workspace}/work",
+            headers={"Authorization": "Bearer " + sign(actor)},
+            json={"item": {"kind": "task", "title": title}, "visibility": visibility},
+        )
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    first = create("Older Budget 50%_draft")
+    second = create("Newer BUDGET 50%_draft")
+    private = create("Private Budget 50%_draft", "private")
+    create("Foreign Budget 50%_draft", workspace=other, actor="outsider")
+    create("Budget 50AXdraft")
+    term = {"q": "  budget 50%_DRAFT  ", "limit": 1, "visibility": "workspace"}
+    assert client.post(path, json=term).status_code == 401
+    for invalid in ("\x00", "X" * 201):
+        assert client.post(path, headers=read, json={"q": invalid}).status_code == 422
+    malformed = client.post(
+        path,
+        headers={**read, "Content-Type": "application/json"},
+        content=rb'{"q":"\ud800"}',
+    )
+    assert malformed.status_code == 422
+    assert malformed.json() == {"detail": "Request contains invalid Unicode."}
+    unfiltered_visibility = client.post(path, headers=read, json={"q": term["q"]}).json()
+    assert [item["id"] for item in unfiltered_visibility["items"]] == [second, first]
+    own_private = client.post(
+        path,
+        headers={"Authorization": "Bearer " + sign("member")},
+        json={"q": term["q"], "visibility": "private"},
+    ).json()
+    assert [item["id"] for item in own_private["items"]] == [private]
+    assert client.post(path, headers=read, json={**term, "after": private}).status_code == 404
+    result = client.post(path, headers=read, json=term)
+    assert result.status_code == 200
+    page = result.json()
+    assert [item["id"] for item in page["items"]] == [second]
+    assert page["next_after"] == second
+    page = client.post(path, headers=read, json={**term, "after": second}).json()
+    assert [item["id"] for item in page["items"]] == [first]
+    assert page["next_after"] is None
+    assert client.post(path, headers=read, json={**term, "kind": "event"}).json() == {
+        "items": [],
+        "next_after": None,
+    }
+
+
+def test_task_status_filter_composes_with_search_and_keeps_cursor_position(workspace_client):
+    client, ws, _, _, sign = workspace_client
+    base = f"/api/v2/workspaces/{ws}"
+    path = base + "/work-page"
+    write = {"Authorization": "Bearer " + sign("member")}
+    read = {"Authorization": "Bearer " + sign("observer", overrides={"scope": "flowpilot:read"})}
+
+    def create(item, visibility="workspace"):
+        response = client.post(
+            base + "/work", headers=write, json={"item": item, "visibility": visibility}
+        )
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    def transition(item_id, target):
+        response = client.post(
+            base + f"/work/{item_id}/transitions",
+            headers=write,
+            json={"target": target, "expected_version": 1},
+        )
+        assert response.status_code == 200
+
+    older = create({"kind": "task", "title": "Pilot budget"})
+    newer = create({"kind": "task", "title": "Pilot schedule"})
+    create({"kind": "task", "title": "Private pilot"}, "private")
+    event = create(
+        {
+            "kind": "event",
+            "title": "Pilot event",
+            "starts_at": "2026-01-01T10:00:00Z",
+            "ends_at": "2026-01-01T11:00:00Z",
+            "time_zone": "UTC",
+        }
+    )
+    transition(event, "canceled")
+    assert client.get(path, headers=read, params={"task_status": "scheduled"}).status_code == 422
+    assert (
+        client.post(
+            path + "/search", headers=read, json={"q": "pilot", "task_status": "scheduled"}
+        ).status_code
+        == 422
+    )
+    params = {"task_status": "open", "limit": 1}
+    page = client.get(path, headers=read, params=params).json()
+    assert [item["id"] for item in page["items"]] == [newer]
+    assert page["next_after"] == newer
+    transition(newer, "canceled")
+    page = client.get(path, headers=read, params={**params, "after": newer}).json()
+    assert [item["id"] for item in page["items"]] == [older]
+    assert page["next_after"] is None
+    body = {"q": "PiLoT", "task_status": "canceled", "visibility": "workspace"}
+    result = client.post(path + "/search", headers=read, json=body)
+    assert result.status_code == 200
+    assert [item["id"] for item in result.json()["items"]] == [newer]
+
+
 def test_due_tasks_order_scope_and_limit(workspace_client):
     client, ws, other, _, sign = workspace_client
     base = f"/api/v2/workspaces/{ws}"
@@ -197,6 +306,80 @@ def test_due_tasks_order_scope_and_limit(workspace_client):
         "Older tied",
         "Later active",
     ]
+
+    private_later = create("Private upcoming", due="2025-01-08", visibility="private")
+    canceled_later = create("Canceled upcoming", due="2025-01-09")
+    transition(canceled_later, "canceled", 1)
+    params = {"from_date": "2025-01-07", "limit": 1}
+    upcoming = client.get(due_path, params=params, headers=observer)
+    assert upcoming.status_code == 200
+    assert [item["id"] for item in upcoming.json()["items"]] == [later]
+    assert upcoming.json()["has_more"] is False
+    assert (
+        client.get(due_path, params=params, headers=authorization("member")).json()["has_more"]
+        is True
+    )
+    following_day = client.get(
+        due_path, params={"from_date": "2025-01-08"}, headers=authorization("member")
+    )
+    assert [item["id"] for item in following_day.json()["items"]] == [private_later]
+    assert following_day.json()["has_more"] is False
+    for value in ("2025-02-29", "2025-01-07T00:00:00Z", "0", "2025-1-7", ""):
+        assert (
+            client.get(due_path, params={"from_date": value}, headers=observer).status_code == 422
+        )
+
+    due_page = base + "/work-due-page"
+    member = authorization("member")
+    unfiltered = client.get(due_page, params={"limit": 1}, headers=member)
+    assert unfiltered.status_code == 200
+    oldest = unfiltered.json()["items"][0]
+    assert oldest["data"]["title"] == "Private earlier"
+    assert unfiltered.json()["next_after"] == oldest["id"]
+    remainder = client.get(
+        due_page,
+        params={"after": oldest["id"], "after_version": oldest["version"]},
+        headers=member,
+    ).json()
+    assert [item["id"] for item in remainder["items"]] == [newer, older, later, private_later]
+    assert remainder["next_after"] is None
+
+    query = {"from_date": "2025-01-06", "limit": 1}
+    first = client.get(due_page, params=query, headers=observer).json()
+    assert [item["id"] for item in first["items"]] == [newer]
+    assert first["next_after"] == newer
+    second = client.get(
+        due_page,
+        params={**query, "after": newer, "after_version": first["items"][0]["version"]},
+        headers=observer,
+    ).json()
+    assert [item["id"] for item in second["items"]] == [older]
+    assert second["next_after"] == older
+    last = client.get(
+        due_page, params={**query, "after": older, "after_version": 1}, headers=observer
+    ).json()
+    assert [item["id"] for item in last["items"]] == [later]
+    assert last["next_after"] is None
+    for pivot, version in ((private_later, 1), (canceled_later, 2), (newer, 1)):
+        assert (
+            client.get(
+                due_page,
+                params={**query, "after": pivot, "after_version": version},
+                headers=observer,
+            ).status_code
+            == 404
+        )
+    assert (
+        client.get(
+            due_page,
+            params={"from_date": "2025-01-07", "after": older, "after_version": 1},
+            headers=observer,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(due_page, params={**query, "after": older}, headers=observer).status_code == 422
+    )
 
 
 def test_upcoming_events_filter_order_scope_and_limit(workspace_client):

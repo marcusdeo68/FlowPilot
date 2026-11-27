@@ -3,6 +3,7 @@
 import re
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -49,9 +50,13 @@ class Commitment(WorkBase):
     due_date: date | None = None
 
 
+TaskStatus = Literal["open", "active", "blocked", "completed", "canceled"]
+TaskPriority = Literal["low", "normal", "high"]
+
+
 class Task(WorkBase):
     kind: Literal["task"] = "task"
-    status: Literal["open", "active", "blocked", "completed", "canceled"] = "open"
+    status: TaskStatus = "open"
     due_date: date | None = None
 
 
@@ -59,6 +64,8 @@ class TaskDetails(WorkDetails):
     """Complete editable fields. Send null explicitly to clear a field."""
 
     due_date: date | None
+    project_id: UUID | None = None
+    priority: TaskPriority = "normal"
 
     @field_validator("due_date", mode="before")
     @classmethod

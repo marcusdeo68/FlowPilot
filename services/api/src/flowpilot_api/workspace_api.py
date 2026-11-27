@@ -8,9 +8,11 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -30,6 +32,13 @@ from flowpilot_api.identity import (
     InvalidAccessToken,
 )
 from flowpilot_api.inbox import InboxPage, InboxService
+from flowpilot_api.ingress import (
+    PROBE_PATHS,
+    AuthenticatedIngress,
+    ProxyIngress,
+    RailwayIngress,
+    railway_edge_enabled,
+)
 from flowpilot_api.login import Exchange, LoginConfig, LoginFlow
 from flowpilot_api.login_transactions import InvalidLoginTransaction, LoginStorageUnavailable
 from flowpilot_api.membership_service import (
@@ -59,6 +68,8 @@ from flowpilot_api.work import (
     InvalidEventSchedule,
     LocalEventSchedule,
     TaskDetails,
+    TaskPriority,
+    TaskStatus,
     WorkBase,
     WorkDetails,
     WorkItem,
@@ -66,6 +77,7 @@ from flowpilot_api.work import (
 from flowpilot_api.work_service import (
     DueTasks,
     ManualSource,
+    ProjectNotFound,
     ReminderCandidates,
     ReminderCategory,
     SharePreview,
@@ -75,6 +87,7 @@ from flowpilot_api.work_service import (
     WorkNotFound,
     WorkPage,
     WorkService,
+    WorkspaceProject,
 )
 from flowpilot_api.workspace_ui import workspace_ui
 
@@ -83,9 +96,38 @@ class Command(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def parse_calendar_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(422, "Use a valid local calendar date") from exc
+
+
 class CreateWork(Command):
     item: WorkItem
     visibility: Visibility = Visibility.PRIVATE
+    project_id: UUID | None = None
+    priority: TaskPriority = "normal"
+
+
+class CreateProject(Command):
+    name: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True, min_length=1, max_length=100, pattern=r"^[^\x00]+$"
+        ),
+    ]
+
+
+class SearchWork(Command):
+    q: str = Field(max_length=200, pattern=r"^[^\x00]*$")
+    limit: int = Field(default=50, ge=1, le=100, strict=True)
+    after: UUID | None = None
+    kind: Literal["event"] | None = None
+    visibility: Visibility | None = None
+    task_status: TaskStatus | None = None
+    project_id: UUID | None = None
+    priority: TaskPriority | None = None
 
 
 class ExpectedVersion(Command):
@@ -140,26 +182,46 @@ def create_workspace_app(
     engine: Engine | None = None,
     verifier: AccessTokenVerifier | None = None,
     browser_origin: str | None = None,
+    hosted: bool | None = None,
     login_config: LoginConfig | None = None,
     login_exchange: Exchange | None = None,
 ) -> FastAPI:
+    if hosted is None:
+        mode = os.environ.get("FLOWPILOT_HOSTED", "0")
+        if mode not in ("0", "1"):
+            raise ValueError("Set FLOWPILOT_HOSTED to 0 or 1")
+        hosted = mode == "1"
+    origin = (
+        browser_origin if browser_origin is not None else os.environ.get("FLOWPILOT_BROWSER_ORIGIN")
+    )
+    if hosted and origin is None:
+        raise ValueError("Hosted mode requires FLOWPILOT_BROWSER_ORIGIN")
+    browser_config = BrowserConfig(origin, hosted=hosted) if origin is not None else None
+    probe_host = os.environ.get("FLOWPILOT_PROBE_HOST")
+    if probe_host is not None:
+        if browser_config is None or not browser_config.hosted:
+            raise ValueError("FLOWPILOT_PROBE_HOST requires hosted mode")
+        if (
+            BrowserConfig(f"https://{probe_host}", hosted=True).authority
+            == browser_config.authority
+        ):
+            raise ValueError("FLOWPILOT_PROBE_HOST must differ from the public hostname")
+    proxy = ProxyIngress.from_environment(browser_config, probe_host)
+    railway_edge = railway_edge_enabled(browser_config, probe_host, proxy)
+    login_config = login_config or LoginConfig.from_environment()
+    if login_config is not None and browser_config is None:
+        raise ValueError("Login requires an explicit browser origin")
     verifier = verifier or AccessTokenVerifier(IdentityConfig.from_environment())
     owns_engine = engine is None
     engine = engine if engine is not None else create_database_engine()
     service = WorkService(engine)
     memberships = MembershipService(engine)
     inbox = InboxService(engine)
-    origin = (
-        browser_origin if browser_origin is not None else os.environ.get("FLOWPILOT_BROWSER_ORIGIN")
-    )
     browser = (
-        BrowserAuth(BrowserSessions(engine, verifier.config, BrowserConfig(origin)))
-        if origin is not None
+        BrowserAuth(BrowserSessions(engine, verifier.config, browser_config))
+        if browser_config is not None
         else None
     )
-    login_config = login_config or LoginConfig.from_environment()
-    if login_config is not None and browser is None:
-        raise ValueError("Login requires an explicit browser origin")
 
     @asynccontextmanager
     async def lifespan(_):
@@ -170,7 +232,16 @@ def create_workspace_app(
                 engine.dispose()
 
     app = FastAPI(title="FlowPilot Workspace API", version="0.2.0", lifespan=lifespan)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+    @app.exception_handler(RequestValidationError)
+    async def safe_validation_error(request: Request, exc: RequestValidationError):
+        try:
+            return await request_validation_exception_handler(request, exc)
+        except UnicodeEncodeError:
+            return JSONResponse({"detail": "Request contains invalid Unicode."}, status_code=422)
+
+    if not hosted:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     bearer = HTTPBearer(auto_error=False)
 
     def bearer_identity(
@@ -234,6 +305,7 @@ def create_workspace_app(
         ),
         (AccessDenied, 403, "Workspace capability denied"),
         (WorkNotFound, 404, "Work item not found"),
+        (ProjectNotFound, 404, "Project not found"),
         (SourceNotFound, 404, "Source item not found"),
         (NoteNotFound, 404, "Note not found"),
         (VersionConflict, 409, "Work changed; reload its current version"),
@@ -250,7 +322,19 @@ def create_workspace_app(
 
     @app.middleware("http")
     async def private_response_headers(request: Request, call_next):
-        response = await call_next(request)
+        probe = request.method == "GET" and request.scope["path"] in PROBE_PATHS
+        hosts = request.headers.getlist("host")
+        if probe and probe_host is not None and hosts != [probe_host]:
+            response = JSONResponse({"detail": "Not found"}, status_code=404)
+        elif (
+            browser_config is not None
+            and browser_config.hosted
+            and not probe
+            and (request.scope["scheme"] != "https" or hosts != [browser_config.authority])
+        ):
+            response = JSONResponse({"detail": "Configured HTTPS host required"}, status_code=400)
+        else:
+            response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -260,6 +344,12 @@ def create_workspace_app(
     @app.get("/healthz")
     def health():
         return {"status": "ok"}
+
+    if hosted:
+
+        @app.get("/", include_in_schema=False)
+        def workspace_home():
+            return RedirectResponse("/api/v2/workspace", status_code=307)
 
     @app.get("/readyz")
     def ready():
@@ -399,6 +489,22 @@ def create_workspace_app(
             user.principal, workspace_id, invitation_id, expected_version=payload.expected_version
         )
 
+    @app.get("/api/v2/workspaces/{workspace_id}/projects", response_model=list[WorkspaceProject])
+    def projects(workspace_id: UUID, user: Annotated[AccessIdentity, Depends(read_identity)]):
+        return service.list_projects(user.principal, workspace_id)
+
+    @app.post(
+        "/api/v2/workspaces/{workspace_id}/projects",
+        response_model=WorkspaceProject,
+        status_code=201,
+    )
+    def create_project(
+        workspace_id: UUID,
+        payload: CreateProject,
+        user: Annotated[AccessIdentity, Depends(write_identity)],
+    ):
+        return service.create_project(user.principal, workspace_id, payload.name)
+
     @app.get("/api/v2/workspaces/{workspace_id}/work", response_model=list[StoredWork])
     def list_work(
         workspace_id: UUID,
@@ -415,9 +521,39 @@ def create_workspace_app(
         after: UUID | None = None,
         kind: Literal["event"] | None = None,
         visibility: Visibility | None = None,
+        task_status: TaskStatus | None = None,
+        project_id: UUID | None = None,
+        priority: TaskPriority | None = None,
     ):
         return service.list_work_page(
-            user.principal, workspace_id, limit=limit, after=after, kind=kind, visibility=visibility
+            user.principal,
+            workspace_id,
+            limit=limit,
+            after=after,
+            kind=kind,
+            visibility=visibility,
+            task_status=task_status,
+            project_id=project_id,
+            priority=priority,
+        )
+
+    @app.post("/api/v2/workspaces/{workspace_id}/work-page/search", response_model=WorkPage)
+    def search_work_page(
+        workspace_id: UUID,
+        payload: SearchWork,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+    ):
+        return service.list_work_page(
+            user.principal,
+            workspace_id,
+            limit=payload.limit,
+            after=payload.after,
+            kind=payload.kind,
+            visibility=payload.visibility,
+            q=payload.q,
+            task_status=payload.task_status,
+            project_id=payload.project_id,
+            priority=payload.priority,
         )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work-due", response_model=DueTasks)
@@ -425,8 +561,30 @@ def create_workspace_app(
         workspace_id: UUID,
         user: Annotated[AccessIdentity, Depends(read_identity)],
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        from_date: Annotated[str | None, Query(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")] = None,
     ):
-        return service.list_due_tasks(user.principal, workspace_id, limit=limit)
+        day = parse_calendar_date(from_date) if from_date is not None else None
+        return service.list_due_tasks(user.principal, workspace_id, limit=limit, from_date=day)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/work-due-page", response_model=WorkPage)
+    def work_due_page(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        from_date: Annotated[str | None, Query(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 5,
+        after: UUID | None = None,
+        after_version: Annotated[int | None, Query(ge=1)] = None,
+    ):
+        if (after is None) != (after_version is None):
+            raise HTTPException(422, "Supply both deadline cursor fields together")
+        cursor = (after, after_version) if after is not None and after_version is not None else None
+        return service.list_due_page(
+            user.principal,
+            workspace_id,
+            limit=limit,
+            from_date=parse_calendar_date(from_date) if from_date is not None else None,
+            after=cursor,
+        )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work-events", response_model=UpcomingEvents)
     def work_events(
@@ -435,6 +593,19 @@ def create_workspace_app(
         limit: Annotated[int, Query(ge=1, le=100)] = 5,
     ):
         return service.list_upcoming_events(user.principal, workspace_id, limit=limit)
+
+    @app.get("/api/v2/workspaces/{workspace_id}/work-schedule", response_model=WorkPage)
+    def work_schedule(
+        workspace_id: UUID,
+        user: Annotated[AccessIdentity, Depends(read_identity)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+        after: UUID | None = None,
+        after_version: Annotated[int | None, Query(ge=1)] = None,
+    ):
+        if (after is None) != (after_version is None):
+            raise HTTPException(422, "Supply both schedule cursor fields together")
+        cursor = (after, after_version) if after is not None and after_version is not None else None
+        return service.list_schedule(user.principal, workspace_id, limit=limit, after=cursor)
 
     @app.get("/api/v2/workspaces/{workspace_id}/reminders", response_model=ReminderCandidates)
     def reminders(
@@ -486,7 +657,12 @@ def create_workspace_app(
         user: Annotated[AccessIdentity, Depends(write_identity)],
     ):
         return service.create_work(
-            user.principal, workspace_id, payload.item, visibility=payload.visibility
+            user.principal,
+            workspace_id,
+            payload.item,
+            visibility=payload.visibility,
+            project_id=payload.project_id,
+            priority=payload.priority,
         )
 
     @app.get("/api/v2/workspaces/{workspace_id}/work/{work_id}", response_model=StoredWork)
@@ -657,4 +833,8 @@ def create_workspace_app(
         app.include_router(workspace_ui(browser, login_enabled=login_config is not None))
         if login_config is not None:
             app.include_router(LoginFlow(browser, verifier, login_config, login_exchange).routes())
+    if proxy is not None:
+        app.add_middleware(AuthenticatedIngress, config=proxy)
+    if railway_edge and browser_config is not None:
+        app.add_middleware(RailwayIngress, public_host=browser_config.authority)
     return app

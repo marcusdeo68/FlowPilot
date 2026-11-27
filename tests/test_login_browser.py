@@ -32,7 +32,12 @@ pytestmark = [pytest.mark.browser, pytest.mark.postgres]
 
 
 @pytest.fixture
-def login_browser(pg, tmp_path):
+def login_browser_headless():
+    return True
+
+
+@pytest.fixture
+def login_browser(pg, tmp_path, login_browser_headless):
     if os.environ.get("FLOWPILOT_BROWSER_TESTS") != "1":
         pytest.skip("Enable FLOWPILOT_BROWSER_TESTS=1 and install Playwright Chromium")
     from playwright.sync_api import sync_playwright
@@ -158,7 +163,7 @@ def login_browser(pg, tmp_path):
                 pytest.fail("Login browser server failed to start")
             time.sleep(0.02)
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
+            browser = playwright.chromium.launch(headless=login_browser_headless)
             try:
                 context = browser.new_context(ignore_https_errors=True)
                 page = context.new_page()
@@ -388,6 +393,12 @@ def test_workspace_browser_captures_and_reviews_private_sources(login_browser):
         )
         assert created["status"] == 201
     page.reload()
+    page.get_by_role("button", name="Work items", exact=True).click()
+    page.get_by_label("New project name").fill("Earlier project")
+    page.get_by_role("button", name="Create project", exact=True).click()
+    expect(page.get_by_text("Project created.", exact=True)).to_be_visible()
+    page.get_by_label("Task status", exact=True).select_option("completed")
+    page.get_by_label("Priority filter", exact=True).select_option("high")
     inbox.click()
     first_row = page.get_by_role("button", name=first, exact=True)
     more = page.get_by_role("button", name="Load more sources", exact=True)
@@ -431,6 +442,8 @@ def test_workspace_browser_captures_and_reviews_private_sources(login_browser):
     expect(page.get_by_text("Private task created.", exact=True)).to_be_visible()
     expect(accept).to_be_hidden()
     page.get_by_role("button", name="Go to work list", exact=True).click()
+    for label in ("Task status", "Priority filter", "Project filter"):
+        expect(page.get_by_label(label, exact=True)).to_have_value("")
     row = page.get_by_role("listitem").filter(has_text="Send the workshop packet")
     expect(row.get_by_text("Due 2030-07-08")).to_be_visible()
     stored = json.loads(fetch(page, base + f"/work/{task['work_id']}")["text"])
@@ -821,13 +834,14 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
 
     work_view.select_option("due")
     expect(page.get_by_role("listitem").first).to_contain_text(urgent)
-    expect(page.get_by_text("Showing the 20 earliest deadlines.", exact=False)).to_be_visible()
     expect(page.get_by_role("listitem")).to_have_count(20)
     expect(page.get_by_text(titles[0], exact=True)).to_have_count(0)
-    expect(page.get_by_role("button", name="Load more", exact=True)).to_be_hidden()
+    more = page.get_by_role("button", name="Load more", exact=True)
+    expect(more).to_be_visible()
     row.get_by_role("button", name="Edit task", exact=True).click()
     expect(work_view).to_be_disabled()
     expect(row.get_by_role("button", name="Start task", exact=True)).to_be_disabled()
+    expect(more).to_have_js_property("inert", True)
     page.get_by_role("button", name="Cancel", exact=True).click()
     expect(work_view).to_have_value("due")
 
@@ -841,6 +855,7 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
         expect(row.get_by_role("button", name="Edit task", exact=True)).to_be_disabled()
         expect(page.get_by_role("button", name="New task", exact=True)).to_be_disabled()
         expect(work_view).to_be_disabled()
+        expect(more).to_have_js_property("inert", True)
         route.continue_()
 
     page.route("**/transitions", check_pending_update, times=1)
@@ -850,8 +865,27 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     assert blocked["data"]["status"] == "blocked" and blocked["version"] == 3
     resumed = click_status("Resume task")
     assert resumed["data"]["status"] == "active" and resumed["version"] == 4
-    expect(row.get_by_role("button", name="Complete task", exact=True)).to_be_enabled()
-    page.route("**/work-due?**", lambda route: route.fulfill(status=503), times=1)
+    complete = row.get_by_role("button", name="Complete task", exact=True)
+    expect(complete).to_be_enabled()
+
+    def fail_pending_page(route: Route) -> None:
+        expect(complete).to_be_disabled()
+        expect(more).to_be_disabled()
+        route.fulfill(status=503)
+
+    page.route("**/work-due-page?limit=20&after=**", fail_pending_page, times=1)
+    more.click()
+    expect(
+        page.get_by_text("Could not load more work items. Try again.", exact=True)
+    ).to_be_visible()
+    expect(page.get_by_role("listitem")).to_have_count(20)
+    expect(complete).to_be_enabled()
+    more.click()
+    expect(page.get_by_text(titles[0], exact=True)).to_be_visible()
+    expect(page.get_by_role("listitem")).to_have_count(21)
+    expect(more).to_be_hidden()
+
+    page.route("**/work-due-page?limit=20", lambda route: route.fulfill(status=503), times=1)
     completed = click_status("Complete task")
     assert completed["data"]["status"] == "completed" and completed["version"] == 5
     expect(page.get_by_text("Could not load work items.", exact=True)).to_be_visible()
@@ -860,7 +894,7 @@ def test_workspace_browser_prioritizes_and_completes_due_tasks(login_browser):
     expect(page.get_by_text(titles[0], exact=True)).to_be_visible()
     expect(row).to_have_count(0)
     expect(page.get_by_role("listitem")).to_have_count(20)
-    expect(page.get_by_text("Showing the 20 earliest deadlines.", exact=False)).to_have_count(0)
+    expect(more).to_be_hidden()
 
     other = page.get_by_role("listitem").filter(has_text=titles[-1])
     cancel = other.get_by_role("button", name="Cancel task", exact=True)
@@ -1671,6 +1705,241 @@ def test_workspace_browser_today_events_render_retry_and_clear_on_workspace_chan
     expect(rows).to_have_count(0)
 
 
+def test_workspace_browser_schedule_pages_reloads_and_scopes_events(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Schedule workshop")
+    base = f"/api/v2/workspaces/{workspace_id}"
+    session = fetch(page, "/api/v2/session")
+    headers = {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": json.loads(session["text"])["csrf_token"],
+    }
+    now = datetime.now(UTC).replace(microsecond=0)
+    pivot = None
+    first_event = None
+    for day in range(21, 0, -1):
+        start = now + timedelta(days=day)
+        saved = fetch(
+            page,
+            base + "/work",
+            method="POST",
+            headers=headers,
+            body=json.dumps(
+                {
+                    "item": {
+                        "kind": "event",
+                        "title": f"Planning day {day:02}",
+                        "starts_at": start.isoformat(),
+                        "ends_at": (start + timedelta(hours=1)).isoformat(),
+                        "time_zone": "UTC",
+                    },
+                }
+            ),
+        )
+        assert saved["status"] == 201
+        if day == 20:
+            pivot = json.loads(saved["text"])["id"]
+        if day == 1:
+            first_event = json.loads(saved["text"])["id"]
+
+    seed_browser_work(page, workspace_id, ["Workshop deadline"], due_date="2099-01-02")
+
+    page.get_by_role("button", name="Today", exact=True).click()
+    expect(
+        page.get_by_role("list", name="Upcoming events", exact=True).get_by_role("listitem")
+    ).to_have_count(5)
+    page.get_by_role("button", name="Open schedule", exact=True).click()
+    expect(page.get_by_label("Work view", exact=True)).to_have_value("schedule")
+    expect(page.get_by_label("Search work titles", exact=True)).to_be_hidden()
+    expect(page.get_by_role("button", name="New task", exact=True)).to_be_hidden()
+    expect(page.get_by_role("button", name="New event", exact=True)).to_be_visible()
+    rows = page.locator("#work-items > li")
+    expect(rows.locator("strong")).to_have_text([f"Planning day {day:02}" for day in range(1, 21)])
+    more = page.get_by_role("button", name="Load more", exact=True)
+    changed = fetch(
+        page,
+        base + f"/work/{pivot}/event-details",
+        method="PATCH",
+        headers=headers,
+        body=json.dumps(
+            {
+                "details": {"title": "Updated planning day 20", "description": None},
+                "expected_version": 1,
+            }
+        ),
+    )
+    assert changed["status"] == 200, changed["text"]
+    more.click()
+    expect(
+        page.get_by_text("The schedule changed. Retry to start from the first page.")
+    ).to_be_visible()
+    expect(rows).to_have_count(0)
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(rows.last.get_by_text("Updated planning day 20", exact=True)).to_be_visible()
+    moved_start = (now + timedelta(days=20, hours=1)).replace(tzinfo=None)
+    moved = fetch(
+        page,
+        base + f"/work/{first_event}/event-details",
+        method="PATCH",
+        headers=headers,
+        body=json.dumps(
+            {
+                "details": {"title": "Planning day 01", "description": None},
+                "expected_version": 1,
+                "schedule": {
+                    "starts_at": moved_start.isoformat(),
+                    "ends_at": (moved_start + timedelta(hours=1)).isoformat(),
+                    "time_zone": "UTC",
+                },
+            }
+        ),
+    )
+    assert moved["status"] == 200, moved["text"]
+    more.click()
+    expect(
+        page.get_by_text("The schedule changed. Retry to start from the first page.")
+    ).to_be_visible()
+    expect(rows).to_have_count(0)
+    expect(more).to_be_hidden()
+    expect(page.get_by_text("Workshop deadline", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(rows.last).to_contain_text("Planning day 01")
+    more.click()
+    expect(rows.last.get_by_text("Planning day 21", exact=True)).to_be_visible()
+    expect(rows).to_have_count(21)
+    expect(rows.get_by_text("Planning day 01", exact=True)).to_have_count(1)
+    expect(more).to_be_hidden()
+    assert datetime.fromisoformat(
+        rows.last.locator("time").first.get_attribute("datetime")
+    ) == now + timedelta(days=21)
+
+    rows.last.get_by_role("button", name="Edit event", exact=True).click()
+    expect(page.get_by_label("Event title", exact=True)).to_have_value("Planning day 21")
+    page.get_by_role("button", name="Close event editor", exact=True).click()
+    page.once("dialog", lambda dialog: dialog.accept())
+    rows.last.get_by_role("button", name="Cancel event", exact=True).click()
+    expect(page.get_by_text("Event canceled.", exact=True)).to_be_visible()
+    expect(rows).to_have_count(20)
+    expect(more).to_be_hidden()
+    page.get_by_label("Work view", exact=True).select_option("events")
+    expect(rows.first.get_by_text("Planning day 01", exact=True)).to_be_visible()
+    more.click()
+    expect(rows.last.get_by_text("Planning day 21", exact=True)).to_be_visible()
+    expect(rows.last).to_contain_text("canceled")
+
+    page.evaluate(
+        """path => {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await originalFetch(url, options);
+                if (url !== path) return response;
+                await new Promise(resolve => { window.releaseOldSchedule = resolve; });
+                const json = response.json.bind(response);
+                response.json = async () => {
+                    const value = await json();
+                    setTimeout(() => { window.oldScheduleParsed = true; }, 0);
+                    return value;
+                };
+                return response;
+            };
+        }""",
+        base + "/work-schedule?limit=20",
+    )
+    page.get_by_label("Work view", exact=True).select_option("schedule")
+    page.wait_for_function("() => typeof window.releaseOldSchedule === 'function'")
+    second = create_workspace_in_browser(page, origin, "Workspace without a schedule")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    expect(page.get_by_text("No ongoing or upcoming events.", exact=True)).to_be_visible()
+    page.evaluate("() => window.releaseOldSchedule()")
+    page.wait_for_function("() => window.oldScheduleParsed === true")
+    expect(rows).to_have_count(0)
+
+
+@pytest.mark.parametrize("action", ["Start task", "Edit task"])
+def test_today_clears_all_lists_on_denied_task_write(login_browser, action):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Today task permissions")
+    seed_browser_work(page, workspace_id, ["Due task"], due_date="2020-01-01")
+    base = f"/api/v2/workspaces/{workspace_id}"
+    page.route(
+        origin + base + "/proposals?limit=5",
+        lambda route: route.fulfill(json=[{"title": "Pending review"}]),
+    )
+    page.evaluate(
+        """path => {
+            const original = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                if (url !== path) return original(url, options);
+                await new Promise(resolve => { window.releaseEvents = resolve; });
+                return {ok: true, json: async () => {
+                    setTimeout(() => { window.eventsHandled = true; }, 0);
+                    return {items: [], has_more: false};
+                }};
+            };
+        }""",
+        base + "/work-events?limit=5",
+    )
+    page.get_by_role("button", name="Today", exact=True).click()
+    pending = page.get_by_text("Pending review", exact=True)
+    expect(pending).to_be_visible()
+    page.wait_for_function("() => typeof window.releaseEvents === 'function'")
+    suffix = "task-details" if action == "Edit task" else "transitions"
+    page.route(origin + base + "/work/*/" + suffix, lambda route: route.fulfill(status=403))
+    page.get_by_role("button", name=action, exact=True).click()
+    if action == "Edit task":
+        page.get_by_label("Task title", exact=True).fill("Updated task")
+        page.get_by_role("button", name="Save changes", exact=True).click()
+
+    expect(page.get_by_text("Today is unavailable.", exact=False)).to_be_visible()
+    expect(page.get_by_text("Due task", exact=True)).to_have_count(0)
+    expect(pending).to_have_count(0)
+    page.evaluate("() => window.releaseEvents()")
+    page.wait_for_function("() => window.eventsHandled === true")
+    expect(page.locator("#today-events-status")).to_be_empty()
+    page.get_by_role("button", name="Work items", exact=True).click()
+    expect(page.get_by_text("Due task", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Edit task", exact=True)).to_have_count(0)
+
+
+@pytest.mark.parametrize("action", ["Start task", "Edit task", "Create project"])
+def test_work_clears_cached_project_names_on_denied_write(login_browser, action):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Work permissions")
+    seed_browser_work(page, workspace_id, ["Existing task"])
+    project_name = page.get_by_label("New project name", exact=True)
+    project_name.fill("Existing group")
+    page.get_by_role("button", name="Create project", exact=True).click()
+    project_filter = page.get_by_label("Project filter", exact=True)
+    expect(project_filter.get_by_role("option", name="Existing group")).to_have_count(1)
+    project_filter.select_option("")
+    expect(page.get_by_text("Existing task", exact=True)).to_be_visible()
+    base = origin + f"/api/v2/workspaces/{workspace_id}"
+    if action == "Create project":
+        page.route(base + "/projects", lambda route: route.fulfill(status=403), times=1)
+        project_name.fill("Second group")
+    else:
+        suffix = "task-details" if action == "Edit task" else "transitions"
+        page.route(base + "/work/*/" + suffix, lambda route: route.fulfill(status=403))
+    page.get_by_role("button", name=action, exact=True).click()
+    if action == "Edit task":
+        page.get_by_label("Task title", exact=True).fill("Updated title")
+        page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_text("You no longer have permission", exact=False)).to_be_visible()
+    expect(page.get_by_text("Existing task", exact=True)).to_have_count(0)
+    expect(project_filter.get_by_role("option")).to_have_count(1)
+    expect(project_filter).to_be_disabled()
+    expect(page.get_by_role("button", name="Create project", exact=True)).to_have_count(0)
+
+
 def test_workspace_browser_today_shows_pending_reviews_separately_from_due_work(login_browser):
     from playwright.sync_api import Route, expect
 
@@ -1778,6 +2047,289 @@ def test_workspace_browser_today_discards_pending_reviews_after_access_denial(lo
     expect(page.get_by_text(title, exact=True)).to_have_count(0)
 
 
+def test_workspace_browser_schedule_deadlines_use_local_day_and_clear_on_access_loss(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Schedule deadlines")
+    cdp = context.new_cdp_session(page)
+    cdp.send("Emulation.setTimezoneOverride", {"timezoneId": "America/Los_Angeles"})
+    page.clock.set_fixed_time(datetime(2030, 1, 3, 6, 30, tzinfo=UTC))
+    seed_browser_work(page, workspace_id, ["Overdue from yesterday"], due_date="2030-01-01")
+    seed_browser_work(page, workspace_id, ["<b>Due today</b>"], due_date="2030-01-02")
+    for day in range(3, 8):
+        seed_browser_work(page, workspace_id, [f"Future task {day}"], due_date=f"2030-01-{day:02}")
+
+    base = f"/api/v2/workspaces/{workspace_id}"
+    session = fetch(page, "/api/v2/session")
+    start = datetime.now(UTC) + timedelta(days=10)
+    saved = fetch(
+        page,
+        base + "/work",
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-CSRF-Token": json.loads(session["text"])["csrf_token"],
+        },
+        body=json.dumps(
+            {
+                "item": {
+                    "kind": "event",
+                    "title": "Workshop meeting",
+                    "starts_at": start.isoformat(),
+                    "ends_at": (start + timedelta(hours=1)).isoformat(),
+                    "time_zone": "UTC",
+                }
+            }
+        ),
+    )
+    assert saved["status"] == 201
+
+    deadline_path = base + "/work-due-page?limit=5&from_date=2030-01-02"
+    work_view = page.get_by_label("Work view", exact=True)
+    event_title = page.get_by_text("Workshop meeting", exact=True)
+    deadlines = page.get_by_role("list", name="Task deadlines", exact=True)
+    page.route(origin + deadline_path, lambda route: route.fulfill(status=503), times=1)
+    work_view.select_option("schedule")
+    expect(event_title).to_be_visible()
+    expect(page.get_by_text("Could not load deadlines.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry deadlines", exact=True).click()
+    expect(deadlines.locator("strong")).to_have_text(
+        ["<b>Due today</b>", "Future task 3", "Future task 4", "Future task 5", "Future task 6"]
+    )
+    expect(deadlines.locator("b")).to_have_count(0)
+    expect(deadlines.locator("time").first).to_have_attribute("datetime", "2030-01-02")
+    more_deadlines = page.get_by_role("button", name="Load more deadlines", exact=True)
+    expect(more_deadlines).to_be_visible()
+    page.route(
+        origin + deadline_path + "&after=**", lambda route: route.fulfill(status=503), times=1
+    )
+    more_deadlines.click()
+    expect(page.get_by_text("Could not load more deadlines. Try again.")).to_be_visible()
+    expect(deadlines.get_by_role("listitem")).to_have_count(5)
+    more_deadlines.click()
+    expect(deadlines.get_by_text("Future task 7", exact=True)).to_be_visible()
+    expect(more_deadlines).to_be_hidden()
+    from_date = page.get_by_label("Show deadlines from", exact=True)
+    expect(from_date).to_have_value("2030-01-02")
+    from_date.fill("2030-01-01")
+    page.get_by_role("button", name="Show deadlines", exact=True).click()
+    expect(deadlines.locator("strong").first).to_have_text("Overdue from yesterday")
+    current = fetch(page, base + "/work-due-page?limit=1&from_date=2030-01-01")
+    assert current["status"] == 200
+    task = json.loads(current["text"])["items"][0]
+    moved = fetch(
+        page,
+        base + f"/work/{task['id']}/task-details",
+        method="PATCH",
+        headers={
+            "Content-Type": "application/json",
+            "X-CSRF-Token": json.loads(session["text"])["csrf_token"],
+        },
+        body=json.dumps(
+            {
+                "expected_version": task["version"],
+                "details": {
+                    "title": task["data"]["title"],
+                    "description": None,
+                    "due_date": "2030-01-05",
+                },
+            }
+        ),
+    )
+    assert moved["status"] == 200, moved["text"]
+    more_deadlines.click()
+    expect(
+        page.get_by_text("The deadline list changed. Retry to start from the first page.")
+    ).to_be_visible()
+    expect(deadlines.get_by_role("listitem")).to_have_count(0)
+    expect(more_deadlines).to_be_hidden()
+    expect(event_title).to_be_visible()
+    expect(from_date).to_have_value("2030-01-01")
+    page.get_by_role("button", name="Retry deadlines", exact=True).click()
+    more_deadlines.click()
+    expect(deadlines.locator("strong")).to_have_text(
+        [
+            "<b>Due today</b>",
+            "Future task 3",
+            "Future task 4",
+            "Future task 5",
+            "Overdue from yesterday",
+            "Future task 6",
+            "Future task 7",
+        ]
+    )
+    from_date.fill("2030-01-06")
+    page.get_by_role("button", name="Show deadlines", exact=True).click()
+    expect(deadlines.locator("strong")).to_have_text(["Future task 6", "Future task 7"])
+    expect(event_title).to_be_visible()
+
+    page.route(
+        origin + base + "/work/*/transitions", lambda route: route.fulfill(status=403), times=1
+    )
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Cancel event", exact=True).click()
+    expect(page.get_by_text("Schedule is unavailable.", exact=False)).to_be_visible()
+    expect(deadlines).to_be_hidden()
+    expect(event_title).to_have_count(0)
+    page.get_by_role("button", name="Refresh workspaces", exact=True).click()
+    expect(event_title).to_be_visible()
+    expect(deadlines.get_by_text("<b>Due today</b>", exact=True)).to_be_visible()
+
+    from_date.fill("2030-01-06")
+    page.get_by_role("button", name="Show deadlines", exact=True).click()
+    expect(deadlines.locator("strong")).to_have_text(["Future task 6", "Future task 7"])
+    from_date.fill("2030-01-07")
+    page.get_by_role("button", name="Open due tasks", exact=True).click()
+    expect(work_view).to_have_value("due")
+    expect(deadlines).to_be_hidden()
+    expect(page.get_by_label("Show due tasks from", exact=True)).to_have_value("2030-01-06")
+    expect(page.get_by_text("Future task 6", exact=True)).to_be_visible()
+    expect(page.get_by_text("Overdue from yesterday", exact=True)).to_have_count(0)
+    page.get_by_role("button", name="Clear due date filter", exact=True).click()
+    expect(page.get_by_text("Overdue from yesterday", exact=True)).to_be_visible()
+
+    page.evaluate(
+        """path => {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (url, options) => {
+                const response = await originalFetch(url, options);
+                if (url !== path) return response;
+                await new Promise(resolve => { window.releaseDeadlineResponse = resolve; });
+                setTimeout(() => { window.deadlineReleased = true; }, 0);
+                return response;
+            };
+        }""",
+        deadline_path,
+    )
+    page.route(origin + deadline_path, lambda route: route.fulfill(status=403), times=2)
+    work_view.select_option("schedule")
+    page.wait_for_function("() => typeof window.releaseDeadlineResponse === 'function'")
+    expect(event_title).to_be_visible()
+    page.evaluate("() => window.releaseDeadlineResponse()")
+    expect(page.get_by_text("Schedule is unavailable.", exact=False)).to_be_visible()
+    expect(event_title).to_have_count(0)
+    expect(deadlines).to_be_hidden()
+
+    page.evaluate(
+        "() => { delete window.releaseDeadlineResponse; window.deadlineReleased = false; }"
+    )
+    work_view.select_option("events")
+    work_view.select_option("schedule")
+    page.wait_for_function("() => typeof window.releaseDeadlineResponse === 'function'")
+    second = create_workspace_in_browser(page, origin, "No schedule deadlines")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    expect(page.get_by_text("No task deadlines from this date.", exact=True)).to_be_visible()
+    page.evaluate("() => window.releaseDeadlineResponse()")
+    page.wait_for_function("() => window.deadlineReleased")
+    expect(page.get_by_text("No task deadlines from this date.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Schedule is unavailable.", exact=False)).to_have_count(0)
+    expect(event_title).to_have_count(0)
+
+
+def test_workspace_browser_due_date_filter_survives_retry_and_task_update(login_browser):
+    from playwright.sync_api import expect
+
+    page, context, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    first = create_workspace_in_browser(page, origin, "Filtered due work")
+    context.new_cdp_session(page).send("Emulation.setTimezoneOverride", {"timezoneId": "UTC"})
+    page.clock.set_fixed_time(datetime(2030, 1, 2, 12, tzinfo=UTC))
+    seed_browser_work(page, first, ["Earlier task"], due_date="2030-01-01")
+    seed_browser_work(page, first, ["Later task"], due_date="2030-01-06")
+
+    view = page.get_by_label("Work view", exact=True)
+    view.select_option("due")
+    due_date = page.get_by_label("Show due tasks from", exact=True)
+    earlier = page.get_by_text("Earlier task", exact=True)
+    later = page.locator("#work-items > li").filter(has_text="Later task")
+    expect(due_date).to_have_value("")
+    expect(earlier).to_be_visible()
+
+    url = origin + f"/api/v2/workspaces/{first}/work-due-page?limit=20&from_date=2030-01-06"
+    page.route(url, lambda route: route.fulfill(status=503), times=1)
+    due_date.fill("2030-01-06")
+    page.get_by_role("button", name="Filter due tasks", exact=True).click()
+    expect(page.get_by_text("Could not load work items.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(later).to_be_visible()
+    expect(earlier).to_have_count(0)
+    later.get_by_role("button", name="Start task", exact=True).click()
+    expect(later.get_by_role("button", name="Complete task", exact=True)).to_be_visible()
+    later.get_by_role("button", name="Complete task", exact=True).click()
+    expect(page.get_by_text("No unfinished tasks due from this date.", exact=True)).to_be_visible()
+    expect(due_date).to_have_value("2030-01-06")
+
+    page.get_by_role("button", name="Today", exact=True).click()
+    expect(due_date).to_be_hidden()
+    expect(earlier).to_be_visible()
+    page.get_by_role("button", name="Work items", exact=True).click()
+    expect(due_date).to_have_value("2030-01-06")
+    expect(earlier).to_have_count(0)
+
+    titles = [f"Filtered task {index:02}" for index in range(21)]
+    seed_browser_work(page, first, titles, due_date="2030-01-07")
+    page.get_by_role("button", name="Filter due tasks", exact=True).click()
+    rows = page.locator("#work-items > li")
+    expect(rows).to_have_count(20)
+    more = page.get_by_role("button", name="Load more", exact=True)
+    page.route(url + "&after=**", lambda route: route.fulfill(status=404), times=1)
+    more.click()
+    expect(
+        page.get_by_text(
+            "The due task list changed. Retry to start from the first page.", exact=True
+        )
+    ).to_be_visible()
+    expect(rows).to_have_count(0)
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    expect(rows).to_have_count(20)
+    more.click()
+    expect(rows).to_have_count(21)
+    expect(rows.last).to_contain_text(titles[0])
+    expect(earlier).to_have_count(0)
+    expect(due_date).to_have_value("2030-01-06")
+
+    page.get_by_role("button", name="Filter due tasks", exact=True).click()
+    expect(rows).to_have_count(20)
+    base = f"/api/v2/workspaces/{first}"
+    current = fetch(page, base + "/work-due-page?limit=1&from_date=2030-01-06")
+    assert current["status"] == 200
+    moved = json.loads(current["text"])["items"][0]
+    assert moved["data"]["title"] == titles[-1]
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    saved = fetch(
+        page,
+        base + f"/work/{moved['id']}/task-details",
+        method="PATCH",
+        headers={"Content-Type": "application/json", "X-CSRF-Token": csrf},
+        body=json.dumps(
+            {
+                "expected_version": moved["version"],
+                "details": {"title": titles[-1], "description": None, "due_date": "2030-01-08"},
+            }
+        ),
+    )
+    assert saved["status"] == 200, saved["text"]
+    more.click()
+    expect(
+        page.get_by_text(
+            "The due task list changed. Retry to start from the first page.", exact=True
+        )
+    ).to_be_visible()
+    expect(rows).to_have_count(0)
+    page.get_by_role("button", name="Retry work list", exact=True).click()
+    more.click()
+    expect(rows).to_have_count(21)
+    expect(rows.last).to_contain_text(titles[-1])
+    expect(page.get_by_text(titles[-1], exact=True)).to_have_count(1)
+
+    second = create_workspace_in_browser(page, origin, "Unfiltered due work")
+    expect(page.get_by_label("Workspace", exact=True)).to_have_value(second)
+    expect(due_date).to_have_value("")
+    expect(earlier).to_have_count(0)
+
+
 def test_workspace_browser_today_uses_local_date_and_bounds_due_work(login_browser):
     from playwright.sync_api import expect
 
@@ -1823,6 +2375,175 @@ def test_workspace_browser_today_uses_local_date_and_bounds_due_work(login_brows
     expect(rows).to_have_count(20)
     expect(limit_message).to_have_count(0)
     expect(page.get_by_text(titles[0], exact=True)).to_be_visible()
+
+
+def test_workspace_browser_title_search_finds_older_items_and_clears(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Title search workspace")
+    seed_browser_work(page, workspace_id, ["Old Budget Review"])
+    seed_browser_work(page, workspace_id, [f"Recent task {index}" for index in range(21)])
+    page.reload()
+    search = page.get_by_role("searchbox", name="Search work titles")
+    button = page.get_by_role("button", name="Search", exact=True)
+    expect(page.get_by_text("Recent task 20", exact=True)).to_be_visible()
+    expect(page.get_by_text("Old Budget Review", exact=True)).to_have_count(0)
+    search.fill("bUdGeT")
+    with page.expect_request("**/work-page/search") as sent:
+        button.click()
+    assert sent.value.method == "POST"
+    assert sent.value.post_data_json["q"] == "bUdGeT"
+    assert "?" not in sent.value.url
+    expect(page.get_by_text("Old Budget Review", exact=True)).to_be_visible()
+    expect(page.get_by_text("Recent task 20", exact=True)).to_have_count(0)
+    search.fill("missing")
+    button.click()
+    expect(page.get_by_text("No work titles match your search.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Clear search").click()
+    expect(search).to_be_focused()
+    expect(search).to_have_value("")
+    expect(page.get_by_text("Recent task 20", exact=True)).to_be_visible()
+    page.get_by_label("Work view", exact=True).select_option("due")
+    expect(search).to_be_hidden()
+
+
+def test_workspace_browser_filters_task_status_with_title_search(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Task status filters")
+    seed_browser_work(page, workspace_id, ["Budget review", "Other task"])
+    page.reload()
+    status = page.get_by_label("Task status", exact=True)
+    search = page.get_by_role("searchbox", name="Search work titles")
+    expect(status).to_be_enabled()
+    status.select_option("open")
+    search.fill("Budget")
+    with page.expect_request("**/work-page/search") as sent:
+        page.get_by_role("button", name="Search", exact=True).click()
+    assert sent.value.post_data_json["task_status"] == "open"
+    row = page.get_by_role("listitem").filter(has_text="Budget review")
+    expect(row).to_be_visible()
+    expect(page.get_by_text("Other task", exact=True)).to_have_count(0)
+    row.get_by_role("button", name="Start task", exact=True).click()
+    expect(page.get_by_text("No tasks match the current filters.", exact=True)).to_be_visible()
+    status.select_option("active")
+    expect(row).to_be_visible()
+    page.get_by_role("button", name="Clear search").click()
+    expect(status).to_have_value("active")
+    expect(row).to_be_visible()
+    expect(page.get_by_text("Other task", exact=True)).to_have_count(0)
+    view = page.get_by_label("Work view", exact=True)
+    view.select_option("events")
+    expect(status).to_be_hidden()
+    view.select_option("all")
+    expect(status).to_have_value("active")
+    expect(row).to_be_visible()
+
+
+def test_workspace_browser_creates_project_and_assigns_task(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    create_workspace_in_browser(page, origin, "Project grouping workspace")
+    project_filter = page.get_by_label("Project filter", exact=True)
+    expect(project_filter).to_be_enabled()
+    page.get_by_label("New project name").fill("Conference")
+    page.get_by_role("button", name="Create project", exact=True).click()
+    expect(page.get_by_text("Project created.", exact=True)).to_be_visible()
+    expect(project_filter.locator("option:checked")).to_have_text("Conference")
+    page.get_by_role("button", name="New task", exact=True).click()
+    task_project = page.get_by_label("Task project", exact=True)
+    expect(task_project.locator("option:checked")).to_have_text("Conference")
+    page.get_by_label("Task title", exact=True).fill("Reserve meeting room")
+    page.get_by_role("button", name="Create task", exact=True).click()
+    task = page.get_by_role("listitem").filter(has_text="Reserve meeting room")
+    expect(task).to_contain_text("Conference")
+    task.get_by_role("button", name="Share with workspace").click()
+    preview = page.get_by_role("form", name="Review workspace sharing")
+    expect(preview.get_by_text("Conference", exact=True)).to_be_visible()
+    preview.get_by_role("button", name="Close sharing review").click()
+    task.get_by_role("button", name="Edit task", exact=True).click()
+    task_project.select_option("")
+    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(task).to_have_count(0)
+    expect(page.get_by_text("No tasks match the current filters.", exact=True)).to_be_visible()
+    project_filter.select_option("")
+    expect(task).to_be_visible()
+    expect(task).not_to_contain_text("Conference")
+
+    # A project added by another request may be newer than the tab's catalog.
+    current = json.loads(fetch(page, "/api/v2/session")["text"])
+    ws = page.get_by_label("Workspace", exact=True).input_value()
+    path = f"/api/v2/workspaces/{ws}"
+    headers = {"Content-Type": "application/json", "X-CSRF-Token": current["csrf_token"]}
+    created = fetch(
+        page,
+        path + "/projects",
+        method="POST",
+        headers=headers,
+        body=json.dumps({"name": "Facilities"}),
+    )
+    assert created["status"] == 201
+    late_project = json.loads(created["text"])["id"]
+    created = fetch(
+        page,
+        path + "/work",
+        method="POST",
+        headers=headers,
+        body=json.dumps(
+            {"item": {"kind": "task", "title": "Late assignment"}, "project_id": late_project}
+        ),
+    )
+    assert created["status"] == 201
+    late_task = json.loads(created["text"])["id"]
+    page.get_by_role("searchbox", name="Search work titles").fill("Late assignment")
+    page.get_by_role("button", name="Search", exact=True).click()
+    row = page.get_by_role("listitem").filter(has_text="Late assignment")
+    row.get_by_role("button", name="Edit task", exact=True).click()
+    expect(task_project).to_have_value(late_project)
+    page.get_by_label("Task title", exact=True).fill("Late assignment updated")
+    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_text("Task updated.", exact=True)).to_be_visible()
+    retained = json.loads(fetch(page, path + "/work/" + late_task)["text"])
+    assert retained["project_id"] == late_project
+    page.route("**/work-page?*", lambda route: route.fulfill(status=403))
+    page.get_by_role("button", name="Clear search").click()
+    expect(page.get_by_text("This work list is unavailable.", exact=False)).to_be_visible()
+    expect(project_filter.get_by_role("option")).to_have_count(1)
+    expect(project_filter).to_be_disabled()
+
+
+def test_workspace_browser_sets_and_filters_task_priority(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    create_workspace_in_browser(page, origin, "Task priorities")
+    priority_filter = page.get_by_label("Priority filter", exact=True)
+    expect(priority_filter).to_be_enabled()
+    priority_filter.select_option("high")
+    page.get_by_role("button", name="New task", exact=True).click()
+    priority = page.get_by_label("Task priority", exact=True)
+    expect(priority).to_have_value("high")
+    page.get_by_label("Task title", exact=True).fill("Prepare budget")
+    page.get_by_role("button", name="Create task", exact=True).click()
+    row = page.get_by_role("listitem").filter(has_text="Prepare budget")
+    expect(row).to_contain_text("High priority")
+    row.get_by_role("button", name="Edit task", exact=True).click()
+    priority.select_option("low")
+    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_text("No tasks match the current filters.", exact=True)).to_be_visible()
+    expect(row).to_have_count(0)
+    priority_filter.select_option("low")
+    expect(row).to_contain_text("Low priority")
+    row.get_by_role("button", name="Share with workspace", exact=True).click()
+    preview = page.get_by_role("form", name="Review workspace sharing")
+    expect(preview.get_by_text("Low", exact=True)).to_be_visible()
 
 
 def test_workspace_browser_transition_refreshes_stale_task_and_hides_read_only_controls(

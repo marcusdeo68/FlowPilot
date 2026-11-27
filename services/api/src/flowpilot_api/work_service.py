@@ -31,6 +31,8 @@ from flowpilot_api.work import (
     InvalidEventSchedule,
     Task,
     TaskDetails,
+    TaskPriority,
+    TaskStatus,
     WorkDetails,
     WorkItem,
     can_change_work_status,
@@ -48,6 +50,10 @@ class WorkNotFound(Exception):
 
 
 class SourceNotFound(Exception):
+    pass
+
+
+class ProjectNotFound(Exception):
     pass
 
 
@@ -78,6 +84,14 @@ class StoredWork:
     data: Commitment | Task | Event
     created_at: datetime
     updated_at: datetime
+    project_id: UUID | None = None
+    priority: TaskPriority | None = None
+
+
+@dataclass(frozen=True)
+class WorkspaceProject:
+    id: UUID
+    name: str
 
 
 @dataclass(frozen=True)
@@ -102,6 +116,7 @@ class UpcomingEvents:
 class SharePreview:
     item: StoredWork
     evidence: list[dict[str, str]]
+    project_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -153,6 +168,8 @@ def _stored(row) -> StoredWork:
         data=_StoredWorkPayload.model_validate(fields).root,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        project_id=row.get("project_id"),
+        priority=(row.get("task_priority") or "normal") if row["kind"] == "task" else None,
     )
 
 
@@ -177,12 +194,20 @@ class WorkService:
         )
 
     def _work(
-        self, connection: Connection, member: Membership, work_id: UUID, *, write: bool = False
+        self,
+        connection: Connection,
+        member: Membership,
+        work_id: UUID,
+        *,
+        write: bool = False,
+        read_lock: bool = False,
     ) -> StoredWork:
         query = """SELECT * FROM work_items WHERE workspace_id = :workspace AND id = :id
                    AND (visibility = 'workspace' OR creator_id = :user)"""
         if write:
             query += " FOR UPDATE"
+        elif read_lock:
+            query += " FOR SHARE"
         row = (
             connection.execute(
                 text(query),
@@ -218,6 +243,45 @@ class WorkService:
             },
         )
 
+    def _project_name(self, connection: Connection, workspace_id: UUID, project_id: UUID) -> str:
+        name = connection.execute(
+            text(
+                "SELECT name FROM workspace_projects WHERE workspace_id = :workspace AND id = :id"
+            ),
+            {"workspace": workspace_id, "id": project_id},
+        ).scalar_one_or_none()
+        if name is None:
+            raise ProjectNotFound
+        return name
+
+    def list_projects(self, principal: Principal, workspace_id: UUID) -> list[WorkspaceProject]:
+        with self.engine.begin() as connection:
+            self._member(connection, principal, workspace_id)
+            rows = connection.execute(
+                text("""SELECT id, name FROM workspace_projects WHERE workspace_id = :workspace
+                    ORDER BY lower(name), id"""),
+                {"workspace": workspace_id},
+            ).mappings()
+            return [WorkspaceProject(row["id"], row["name"]) for row in rows]
+
+    def create_project(
+        self, principal: Principal, workspace_id: UUID, name: str
+    ) -> WorkspaceProject:
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id, write=True)
+            project = WorkspaceProject(uuid4(), name)
+            connection.execute(
+                text("""INSERT INTO workspace_projects (workspace_id, id, name, created_by)
+                    VALUES (:workspace, :id, :name, :actor)"""),
+                {
+                    "workspace": workspace_id,
+                    "id": project.id,
+                    "name": name,
+                    "actor": member.user_id,
+                },
+            )
+            return project
+
     def create_work(
         self,
         principal: Principal,
@@ -225,10 +289,19 @@ class WorkService:
         data: Commitment | Task | Event,
         *,
         visibility: Visibility = Visibility.PRIVATE,
+        project_id: UUID | None = None,
+        priority: TaskPriority = "normal",
     ) -> StoredWork:
         with self.engine.begin() as connection:
             member = self._member(connection, principal, workspace_id, write=True)
-            return self.insert_authorized_work(connection, member, data, visibility=visibility)
+            return self.insert_authorized_work(
+                connection,
+                member,
+                data,
+                visibility=visibility,
+                project_id=project_id,
+                priority=priority,
+            )
 
     def insert_authorized_work(
         self,
@@ -237,6 +310,8 @@ class WorkService:
         data: Commitment | Task | Event,
         *,
         visibility: Visibility,
+        project_id: UUID | None = None,
+        priority: TaskPriority = "normal",
     ) -> StoredWork:
         """Insert and audit using the caller's already-authorized transaction."""
         if visibility not in (Visibility.PRIVATE, Visibility.WORKSPACE):
@@ -244,7 +319,13 @@ class WorkService:
         initial = {"task": "open", "commitment": "detected", "event": "scheduled"}
         if data.status != initial[data.kind]:
             raise InvalidTransition("Creation requires the initial state")
+        if not isinstance(data, Task) and priority != "normal":
+            raise InvalidTransition("Only tasks can have a priority")
         workspace_id = member.workspace_id
+        if project_id is not None:
+            if not isinstance(data, Task):
+                raise InvalidTransition("Only tasks can belong to projects")
+            self._project_name(connection, workspace_id, project_id)
         values = {
             "id": uuid4(),
             "workspace": workspace_id,
@@ -258,14 +339,18 @@ class WorkService:
             "starts_at": getattr(data, "starts_at", None),
             "ends_at": getattr(data, "ends_at", None),
             "time_zone": getattr(data, "time_zone", None),
+            "project": project_id,
+            "priority": None if priority == "normal" else priority,
         }
         row = (
             connection.execute(
                 text("""
             INSERT INTO work_items (id, workspace_id, creator_id, owner_id, kind, title,
-                description, status, visibility, due_date, starts_at, ends_at, time_zone)
+                description, status, visibility, due_date, starts_at, ends_at, time_zone, project_id,
+                task_priority)
             VALUES (:id, :workspace, :user, :user, :kind, :title, :description, :status,
-                :visibility, :due_date, :starts_at, :ends_at, :time_zone) RETURNING *
+                :visibility, :due_date, :starts_at, :ends_at, :time_zone, :project, :priority)
+            RETURNING *
         """),
                 values,
             )
@@ -305,6 +390,10 @@ class WorkService:
         after: UUID | None = None,
         kind: Literal["event"] | None = None,
         visibility: Visibility | None = None,
+        q: str = "",
+        task_status: TaskStatus | None = None,
+        project_id: UUID | None = None,
+        priority: TaskPriority | None = None,
     ) -> WorkPage:
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
@@ -315,6 +404,19 @@ class WorkService:
             if visibility is not None:
                 boundary += " AND visibility = :visibility"
                 params["visibility"] = visibility
+            if task_status is not None:
+                boundary += " AND kind = 'task' AND status = :task_status"
+                params["task_status"] = task_status
+            if project_id is not None:
+                boundary += " AND project_id = :project"
+                params["project"] = project_id
+            if priority is not None:
+                boundary += " AND kind = 'task' AND COALESCE(task_priority, 'normal') = :priority"
+                params["priority"] = priority
+            title_query = q.strip()
+            if title_query:
+                boundary += " AND strpos(lower(title), lower(:title_query)) > 0"
+                params["title_query"] = title_query
             if after is not None:
                 pivot = self._work(connection, member, after)
                 if (kind is not None and pivot.data.kind != kind) or (
@@ -340,31 +442,71 @@ class WorkService:
             return WorkPage(items, items[-1].id if len(rows) > limit else None)
 
     def list_due_tasks(
-        self, principal: Principal, workspace_id: UUID, *, limit: int = 20
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        *,
+        limit: int = 20,
+        from_date: date | None = None,
     ) -> DueTasks:
+        page = self.list_due_page(principal, workspace_id, limit=limit, from_date=from_date)
+        return DueTasks(page.items, page.next_after is not None)
+
+    def list_due_page(
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        *,
+        limit: int = 5,
+        from_date: date | None = None,
+        after: tuple[UUID, int] | None = None,
+    ) -> WorkPage:
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
         with self.engine.begin() as connection:
             member = self._member(connection, principal, workspace_id)
+            boundary = " AND due_date >= :from_date" if from_date is not None else ""
+            params = {
+                "workspace": workspace_id,
+                "user": member.user_id,
+                "unfinished": tuple(TASK_TRANSITIONS),
+                "limit": limit + 1,
+                "from_date": from_date,
+            }
+            if after is not None:
+                work_id, version = after
+                pivot = self._work(connection, member, work_id, read_lock=True)
+                task = pivot.data
+                if (
+                    not isinstance(task, Task)
+                    or task.due_date is None
+                    or task.status not in TASK_TRANSITIONS
+                    or pivot.version != version
+                    or (from_date is not None and task.due_date < from_date)
+                ):
+                    raise WorkNotFound
+                boundary += """ AND (due_date > :cursor_date OR (
+                    due_date = :cursor_date AND (created_at, id) < (:cursor_created, :cursor_id)
+                ))"""
+                params.update(
+                    cursor_date=task.due_date, cursor_created=pivot.created_at, cursor_id=pivot.id
+                )
             rows = (
                 connection.execute(
-                    text("""SELECT * FROM work_items WHERE workspace_id = :workspace
+                    text(
+                        """SELECT * FROM work_items WHERE workspace_id = :workspace
                         AND (visibility = 'workspace' OR creator_id = :user)
-                        AND kind = 'task' AND due_date IS NOT NULL AND status IN :unfinished
-                        ORDER BY due_date ASC, created_at DESC, id DESC LIMIT :limit""").bindparams(
-                        bindparam("unfinished", expanding=True)
-                    ),
-                    {
-                        "workspace": workspace_id,
-                        "user": member.user_id,
-                        "unfinished": tuple(TASK_TRANSITIONS),
-                        "limit": limit + 1,
-                    },
+                        AND kind = 'task' AND due_date IS NOT NULL AND status IN :unfinished"""
+                        + boundary
+                        + " ORDER BY due_date ASC, created_at DESC, id DESC LIMIT :limit"
+                    ).bindparams(bindparam("unfinished", expanding=True)),
+                    params,
                 )
                 .mappings()
                 .all()
             )
-            return DueTasks([_stored(row) for row in rows[:limit]], len(rows) > limit)
+            items = [_stored(row) for row in rows[:limit]]
+            return WorkPage(items, items[-1].id if len(rows) > limit else None)
 
     def list_upcoming_events(
         self, principal: Principal, workspace_id: UUID, *, limit: int = 5
@@ -387,6 +529,48 @@ class WorkService:
                 .all()
             )
             return UpcomingEvents([_stored(row) for row in rows[:limit]], len(rows) > limit)
+
+    def list_schedule(
+        self,
+        principal: Principal,
+        workspace_id: UUID,
+        *,
+        limit: int = 20,
+        after: tuple[UUID, int] | None = None,
+    ) -> WorkPage:
+        if not 1 <= limit <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        with self.engine.begin() as connection:
+            member = self._member(connection, principal, workspace_id)
+            params = {"workspace": workspace_id, "user": member.user_id, "limit": limit + 1}
+            boundary = ""
+            if after is not None:
+                work_id, version = after
+                # Keep the validated start time stable until the page query finishes.
+                pivot = self._work(connection, member, work_id, read_lock=True)
+                if not isinstance(pivot.data, Event) or (
+                    pivot.data.status != "scheduled" or pivot.version != version
+                ):
+                    raise WorkNotFound
+                boundary = " AND (starts_at, id) > (:starts, :after)"
+                params.update(starts=pivot.data.starts_at, after=pivot.id)
+            rows = (
+                connection.execute(
+                    text(
+                        """SELECT * FROM work_items WHERE workspace_id = :workspace
+                        AND (visibility = 'workspace' OR creator_id = :user)
+                        AND kind = 'event' AND status = 'scheduled'
+                        AND ends_at > statement_timestamp()"""
+                        + boundary
+                        + " ORDER BY starts_at ASC, id ASC LIMIT :limit"
+                    ),
+                    params,
+                )
+                .mappings()
+                .all()
+            )
+            items = [_stored(row) for row in rows[:limit]]
+            return WorkPage(items, items[-1].id if len(rows) > limit else None)
 
     def reminder_candidates(
         self,
@@ -456,22 +640,37 @@ class WorkService:
                 raise AccessDenied
             if current.version != expected_version:
                 raise VersionConflict
+            project_id = (
+                details.project_id
+                if "project_id" in details.model_fields_set
+                else current.project_id
+            )
+            if project_id is not None and project_id != current.project_id:
+                self._project_name(connection, workspace_id, project_id)
+            priority = (
+                details.priority if "priority" in details.model_fields_set else current.priority
+            )
             if (
                 current.data.title == details.title
                 and current.data.description == details.description
                 and current.data.due_date == details.due_date
+                and current.project_id == project_id
+                and current.priority == priority
             ):
                 return current
             row = (
                 connection.execute(
                     text("""UPDATE work_items SET title = :title, description = :description,
-                    due_date = :due_date, version = version + 1, updated_at = now()
+                    due_date = :due_date, project_id = :project, task_priority = :priority,
+                    version = version + 1, updated_at = now()
                     WHERE workspace_id = :workspace AND id = :id AND version = :version
                     RETURNING *"""),
                     {
                         "title": details.title,
                         "description": details.description,
                         "due_date": details.due_date,
+                        "project": project_id,
+                        "priority": None if priority == "normal" else priority,
                         "workspace": workspace_id,
                         "id": work_id,
                         "version": expected_version,
@@ -625,7 +824,12 @@ class WorkService:
                 )
                 if fields:
                     evidence.append(fields)
-            return SharePreview(item, evidence)
+            project_name = (
+                self._project_name(connection, workspace_id, item.project_id)
+                if item.project_id is not None
+                else None
+            )
+            return SharePreview(item, evidence, project_name)
 
     def share_work(
         self, principal: Principal, workspace_id: UUID, work_id: UUID, *, expected_version: int

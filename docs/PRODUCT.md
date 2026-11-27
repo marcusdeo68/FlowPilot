@@ -37,6 +37,10 @@ The initial audience is small teams of roughly 5–20 people coordinating events
 
 This problem hypothesis needs validation through interviews and pilot use. We should first prove a narrow workflow with one team and a small number of sources, then add providers based on demonstrated value.
 
+The first hosted pilot is a portfolio project for the owner and a small group
+of invited friends. Use sample data to test the manual workflow and collect
+feedback before connecting external accounts. See the [hosted pilot roadmap](ROADMAP.md#stage-8--hosted-portfolio-pilot).
+
 ## Product promise
 
 FlowPilot helps a team answer:

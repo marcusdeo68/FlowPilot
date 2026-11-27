@@ -26,11 +26,14 @@ The default local dashboard uses the legacy SQLite adapter. A separate verified
 workspace API uses PostgreSQL, SQLAlchemy transactions, and Alembic migrations for
 users, workspaces, memberships, manual sources, evidence, typed work, and audit.
 Workspace onboarding and owner-only membership administration are increment 0008.
-Private task proposals and review history are increment 0009. Provider connections,
-projects, action proposals, approvals, and executions remain future
-records. Every tenant-owned record needs a workspace key and server-enforced
-authorization. The live authentication provider/sign-in flow remains unconfigured;
-AWS is the planned later deployment target.
+Private task proposals and review history are increment 0009. Provider
+connections, action proposals, approvals, and executions remain future records.
+Every tenant-owned record needs a workspace key and server-enforced
+authorization. Workspace projects group tasks through a workspace-qualified
+foreign key. [0038](implementation/0038-workspace-projects.md) describes
+assignment and sharing. The signed-in workspace has an opt-in HTTPS mode and
+deployable Linux image for synthetic staging. Live authentication provider
+configuration remains pending. See [0031](implementation/0031-hosted-workspace.md).
 
 ## Module boundaries
 
@@ -135,8 +138,14 @@ The current SQLite database is appropriate only for local development with synth
 
 ## Local web shell
 
-The first dashboard is a dependency-free static client served by the local FastAPI process. It reads and writes only the existing synthetic/manual commitment API. The task view uses DOM text nodes for API values and same-origin `fetch` requests; sample inbox and schedule content is presentation-only and is not persisted or connected to a provider. This shell is a learning and product-validation surface, not an authenticated web application. Keep the local process bound to loopback until request identity, workspace authorization, CSRF strategy for cookie auth, and production hosting controls are implemented.
+The first dashboard is a dependency-free static client served by the local FastAPI process. It reads and writes only the existing synthetic/manual commitment API. The task view uses DOM text nodes for API values and same-origin `fetch` requests; sample inbox and schedule content is presentation-only and is not persisted or connected to a provider. Keep this dashboard bound to loopback. Use the separate signed-in workspace for staging.
 
-## AWS deployment target (planned)
+## Hosted pilot architecture
 
-The initial cloud deployment should remain one containerized modular monolith. Use ECR for immutable image versions, ECS on Fargate for the API/web process, RDS PostgreSQL in private subnets, Secrets Manager for runtime secrets, CloudWatch for logs/metrics/alarms, and Terraform for reproducible infrastructure. A load balancer and public endpoint should be introduced only after authentication and operational security are ready. CI/CD should use GitHub Actions OIDC with an IAM trust condition scoped to the exact repository and deployment branch/environment; no long-lived AWS key belongs in GitHub secrets. See `docs/implementation/0003-local-dashboard-and-cloud-path.md` for sequence, trade-offs, and the resume skill map.
+The planned Railway pilot uses one application container and its own PostgreSQL
+service in a dedicated environment. Browsers reach Railway's HTTPS edge.
+The pilot trusts the services in that environment. The
+container serves the workspace UI and API from one origin. GitHub Actions
+checks code and builds the image. Railway runs the database migrations before
+starting each deployment and checks its readiness before switching traffic.
+See [0032](implementation/0032-railway-pilot.md).

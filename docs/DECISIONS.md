@@ -1,5 +1,14 @@
 # Architecture decisions
 
+## 0020 - Target a free Railway portfolio pilot
+
+Ship the signed-in workspace as one Railway application service with private
+PostgreSQL in a dedicated environment, using Railway's supplied HTTPS origin.
+Start with synthetic data and validate
+real hosting and identity before inviting friends. This keeps the service count,
+cost, and upkeep appropriate for a personal project. The prior AWS direction
+in decision 0011 is historical. See [0032](implementation/0032-railway-pilot.md).
+
 ## 0019 - Complete login from a same-origin document
 
 Present a script-free callback form and perform code exchange/session issuance on

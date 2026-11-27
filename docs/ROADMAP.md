@@ -63,6 +63,16 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 - [x] Opt-in reminders for due-today tasks and imminent events in an open workspace tab (0026).
 - [x] Choose reminder categories, event lead time, and snooze duration for the signed-in tab (0027).
 - [x] Review and share private tasks and events, and browse shared work by visibility (0030).
+- [x] Search authorized work by title across pages (0036).
+- [x] Filter authorized tasks by status and combine with title search (0037).
+- [x] Create workspace projects, group tasks, and filter Work items (0038).
+- [x] Set and filter task priorities (0039).
+- [x] Open an interactive local workspace preview with synthetic records (0040).
+- [x] Browse ongoing and future manual events in chronological order in Schedule (0041).
+- [x] See upcoming task deadlines alongside events in Schedule (0042).
+- [x] Choose a start date and page through unfinished task deadlines in Schedule (0043).
+- [x] Carry a selected Schedule date into Due tasks and filter tasks while managing them (0044).
+- [x] Page through matching deadlines while managing tasks in Due tasks (0045).
 - Unified Inbox with source evidence and review/edit/confirm/dispute actions.
 - Tasks & Projects and a schedule view.
 - Action review UI that makes sender account, recipients, target, and content visible before approval.
@@ -120,17 +130,29 @@ Gmail `gmail.send` is sensitive, while `gmail.compose` is a restricted scope; th
 - Measure missed/incorrect proposals, duplicate rate, user corrections, time to resolve, action success, latency, and model/API costs.
 - Improve observability, retries, data deletion/export, permission transparency, and recovery from provider outages.
 
-## Stage 8 — AWS delivery and operations (parallel portfolio track)
+## Stage 8 — Hosted portfolio pilot
 
-Build and prove the local container first, then deploy a private development environment only after authentication, workspace authorization, PostgreSQL migrations, and secret handling are in place. The initial AWS target is an ECS service on Fargate, with images in ECR, PostgreSQL in RDS inside private subnets, credentials in Secrets Manager, and application logs/alarms in CloudWatch. Fargate runs containers without requiring the project to manage EC2 hosts ([ECS Fargate overview](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html)); RDS provides a managed PostgreSQL option ([RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html)).
+The first hosted release is a signed-in personal project for a small group of
+invited friends. Start at zero cost with one Railway web service, a private
+PostgreSQL service in a dedicated environment, and Railway's HTTPS URL. Use synthetic
+data during staging. Measure usage and cold starts before promising ongoing
+availability. The owner decides whether to pay for upgrades or a custom domain.
+See [Railway's free plan](https://docs.railway.com/pricing/free-plan).
 
-- Dockerize the API/UI and add a non-root runtime, health checks, and image scanning.
-- Define the network, IAM roles, database, service, and logs as Terraform; keep state remote and encrypted before team use.
-- Build/test in GitHub Actions and authenticate to AWS through OIDC with a repository-and-branch constrained trust policy; do not store long-lived AWS keys as repository secrets ([GitHub OIDC for AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws)).
-- Add CloudWatch alarms, log retention, a deployment rollback path, deletion/backup notes, and an AWS Budget alert before enabling a public endpoint.
-- Start with a private, low-cost dev environment and tear it down when idle. Budget alerts are useful but delayed: AWS billing data used by Budgets refreshes at least daily ([AWS Budgets guidance](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-best-practices.html)).
+- [x] Package the signed-in workspace as a non-root container. Verify exact HTTPS origin, synthetic sign-in and trusted proxy behavior locally. See [0031](implementation/0031-hosted-workspace.md).
+- [x] Document the Railway deployment settings and verify migration and readiness behavior locally. See [0032](implementation/0032-railway-pilot.md).
+- [x] Add an option to close database connections when work finishes. Verify
+  that writes and rollbacks work with PostgreSQL. See [0033](implementation/0033-idle-database-connections.md).
+- [ ] Measure Railway sleep, cold-start latency, and combined app and database
+  usage during staging.
+- [x] Implement and test the Railway-only ingress and a public HTTPS smoke check locally. See [0035](implementation/0035-railway-direct-pilot.md).
+- [x] Rehearse packaged startup, migrations, and Railway-mode responses with disposable PostgreSQL (0046).
+- Verify the actual edge and private network, callback log privacy, sign-in compatibility, account isolation, and teardown. Use the smallest deployment that passes these checks.
+- Invite friends to use the manual task, notes, events, and reminders workflow with sample content. Collect feedback, then prioritize the next product increment. Keep a short demo and screenshots available if the free app sleeps or reaches its allowance.
+- Review one external integration at a time before introducing real accounts or provider data. See [SECURITY](SECURITY.md).
 
-This track adds credible resume evidence in containerization, AWS networking/IAM, managed PostgreSQL, Infrastructure as Code, secure CI/CD, observability, and cost-aware operations. It is a later deployment target, not authorization to create AWS resources now.
+AWS and Terraform were evaluated as a learning path and are deferred. Track
+implemented skills and tested services in [portfolio evidence](PORTFOLIO.md).
 
 ## Commitment lifecycle in the current scaffold
 

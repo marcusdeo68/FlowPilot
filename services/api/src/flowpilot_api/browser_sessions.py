@@ -29,8 +29,21 @@ class SessionUnavailable(Exception):
 @dataclass(frozen=True)
 class BrowserConfig:
     origin: str
+    hosted: bool = False
 
     def __post_init__(self):
+        if self.hosted:
+            label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+            suffix = r"[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?"
+            host = self.origin.removeprefix("https://")
+            if (
+                host == self.origin
+                or len(host) > 253
+                or not re.fullmatch(rf"(?:{label}\.)+{suffix}", host)
+                or host.endswith(".localhost")
+            ):
+                raise ValueError("Hosted browser origin must be a canonical HTTPS DNS origin")
+            return
         match = re.fullmatch(
             r"(https?)://(localhost|127\.0\.0\.1)(?::([1-9][0-9]{0,4}))?", self.origin
         )
@@ -43,6 +56,10 @@ class BrowserConfig:
     @property
     def secure(self) -> bool:
         return self.origin.startswith("https:")
+
+    @property
+    def authority(self) -> str:
+        return self.origin.split("://", 1)[1]
 
 
 def credential_digest(credential: str) -> str:

@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!README.md
+!alembic.ini
+!migrations/
+!migrations/**
+!services/
+!services/api/
+!services/api/src/
+!services/api/src/**
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
