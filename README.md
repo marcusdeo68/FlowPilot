@@ -4,6 +4,8 @@
 
 The signed-in PostgreSQL workspace supports manual inbox review, tasks, projects, private notes, events, reminders, and work sharing. You can exercise these workflows with synthetic accounts. Live provider integrations and hosted sign-in remain planned.
 
+[See a workshop request become a private task in three screenshots.](docs/implementation/0049-workspace-demo.md)
+
 ## Legacy loopback dashboard
 
 - Same-origin local dashboard served at `/` for Today, inbox, tasks, schedule, and review/send workflow previews.

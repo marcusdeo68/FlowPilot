@@ -148,6 +148,7 @@ See [Railway's free plan](https://docs.railway.com/pricing/free-plan).
   usage during staging.
 - [x] Implement and test the Railway-only ingress and a public HTTPS smoke check locally. See [0035](implementation/0035-railway-direct-pilot.md).
 - [x] Rehearse packaged startup, migrations, and Railway-mode responses with disposable PostgreSQL (0046).
+- [x] Publish a [synthetic workspace demo with screenshots](implementation/0049-workspace-demo.md) for visitors to try while the hosted pilot is unavailable.
 - Verify the actual edge and private network, callback log privacy, sign-in compatibility, account isolation, and teardown. Use the smallest deployment that passes these checks.
 - Invite friends to use the manual task, notes, events, and reminders workflow with sample content. Collect feedback, then prioritize the next product increment. Keep a short demo and screenshots available if the free app sleeps or reaches its allowance.
 - Review one external integration at a time before introducing real accounts or provider data. See [SECURITY](SECURITY.md).

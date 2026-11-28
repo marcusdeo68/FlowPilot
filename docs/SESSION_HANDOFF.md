@@ -1,5 +1,9 @@
 # Session handoff
 
+The [portfolio walkthrough](implementation/0049-workspace-demo.md) is
+available without a running server. Live staging verification still requires
+the Railway pilot's assigned HTTPS origin.
+
 ## Open a review from Today
 
 [0048](implementation/0048-open-review-from-today.md) connects a pending

@@ -2,6 +2,10 @@
 
 ## Implemented and exercised
 
+- The [three-screen walkthrough](implementation/0049-workspace-demo.md)
+  shows a real Chromium session reviewing a synthetic request and accepting it
+  into private work.
+
 - Python and FastAPI serve a same-origin HTML, CSS, and JavaScript workspace.
   See [workspace UI](implementation/0017-workspace-screen.md).
 - PostgreSQL, SQLAlchemy, and Alembic support workspace-scoped storage,
