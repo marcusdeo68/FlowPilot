@@ -15,6 +15,12 @@ Today lists up to five recent pending suggestions. A suggestion can change
 between loading Today and opening it. The detail view reads the stored
 state so the user can see a decision already made in another tab.
 
+Chromium opened the older of two identically titled suggestions, retried a
+failed detail read, and displayed the saved dismissal and the correct source
+excerpt. The browser test checked that navigation used only GET requests,
+that a denied inbox listing blocked the detail read, and that paging the
+source into view restored keyboard focus to its row after closing details.
+
 See [the review workflow](0020-signed-in-private-inbox.md) and the
 [verification tracker](../STATUS.md). Live pilot testing through the
 Railway HTTPS origin remains a separate milestone.
