@@ -1,5 +1,8 @@
 # Session handoff
 
+In [0050](implementation/0050-today-blocked-tasks.md), Today opens blocked
+tasks across the selected workspace through the existing Work status filter.
+
 The [portfolio walkthrough](implementation/0049-workspace-demo.md) is
 available without a running server. Live staging verification still requires
 the Railway pilot's assigned HTTPS origin.
