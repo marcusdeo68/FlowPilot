@@ -27,7 +27,8 @@ database with the Docker Desktop executable:
 ```
 
 The browser opens on **Today** with **Confirm workshop agenda** due today
-and **Workshop planning session** starting in about ten minutes.
+and **Workshop planning session** starting in about ten minutes. A pending
+room request opens a [three-step review walkthrough](0049-workspace-demo.md).
 Turn on **In-app reminders**, find the High task in **Work items**, and
 open **Notes** to edit the sample sticky note. Press **Enter** in
 PowerShell to close the browser and discard the preview records. The
@@ -43,6 +44,7 @@ deployed application do not include the preview entry point.
 
 For a noninteractive check, set `FLOWPILOT_INTERACTIVE_PREVIEW` to `0` and run
 the same test with the Chromium headless shell installed. The test asserts
-that Today renders both the sample task and event. Live sign-in and external
+that Today renders the sample task and event, then reviews the room request
+and verifies the resulting private task. Live sign-in and external
 accounts remain outside the preview. The next hosted milestone is synthetic
 staging verification through Railway's public ingress.

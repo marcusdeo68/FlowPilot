@@ -6,6 +6,11 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- [0049](implementation/0049-workspace-demo.md) adds a pending suggestion to
+  the interactive preview and publishes a three-screen portfolio walkthrough.
+  Headless Chromium exercised Today, evidence review, acceptance, and the
+  saved private task against the disposable PostgreSQL schema.
+
 - [0048](implementation/0048-open-review-from-today.md) opens a selected
   pending review from Today in the private inbox, including sources outside
   its first page. The general inbox shortcut remains available. Independent

@@ -3,6 +3,7 @@
 import json
 import os
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from test_login_browser import create_workspace_in_browser, fetch, open_workspace
@@ -55,6 +56,17 @@ def test_workspace_preview(request, monkeypatch, login_browser_headless):
         return json.loads(result["text"])
 
     project = create("projects", {"name": "Community workshop"})
+    title = "Reserve a room for the workshop"
+    excerpt = "Please book a room with space for twelve people before the workshop."
+    source = create("sources", {"reference": "workshop-room", "summary": title, "excerpt": excerpt})
+    suggestion = fetch(
+        page,
+        f"/api/v2/workspaces/{workspace}/sources/{source['id']}/task-proposal",
+        method="PUT",
+        headers=headers,
+    )
+    assert suggestion["status"] == 200
+    assert json.loads(suggestion["text"])["state"] == "pending_review"
     due_date = page.evaluate(
         "() => { const now = new Date(); return new Date(now - "
         "now.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }"
@@ -87,6 +99,36 @@ def test_workspace_preview(request, monkeypatch, login_browser_headless):
     page.get_by_role("button", name="Today", exact=True).click()
     expect(page.get_by_text("Confirm workshop agenda", exact=True)).to_be_visible()
     expect(page.get_by_text("Workshop planning session", exact=True)).to_be_visible()
+    review = page.get_by_role("button", name=title, exact=True)
+    expect(review).to_be_visible()
 
     if not login_browser_headless:
         input("FlowPilot is open in Chromium. Press Enter here to close the preview. ")
+        return
+
+    capture = os.environ.get("FLOWPILOT_CAPTURE_PREVIEW") == "1"
+    output = Path(__file__).resolve().parents[1] / ".tools" / "preview-images"
+    if capture:
+        output.mkdir(parents=True, exist_ok=True)
+        page.locator("#work-panel").screenshot(path=output / "today.png")
+    review.click()
+    expect(page.get_by_text(excerpt, exact=True)).to_be_visible()
+    accept = page.get_by_role("button", name="Accept and create task", exact=True)
+    expect(accept).to_be_enabled()
+    if capture:
+        page.locator("#source-detail").screenshot(path=output / "review.png")
+    with page.expect_response("**/review") as accepted:
+        accept.click()
+    assert accepted.value.status == 200
+    result = accepted.value.json()
+    assert result["state"] == "accepted" and result["source_id"] == source["id"]
+    page.get_by_role("button", name="Go to work list", exact=True).click()
+    row = page.get_by_role("listitem").filter(has=page.get_by_text(title, exact=True))
+    expect(row).to_have_count(1)
+    expect(row).to_be_visible()
+    saved = fetch(page, f"/api/v2/workspaces/{workspace}/work/{result['work_id']}")
+    assert saved["status"] == 200
+    task = json.loads(saved["text"])
+    assert task["visibility"] == "private" and task["data"]["title"] == title
+    if capture:
+        row.screenshot(path=output / "task.png")
