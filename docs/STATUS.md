@@ -6,6 +6,14 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- [0048](implementation/0048-open-review-from-today.md) opens a selected
+  pending review from Today in the private inbox, including sources outside
+  its first page. The general inbox shortcut remains available. Independent
+  local verification recorded 371 passing tests with zero failures, errors,
+  or skips. See [PR #43](https://github.com/marcusdeo68/FlowPilot/pull/43).
+- Increments 0031–0047 merged in [PR #42](https://github.com/marcusdeo68/FlowPilot/pull/42)
+  after all seven PR checks passed. The squash commit is `feedb07`.
+
 - The [outsider audit](implementation/0047-schedule-page-consistency.md)
   reproduced duplicate Schedule rows when an already displayed event or
   deadline moved to a later page. The local synthetic preview also ran

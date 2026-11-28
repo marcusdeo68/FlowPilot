@@ -609,7 +609,10 @@ def test_workspace_browser_keeps_inbox_read_only_after_role_downgrade(login_brow
 
 
 @pytest.mark.parametrize("delayed_status", [200, 401])
-def test_workspace_browser_ignores_late_inbox_details_after_switch(login_browser, delayed_status):
+@pytest.mark.parametrize("from_today", [False, True])
+def test_workspace_browser_ignores_late_inbox_details_after_switch(
+    login_browser, delayed_status, from_today
+):
     from playwright.sync_api import Route, expect
 
     page, _, origin, provider, _, _ = login_browser
@@ -619,9 +622,15 @@ def test_workspace_browser_ignores_late_inbox_details_after_switch(login_browser
     name = "First workspace source summary"
     secret = "First workspace private excerpt"
     source_id = capture_source_in_browser(page, "first-source", name, secret)
+    if from_today:
+        page.get_by_role("button", name=name, exact=True).click()
+        page.get_by_role("button", name="Suggest task", exact=True).click()
+        expect(page.get_by_role("button", name="Accept and create task")).to_be_enabled()
     second = create_workspace_in_browser(page, origin, "Second inbox workspace")
     selector = page.get_by_label("Workspace", exact=True)
     selector.select_option(first)
+    if from_today:
+        page.get_by_role("button", name="Today", exact=True).click()
     path = f"/api/v2/workspaces/{first}/sources/{source_id}"
     page.evaluate(
         """path => {
@@ -1997,6 +2006,83 @@ def test_workspace_browser_today_shows_pending_reviews_separately_from_due_work(
     page.wait_for_function("() => window.oldReviewsHandled === true")
     expect(page.get_by_text("No pending reviews.", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Sign out", exact=True)).to_be_visible()
+
+
+def test_workspace_browser_opens_exact_review_from_today(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace_id = create_workspace_in_browser(page, origin, "Direct review workspace")
+    base = f"/api/v2/workspaces/{workspace_id}"
+    csrf = json.loads(fetch(page, "/api/v2/session")["text"])["csrf_token"]
+    headers = {"X-CSRF-Token": csrf, "Content-Type": "application/json"}
+    title = "<b>Confirm the venue</b>"
+    suggestions = []
+    for index in range(21):
+        summary = title if index in (0, 20) else f"Other source {index}"
+        source = fetch(
+            page,
+            base + "/sources",
+            method="POST",
+            headers=headers,
+            body=json.dumps(
+                {"reference": f"venue-{index}", "summary": summary, "excerpt": f"Evidence {index}"}
+            ),
+        )
+        assert source["status"] == 201
+        if summary == title:
+            source_id = json.loads(source["text"])["id"]
+            result = fetch(
+                page, base + f"/sources/{source_id}/task-proposal", method="PUT", headers=headers
+            )
+            assert result["status"] == 200
+            suggestions.append(json.loads(result["text"]))
+
+    page.get_by_role("button", name="Work items", exact=True).click()
+    page.get_by_role("button", name="Today", exact=True).click()
+    reviews = page.get_by_role("list", name="Pending reviews").get_by_role(
+        "button", name=title, exact=True
+    )
+    expect(reviews).to_have_count(2)
+    older = suggestions[0]
+    proposal_path = base + f"/proposals/{older['id']}"
+    resolved = fetch(
+        page,
+        proposal_path + "/review",
+        method="POST",
+        headers=headers,
+        body=json.dumps({"decision": "dismiss", "expected_version": older["version"]}),
+    )
+    assert resolved["status"] == 200
+    requests = []
+    page.on("request", lambda request: requests.append((request.method, request.url)))
+    page.route(origin + proposal_path, lambda route: route.fulfill(status=503), times=1)
+    reviews.last.click()
+    expect(page.get_by_text("Could not load source details.", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Reload source details", exact=True).click()
+    expect(page.get_by_text("Evidence 0", exact=True)).to_be_visible()
+    expect(page.locator("#proposal-state")).to_have_text("Dismissed")
+    expect(page.get_by_role("button", name="Accept and create task", exact=True)).to_be_hidden()
+    rows = page.get_by_role("list", name="Sources").get_by_role("listitem")
+    expect(rows.filter(has_text=title)).to_have_count(1)
+    expect(rows.filter(has_text=title)).to_contain_text("Pending review")
+    page.get_by_role("button", name="Load more sources", exact=True).click()
+    expect(rows.filter(has_text=title).last).to_contain_text("Dismissed")
+    page.get_by_role("button", name="Close source details", exact=True).click()
+    expect(rows.filter(has_text=title).last.get_by_role("button")).to_be_focused()
+    assert {method for method, url in requests if origin + base in url} == {"GET"}
+
+    page.get_by_role("button", name="Today", exact=True).click()
+    expect(reviews).to_have_count(1)
+    requests.clear()
+    page.route(
+        origin + base + "/sources?limit=20", lambda route: route.fulfill(status=403), times=1
+    )
+    reviews.click()
+    expect(page.get_by_text("Inbox access changed.", exact=False)).to_be_visible()
+    expect(page.get_by_role("heading", name="Source details")).to_be_hidden()
+    assert not any(origin + base + "/sources/" in url for _, url in requests)
 
 
 def test_workspace_browser_today_discards_pending_reviews_after_access_denial(login_browser):
