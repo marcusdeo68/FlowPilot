@@ -56,6 +56,7 @@ The detailed design and acceptance criteria are in `docs/implementation/0002-uni
 
 - Today / Command Center for changes, due work, events, blockers, and approvals.
 - [x] Signed-in Today view for due-today and overdue tasks (0021).
+- [x] Open all visible blocked tasks from Today, including undated tasks (0050).
 - [x] Surface recent pending private reviews in the signed-in Today view (0022).
 - [x] Open a specific pending suggestion and its evidence directly from Today (0048).
 - [x] Surface authorized upcoming and ongoing manual events in signed-in Today (0023).

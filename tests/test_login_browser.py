@@ -2495,6 +2495,59 @@ def test_workspace_browser_title_search_finds_older_items_and_clears(login_brows
     expect(search).to_be_hidden()
 
 
+def test_today_opens_blocked_tasks_across_work_filters(login_browser):
+    from playwright.sync_api import expect
+
+    page, _, origin, provider, _, _ = login_browser
+    open_workspace(page, origin, provider)
+    workspace = create_workspace_in_browser(page, origin, "Workshop blockers")
+    seed_browser_work(page, workspace, ["Await room confirmation", "Unrelated open task"])
+    seed_browser_work(page, workspace, ["Await speaker reply"], due_date="2099-06-01")
+    page.reload()
+    for title in ("Await room confirmation", "Await speaker reply"):
+        row = page.get_by_role("listitem").filter(has_text=title)
+        row.get_by_role("button", name="Start task").click()
+        row.get_by_role("button", name="Block task").click()
+        expect(row.get_by_role("button", name="Resume task")).to_be_visible()
+
+    view = page.get_by_label("Work view", exact=True)
+    status = page.get_by_label("Task status", exact=True)
+    project = page.get_by_label("Project filter", exact=True)
+    priority = page.get_by_label("Priority filter", exact=True)
+    search = page.get_by_role("searchbox", name="Search work titles")
+    view.select_option("workspace")
+    page.get_by_label("New project name").fill("Old project")
+    page.get_by_role("button", name="Create project", exact=True).click()
+    expect(project.locator("option:checked")).to_have_text("Old project")
+    status.select_option("completed")
+    priority.select_option("high")
+    search.fill("Old search")
+    with page.expect_response("**/work-page/search"):
+        page.get_by_role("button", name="Search", exact=True).click()
+    search.fill("Unapplied draft")
+    shortcut = page.get_by_role("button", name="View blocked tasks")
+    expect(shortcut).to_be_hidden()
+    page.get_by_role("button", name="Today", exact=True).click()
+    page.get_by_role("button", name="New task", exact=True).click()
+    expect(shortcut).to_be_disabled()
+    page.get_by_role("button", name="Cancel", exact=True).click()
+    with page.expect_request("**/work-page?*") as sent:
+        shortcut.press("Enter")
+    assert sent.value.method == "GET"
+    assert parse_qs(urlsplit(sent.value.url).query) == {"limit": ["20"], "task_status": ["blocked"]}
+    expect(page.get_by_role("button", name="Work items", exact=True)).to_be_focused()
+    expect(view).to_have_value("all")
+    expect(status).to_have_value("blocked")
+    for control in (project, priority, search):
+        expect(control).to_have_value("")
+    expect(page.get_by_text("Unrelated open task", exact=True)).to_have_count(0)
+    for title in ("Await room confirmation", "Await speaker reply"):
+        row = page.get_by_role("listitem").filter(has_text=title)
+        row.get_by_role("button", name="Resume task").click()
+        expect(row).to_have_count(0)
+    expect(page.get_by_text("No tasks match the current filters.", exact=True)).to_be_visible()
+
+
 def test_workspace_browser_filters_task_status_with_title_search(login_browser):
     from playwright.sync_api import expect
 

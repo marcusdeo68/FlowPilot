@@ -6,6 +6,10 @@ verification for each revision. Update this file when an item's state changes.
 
 ## Current checkpoint
 
+- [0050](implementation/0050-today-blocked-tasks.md) adds a Today shortcut
+  to blocked tasks across accessible projects and due dates. Chromium
+  covers clearing stale filters, keyboard navigation, and the empty list.
+
 - [0049](implementation/0049-workspace-demo.md) adds a pending suggestion to
   the interactive preview and publishes a three-screen portfolio walkthrough.
   Headless Chromium exercised Today, evidence review, acceptance, and the

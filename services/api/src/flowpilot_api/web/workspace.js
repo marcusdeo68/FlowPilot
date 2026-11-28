@@ -30,6 +30,7 @@ const eventsStatus = document.querySelector("#today-events-status");
 const eventItems = document.querySelector("#today-event-items");
 const retryEvents = document.querySelector("#retry-today-events");
 const openEvents = document.querySelector("#open-events");
+const openBlockedTasks = document.querySelector("#open-blocked-tasks");
 const openSchedule = document.querySelector("#open-schedule");
 const scheduleDeadlines = document.querySelector("#schedule-deadlines");
 const scheduleDeadlinesStatus = document.querySelector("#schedule-deadlines-status");
@@ -122,11 +123,7 @@ const inbox = createWorkspaceInbox({
   },
   denyWrites: clearWorkspaceWriteHint,
   openWork() {
-    workView.value = "all";
-    resetWorkSearch();
-    workTaskStatus.value = workPriority.value = workProject.value = "";
-    switchWorkspaceView("work");
-    showWork.focus();
+    openAllWork("");
   },
 });
 
@@ -326,6 +323,7 @@ function syncWorkspaceNavigation() {
   accessPanel.hidden = workspaceView !== "access";
   workHeading.textContent = today ? "Today" : "Work items";
   todayReviews.hidden = !today;
+  openBlockedTasks.hidden = !today;
   todayEvents.hidden = !today;
   workViewLabel.hidden = workView.hidden = today;
   showToday.setAttribute("aria-pressed", String(today));
@@ -410,6 +408,7 @@ function syncWorkControls() {
   for (const button of reviewItems.querySelectorAll("button")) button.disabled = navigationLocked;
   openEvents.disabled = openSchedule.disabled = navigationLocked;
   openDueTasks.disabled = navigationLocked || workspaceSelectionBusy;
+  openBlockedTasks.disabled = navigationLocked || workspaceSelectionBusy;
   newTask.disabled = Boolean(taskUpdate) || editorOpen || projectSaving || loadingDueMore;
   events.disableCreate(newTask.disabled || workspaceSelectionBusy);
   retryWork.inert = eventLocked || sharingLocked;
@@ -1172,6 +1171,15 @@ reviewInInbox.addEventListener("click", () => {
 });
 retryReviews.addEventListener("click", loadTodayReviews);
 retryEvents.addEventListener("click", loadTodayEvents);
+function openAllWork(status) {
+  workView.value = "all";
+  resetWorkSearch();
+  workPriority.value = workProject.value = "";
+  workTaskStatus.value = status;
+  switchWorkspaceView("work");
+  showWork.focus();
+}
+openBlockedTasks.addEventListener("click", () => openAllWork("blocked"));
 function openEventView(view) {
   workView.value = view;
   resetWorkSearch();
