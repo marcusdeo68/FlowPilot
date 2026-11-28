@@ -38,6 +38,7 @@ With the [preview prerequisites](0040-local-workspace-preview.md) running,
 use these settings in PowerShell to regenerate the three panel captures:
 
 ```powershell
+.venv\Scripts\python.exe -m playwright install --only-shell chromium
 $env:FLOWPILOT_INTERACTIVE_PREVIEW = '0'
 $env:FLOWPILOT_CAPTURE_PREVIEW = '1'
 .venv\Scripts\python.exe -m pytest -q --basetemp .tools\demo-preview-temp tests/workspace_preview.py
